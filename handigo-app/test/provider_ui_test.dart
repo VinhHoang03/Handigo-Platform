@@ -897,14 +897,34 @@ Future<void> main() async {
     await tester.tap(find.text('Thu nhập').last);
     await tester.pumpAndSettle();
     expect(find.byType(ProviderIncomeScreen), findsOneWidget);
-    await tester.tap(find.byTooltip('Quay lại'));
+    expect(find.byType(NavigationBar), findsNothing);
+    final body = tester.getRect(
+      find.byKey(const ValueKey('provider-tab-transition')),
+    );
+    final navigation = tester.getRect(
+      find
+          .ancestor(
+            of: find.text('Tài khoản').last,
+            matching: find.byType(Material),
+          )
+          .first,
+    );
+    expect(body.bottom, lessThanOrEqualTo(navigation.top));
+    expect(find.byType(SegmentedButton<int>), findsOneWidget);
+    expect(find.text('Thời gian thống kê'), findsOneWidget);
+    await tester.tap(find.text('Ví'));
     await tester.pumpAndSettle();
+    expect(find.text('Ví Handigo'), findsOneWidget);
+    expect(find.byType(ProviderWalletBalanceCard), findsOneWidget);
+    expect(find.text('Tài khoản ngân hàng'), findsOneWidget);
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
     expect(find.text('2 lịch hẹn'), findsOneWidget);
     await tester.tap(find.text('Tài khoản').last);
     await tester.pumpAndSettle();
-    expect(find.text('Quản lý công việc'), findsOneWidget);
+    expect(find.text('Hồ sơ đối tác'), findsOneWidget);
+    expect(find.text('Ví và thu nhập'), findsNothing);
+    expect(find.text('Tài khoản ngân hàng'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

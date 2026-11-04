@@ -20,6 +20,8 @@ import 'package:handigo_app/features/orders/domain/order_summary.dart';
 import 'package:handigo_app/features/orders/presentation/order_screens.dart';
 import 'package:handigo_app/features/provider/presentation/provider_screens.dart';
 import 'package:handigo_app/features/provider/presentation/provider_income_screen.dart';
+import 'package:handigo_app/features/provider/presentation/provider_account_screens.dart';
+import 'package:handigo_app/features/account/domain/account_models.dart';
 import 'package:handigo_app/features/provider/domain/provider_income.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_detail_screen.dart';
 import 'package:handigo_app/shared/widgets/app_feedback.dart';
@@ -57,6 +59,15 @@ Future<GoRouter> _show(
   final container = ProviderContainer(
     retry: (_, _) => null,
     overrides: [
+      if (withIncome) ...[
+        providerWalletProvider.overrideWith(
+          (ref) async => const WalletInfo(balance: 500000, pendingBalance: 0),
+        ),
+        providerWalletSummaryProvider.overrideWith(
+          (ref) async => const WalletSummary(),
+        ),
+        providerBanksProvider.overrideWith((ref) async => []),
+      ],
       if (withIncome)
         providerIncomeProvider.overrideWith(
           (ref, range) async => const ProviderIncomeSummary(
@@ -120,7 +131,7 @@ Finder _tab(String label) =>
     find.descendant(of: find.byType(SafeArea), matching: find.text(label)).last;
 
 void main() {
-  testWidgets('Mở đơn từ Thu nhập rồi quay lại giữ màn hình Thu nhập', (
+  testWidgets('Thu nhập dùng giao diện ví và mở ngân hàng rồi quay lại', (
     tester,
   ) async {
     final router = await _show(tester, UserRole.provider, withIncome: true);
@@ -128,17 +139,19 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(_tab('Thu nhập'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('ORD-001'));
+    expect(find.text('Thời gian thống kê'), findsOneWidget);
+    expect(find.byType(SegmentedButton<int>), findsOneWidget);
+    await tester.tap(find.text('Ví'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('ORD-001'));
+    expect(find.text('Ví Handigo'), findsOneWidget);
+    await tester.tap(find.text('Tài khoản ngân hàng'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Xem đơn dịch vụ'));
-    await tester.pumpAndSettle();
-    expect(find.byType(ProviderOrderDetailScreen), findsOneWidget);
+    expect(find.byType(ProviderBankAccountsScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
     router.pop();
     await tester.pumpAndSettle();
     expect(find.byType(ProviderIncomeScreen), findsOneWidget);
+    expect(find.byType(ProviderWalletScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
   testWidgets(
@@ -385,8 +398,9 @@ void main() {
     for (final entry in const [
       ('Tổng quan', '/provider', 0),
       ('Đơn hàng', '/provider/orders', 1),
-      ('Lịch hẹn', '/provider/schedule', 2),
-      ('Tài khoản', '/provider/account', 3),
+      ('Thu nhập', '/provider/income', 2),
+      ('Lịch hẹn', '/provider/schedule', 3),
+      ('Tài khoản', '/provider/account', 4),
     ]) {
       await tester.tap(_tab(entry.$1));
       await tester.pumpAndSettle();
@@ -404,15 +418,9 @@ void main() {
     await tester.tap(_tab('Thu nhập'));
     await tester.pumpAndSettle();
     expect(find.byType(ProviderIncomeScreen), findsOneWidget);
-    expect(find.text('Đơn hàng').hitTestable(), findsNothing);
-    expect(
-      tester
-          .widget<NavigationBar>(find.byType(NavigationBar))
-          .destinations
-          .length,
-      2,
-    );
-    await tester.tap(find.byTooltip('Quay lại'));
+    expect(_tab('Đơn hàng').hitTestable(), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    await tester.tap(_tab('Đơn hàng'));
     await tester.pumpAndSettle();
     expect(find.byType(ProviderOrderDetailScreen), findsOneWidget);
     expect(tester.takeException(), isNull);

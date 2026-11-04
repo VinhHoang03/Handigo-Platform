@@ -16,6 +16,7 @@ import 'package:handigo_app/features/auth/presentation/auth_controller.dart';
 import 'package:handigo_app/features/provider/data/provider_repository.dart';
 import 'package:handigo_app/features/provider/domain/provider_income.dart';
 import 'package:handigo_app/features/provider/presentation/provider_income_screen.dart';
+import 'package:handigo_app/shared/widgets/account_overview_widgets.dart';
 
 Map<String, dynamic> _entry(
   String id,
@@ -81,6 +82,11 @@ class _Api extends ApiClient {
         'data': {'balance': 500000, 'pendingBalance': 50000},
       };
     }
+    if (path == '/wallets/me/summary') {
+      return {
+        'data': {'totalEarnings': 80000, 'totalWithdrawals': 100000},
+      };
+    }
     if (path == '/bank-accounts') {
       return {
         'data': [
@@ -121,6 +127,7 @@ Future<GoRouter> _show(
   WidgetTester tester,
   _Api api, {
   double textScale = 1,
+  bool asTab = false,
   Future<bool> Function(Uri)? launch,
 }) async {
   FlutterSecureStorage.setMockInitialValues({});
@@ -147,7 +154,7 @@ Future<GoRouter> _show(
       ),
       GoRoute(
         path: '/provider/income',
-        builder: (_, _) => const ProviderIncomeScreen(),
+        builder: (_, _) => ProviderIncomeScreen(asTab: asTab),
       ),
     ],
   );
@@ -186,7 +193,58 @@ Future<void> _wallet(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _pickRangeDate(
+  WidgetTester tester,
+  String field,
+  String value,
+) async {
+  final target = find.byKey(ValueKey(field));
+  await tester.ensureVisible(target);
+  await tester.tap(target);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byIcon(Icons.edit_outlined));
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byType(TextField), value);
+  await tester.tap(find.text('Chọn'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  testWidgets('Thu nhập và Ví dùng chung kiểu thẻ, chuyển mục giữ bộ lọc', (
+    tester,
+  ) async {
+    await _show(tester, _Api(), asTab: true, textScale: 2);
+    expect(find.byType(SegmentedButton<int>), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    await tester.tap(find.text('Tháng này'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Thu nhập dịch vụ sau phí'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byType(AccountFinancialStatCard), findsOneWidget);
+    await tester.tap(find.text('Ví'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ví Handigo'), findsOneWidget);
+    expect(find.text('Số dư khả dụng'), findsOneWidget);
+    expect(find.byType(AccountFinancialStatCard), findsWidgets);
+    await tester.tap(find.text('Thu nhập').last);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Tháng này'),
+      -150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Tháng này'))
+          .selected,
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   test('Khoảng ngày dùng múi giờ Việt Nam, tuần từ thứ hai và đủ tháng', () {
     final now = DateTime.parse('2026-11-01T18:30:00Z');
     final today = ProviderIncomeRange.forPeriod(
@@ -367,11 +425,11 @@ void main() {
       expect(find.text('Thu nhập theo tháng'), findsOneWidget);
       await tester.tap(find.text('Khoảng thời gian'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.edit_outlined));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).at(0), '11/01/2026');
-      await tester.enterText(find.byType(TextField).at(1), '11/05/2026');
-      await tester.tap(find.text('Chọn'));
+      final requestsBeforeApply = api.calls.length;
+      await _pickRangeDate(tester, 'income-range-start', '11/01/2026');
+      await _pickRangeDate(tester, 'income-range-end', '11/05/2026');
+      expect(api.calls.length, requestsBeforeApply);
+      await tester.tap(find.text('Áp dụng'));
       await tester.pumpAndSettle();
       query = api.calls
           .where((call) => call.path == '/dashboard/earnings')
@@ -385,7 +443,7 @@ void main() {
       final requests = api.calls.length;
       await tester.tap(find.text('Khoảng thời gian'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.close));
+      await tester.tap(find.byTooltip('Đóng'));
       await tester.pumpAndSettle();
       expect(api.calls.length, requests);
       expect(find.text('Thu nhập trong khoảng đã chọn'), findsOneWidget);
@@ -398,6 +456,65 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Chọn nhanh chỉ áp dụng khi xác nhận, hủy giữ kỳ hiện tại', (
+    tester,
+  ) async {
+    final api = _Api();
+    await _show(tester, api, asTab: true);
+    for (final (label, from, to) in const [
+      ('7 ngày qua', '2026-10-27', '2026-11-02'),
+      ('30 ngày qua', '2026-10-04', '2026-11-02'),
+      ('Tháng trước', '2026-10-01', '2026-10-31'),
+    ]) {
+      await tester.tap(find.text('Khoảng thời gian'));
+      await tester.pumpAndSettle();
+      final requests = api.calls.length;
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+      expect(api.calls.length, requests);
+      await tester.tap(find.text('Áp dụng'));
+      await tester.pumpAndSettle();
+      final query = api.calls
+          .where((call) => call.path == '/dashboard/earnings')
+          .last
+          .query!;
+      expect((query['fromDate'], query['toDate']), (from, to));
+    }
+    await tester.tap(find.text('Khoảng thời gian'));
+    await tester.pumpAndSettle();
+    final requests = api.calls.length;
+    await tester.tap(find.text('7 ngày qua'));
+    await tester.tap(find.text('Hủy'));
+    await tester.pumpAndSettle();
+    expect(api.calls.length, requests);
+    expect(find.text('01/10/2026 – 31/10/2026'), findsOneWidget);
+  });
+
+  testWidgets('Sheet ngày chặn khoảng đảo ngược và cuộn được khi chữ lớn', (
+    tester,
+  ) async {
+    final api = _Api();
+    await _show(tester, api, asTab: true, textScale: 2);
+    await tester.tap(find.text('Khoảng thời gian'));
+    await tester.pumpAndSettle();
+    await _pickRangeDate(tester, 'income-range-start', '11/03/2026');
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Áp dụng'))
+          .onPressed,
+      isNull,
+    );
+    await _pickRangeDate(tester, 'income-range-end', '11/03/2026');
+    await tester.tap(find.text('Áp dụng'));
+    await tester.pumpAndSettle();
+    final query = api.calls
+        .where((call) => call.path == '/dashboard/earnings')
+        .last
+        .query!;
+    expect((query['fromDate'], query['toDate']), ('2026-11-03', '2026-11-03'));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'Rút tiền kiểm tra số dư, hủy không gửi và chặn gửi lặp khi đang xử lý',

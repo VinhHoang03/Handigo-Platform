@@ -11,10 +11,12 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../core/network/realtime_connection.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/account_overview_widgets.dart';
 import '../domain/provider_income.dart';
 import 'provider_account_screens.dart';
 import 'provider_screens.dart';
 import 'provider_order_detail_screen.dart';
+import 'provider_income_range_sheet.dart';
 
 final providerFinanceNowProvider = Provider<DateTime Function()>(
   (ref) => DateTime.now,
@@ -46,13 +48,15 @@ void _refreshFinances(WidgetRef ref) {
   ref.invalidate(providerIncomeProvider);
   ref.invalidate(providerFinanceHistoryProvider);
   ref.invalidate(providerWalletProvider);
+  ref.invalidate(providerWalletSummaryProvider);
   ref.invalidate(providerWalletTransactionsProvider);
   ref.invalidate(providerWithdrawalsProvider);
   ref.invalidate(providerOverviewProvider);
 }
 
 class ProviderIncomeScreen extends ConsumerStatefulWidget {
-  const ProviderIncomeScreen({super.key});
+  const ProviderIncomeScreen({this.asTab = false, super.key});
+  final bool asTab;
   @override
   ConsumerState<ProviderIncomeScreen> createState() =>
       _ProviderIncomeScreenState();
@@ -109,22 +113,18 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
     }
   }
 
+  void _selectTab(int value) => setState(() {
+    _tab = value;
+    if (value == 1) _walletVisited = true;
+  });
+
   Future<void> _selectPeriod(ProviderIncomePeriod period) async {
     final now = vietnamDateTime(ref.read(providerFinanceNowProvider)());
     if (period == ProviderIncomePeriod.customRange) {
-      final range = await showDateRangePicker(
-        context: context,
-        initialDateRange: _selectedRange,
-        currentDate: DateTime(now.year, now.month, now.day),
-        firstDate: DateTime(1),
-        lastDate: DateTime(9999, 12, 31),
-        helpText: 'Chọn khoảng thời gian',
-        cancelText: 'Hủy',
-        confirmText: 'Chọn',
-        saveText: 'Áp dụng',
-        fieldStartLabelText: 'Ngày bắt đầu',
-        fieldEndLabelText: 'Ngày kết thúc',
-        errorInvalidRangeText: 'Ngày kết thúc phải từ ngày bắt đầu trở đi.',
+      final range = await showProviderIncomeRangeSheet(
+        context,
+        now: now,
+        initialRange: _selectedRange,
       );
       if (range == null || !mounted) return;
       setState(() {
@@ -173,57 +173,107 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
       selectedStartDate: _selectedRange?.start,
       selectedEndDate: _selectedRange?.end,
     );
+    final content = IndexedStack(
+      index: _tab,
+      children: [
+        _IncomeContent(range: range, onPeriod: _selectPeriod),
+        if (_walletVisited)
+          widget.asTab
+              ? ProviderWalletScreen(
+                  embedded: true,
+                  actionsBuilder: (wallet) =>
+                      _FinanceWalletActions(balance: wallet.balance),
+                )
+              : const _FinanceWallet()
+        else
+          const SizedBox.shrink(),
+      ],
+    );
+    if (widget.asTab) {
+      return AccountDetailScaffold(
+        title: _tab == 0 ? 'Thu nhập' : 'Ví Handigo',
+        showBackButton: false,
+        actions: [
+          IconButton(
+            tooltip: 'Tải lại',
+            onPressed: () => _refreshFinances(ref),
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<int>(
+                  style: SegmentedButton.styleFrom(
+                    foregroundColor: accountMuted,
+                    selectedForegroundColor: accountPrimary,
+                    selectedBackgroundColor: accountPrimarySoft,
+                  ),
+                  segments: const [
+                    ButtonSegment(
+                      value: 0,
+                      icon: Icon(Icons.insights_outlined),
+                      label: Text('Thu nhập'),
+                    ),
+                    ButtonSegment(
+                      value: 1,
+                      icon: Icon(Icons.account_balance_wallet_outlined),
+                      label: Text('Ví'),
+                    ),
+                  ],
+                  selected: {_tab},
+                  onSelectionChanged: (value) => _selectTab(value.single),
+                ),
+              ),
+            ),
+            Expanded(child: content),
+          ],
+        ),
+      );
+    }
+    final screen = Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Quay lại',
+          onPressed: _back,
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
+        title: Text(_tab == 0 ? 'Thu nhập' : 'Ví Handigo'),
+        actions: [
+          IconButton(
+            tooltip: 'Tải lại',
+            onPressed: () => _refreshFinances(ref),
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      body: content,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: _selectTab,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights_rounded),
+            label: 'Thu nhập',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+            label: 'Ví',
+          ),
+        ],
+      ),
+    );
     return PopScope(
       canPop: context.canPop(),
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _back();
       },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            tooltip: 'Quay lại',
-            onPressed: _back,
-            icon: const Icon(Icons.arrow_back_rounded),
-          ),
-          title: Text(_tab == 0 ? 'Thu nhập' : 'Ví Handigo'),
-          actions: [
-            IconButton(
-              tooltip: 'Tải lại',
-              onPressed: () => _refreshFinances(ref),
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          ],
-        ),
-        body: IndexedStack(
-          index: _tab,
-          children: [
-            _IncomeContent(range: range, onPeriod: _selectPeriod),
-            if (_walletVisited)
-              const _FinanceWallet()
-            else
-              const SizedBox.shrink(),
-          ],
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _tab,
-          onDestinationSelected: (value) => setState(() {
-            _tab = value;
-            if (value == 1) _walletVisited = true;
-          }),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.insights_outlined),
-              selectedIcon: Icon(Icons.insights_rounded),
-              label: 'Thu nhập',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-              label: 'Ví',
-            ),
-          ],
-        ),
-      ),
+      child: screen,
     );
   }
 }
@@ -250,33 +300,56 @@ class _IncomeContent extends ConsumerWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final period in ProviderIncomePeriod.values)
-                ChoiceChip(
-                  label: Text(switch (period) {
-                    ProviderIncomePeriod.today => 'Hôm nay',
-                    ProviderIncomePeriod.week => 'Tuần này',
-                    ProviderIncomePeriod.month => 'Tháng này',
-                    ProviderIncomePeriod.year =>
-                      range.period == period
-                          ? 'Năm ${range.from.year}'
-                          : 'Theo năm',
-                    ProviderIncomePeriod.customRange => 'Khoảng thời gian',
-                  }),
-                  selected: range.period == period,
-                  onSelected: (_) => onPeriod(period),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: accountSurface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: accountDivider),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AccountDetailSectionTitle(
+                  'Thời gian thống kê',
+                  subtitle:
+                      '${DateFormat('dd/MM/yyyy').format(range.from)} – ${DateFormat('dd/MM/yyyy').format(range.to)}',
                 ),
-            ],
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final period in ProviderIncomePeriod.values)
+                      ChoiceChip(
+                        backgroundColor: accountSurface,
+                        selectedColor: accountPrimarySoft,
+                        checkmarkColor: accountPrimary,
+                        side: const BorderSide(color: accountDivider),
+                        labelStyle: TextStyle(
+                          color: range.period == period
+                              ? accountPrimary
+                              : accountMuted,
+                        ),
+                        label: Text(switch (period) {
+                          ProviderIncomePeriod.today => 'Hôm nay',
+                          ProviderIncomePeriod.week => 'Tuần này',
+                          ProviderIncomePeriod.month => 'Tháng này',
+                          ProviderIncomePeriod.year =>
+                            range.period == period
+                                ? 'Năm ${range.from.year}'
+                                : 'Theo năm',
+                          ProviderIncomePeriod.customRange =>
+                            'Khoảng thời gian',
+                        }),
+                        selected: range.period == period,
+                        onSelected: (_) => onPeriod(period),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
-          Text(
-            '${DateFormat('dd/MM/yyyy').format(range.from)} – ${DateFormat('dd/MM/yyyy').format(range.to)}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
           state.when(
             loading: () =>
                 const Padding(padding: EdgeInsets.all(40), child: AppLoading()),
@@ -287,40 +360,15 @@ class _IncomeContent extends ConsumerWidget {
             data: (data) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: scheme.primary,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Thu nhập ${range.label.toLowerCase()}',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(color: scheme.onPrimary),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _money(data.amount),
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(
-                              color: scheme.onPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Thu nhập dịch vụ sau phí',
-                        style: TextStyle(color: scheme.onPrimary),
-                      ),
-                    ],
-                  ),
+                AccountFinancialStatCard(
+                  label: 'Thu nhập ${range.label.toLowerCase()}',
+                  value: _money(data.amount),
+                  icon: Icons.trending_up_rounded,
+                  primary: true,
+                  subtitle: 'Thu nhập dịch vụ sau phí',
                 ),
                 const SizedBox(height: 20),
-                _section(
-                  context,
+                AccountDetailSectionTitle(
                   range.isSingleDay
                       ? 'Thu nhập theo giờ'
                       : range.period == ProviderIncomePeriod.year
@@ -330,7 +378,10 @@ class _IncomeContent extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _IncomeChart(key: ValueKey(range), points: data.chart(range)),
                 const SizedBox(height: 20),
-                _section(context, 'Thu nhập theo đơn'),
+                const AccountDetailSectionTitle(
+                  'Thu nhập theo đơn',
+                  subtitle: 'Chi tiết các khoản thu từ dịch vụ trong kỳ.',
+                ),
                 const SizedBox(height: 8),
                 if (data.groups.isEmpty)
                   const AppMessage(
@@ -340,6 +391,13 @@ class _IncomeContent extends ConsumerWidget {
                   ),
                 for (final group in data.groups)
                   Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    color: accountSurface,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: accountDivider),
+                    ),
                     child: ListTile(
                       isThreeLine: true,
                       title: Text(
@@ -348,17 +406,28 @@ class _IncomeContent extends ConsumerWidget {
                       subtitle: Text(
                         '${_money(group.amount)}\n${_date(group.primary.createdAt)}',
                       ),
-                      trailing: const Icon(Icons.chevron_right),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: accountMuted,
+                      ),
                       onTap: () => _showIncomeGroup(context, group),
                       leading: Tooltip(
                         message: _money(group.amount),
-                        child: Icon(
-                          group.amount >= 0
-                              ? Icons.south_west
-                              : Icons.north_east,
-                          color: group.amount >= 0
-                              ? scheme.primary
-                              : scheme.error,
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: accountPrimarySoft,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            group.amount >= 0
+                                ? Icons.south_west
+                                : Icons.north_east,
+                            color: group.amount >= 0
+                                ? accountPrimary
+                                : scheme.error,
+                          ),
                         ),
                       ),
                     ),
@@ -390,6 +459,12 @@ class _IncomeChartState extends State<_IncomeChart> {
     );
     return Card(
       margin: EdgeInsets.zero,
+      color: accountSurface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: accountDivider),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -436,8 +511,8 @@ class _IncomeChartState extends State<_IncomeChart> {
                                             : 0,
                                         decoration: BoxDecoration(
                                           color: _selected == index
-                                              ? scheme.secondary
-                                              : scheme.primary,
+                                              ? accountInk
+                                              : accountPrimary,
                                           borderRadius:
                                               const BorderRadius.vertical(
                                                 top: Radius.circular(6),
@@ -607,6 +682,13 @@ class _FinanceWallet extends ConsumerWidget {
                 children: [
                   ProviderWalletBalanceCard(
                     wallet: wallet,
+                    summary: ref
+                        .watch(providerWalletSummaryProvider)
+                        .asData
+                        ?.value,
+                    summaryLoading: ref
+                        .watch(providerWalletSummaryProvider)
+                        .isLoading,
                     onBankAccounts: () => _openBanks(context),
                   ),
                   const SizedBox(height: 12),
@@ -614,24 +696,7 @@ class _FinanceWallet extends ConsumerWidget {
                     'Số dư hiện tại của ví, không phụ thuộc bộ lọc thu nhập.',
                   ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.icon(
-                        icon: const Icon(Icons.add),
-                        label: const Text('Nạp ví'),
-                        onPressed: () => _openMoneyForm(context, ref, false),
-                      ),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.outbound_outlined),
-                        label: const Text('Yêu cầu rút tiền'),
-                        onPressed: wallet.balance > 0
-                            ? () => _openMoneyForm(context, ref, true)
-                            : null,
-                      ),
-                    ],
-                  ),
+                  _FinanceWalletActions(balance: wallet.balance),
                 ],
               ),
             ),
@@ -683,6 +748,31 @@ class _FinanceWallet extends ConsumerWidget {
         ],
       ],
     ),
+  );
+}
+
+class _FinanceWalletActions extends ConsumerWidget {
+  const _FinanceWalletActions({required this.balance});
+  final double balance;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Wrap(
+    spacing: 12,
+    runSpacing: 8,
+    children: [
+      FilledButton.icon(
+        icon: const Icon(Icons.add),
+        label: const Text('Nạp ví'),
+        onPressed: () => _openMoneyForm(context, ref, false),
+      ),
+      OutlinedButton.icon(
+        icon: const Icon(Icons.outbound_outlined),
+        label: const Text('Yêu cầu rút tiền'),
+        onPressed: balance > 0
+            ? () => _openMoneyForm(context, ref, true)
+            : null,
+      ),
+    ],
   );
 
   Future<void> _openMoneyForm(

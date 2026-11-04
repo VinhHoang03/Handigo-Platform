@@ -27,6 +27,7 @@ import 'provider_schedule_preview.dart';
 import 'provider_history_widgets.dart';
 import 'provider_inbox_visits.dart';
 import 'provider_assignment_customer_info.dart';
+import 'provider_income_screen.dart';
 
 bool _schedulePreviewRegistered = false;
 ValueChanged<bool>? _setActiveSchedulePreview;
@@ -203,30 +204,25 @@ class _ProviderShellState extends State<ProviderShell> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final branchIndex = widget.navigationShell?.currentIndex;
-    final activeIndex = branchIndex == null
-        ? index
-        : branchIndex >= 2
-        ? branchIndex + 1
-        : branchIndex;
+    final activeIndex = widget.navigationShell?.currentIndex ?? index;
     final content =
         widget.navigationShell ??
         IndexedStack(
-          index: index >= 3 ? index - 1 : index,
+          index: index,
           children: [
             ProviderDashboardScreen(
               onOrders: () => setState(() => index = 1),
-              onIncome: () => context.push('/provider/income'),
+              onIncome: () => setState(() => index = 2),
               onSchedule: _showSchedule,
             ),
             const ProviderOrdersScreen(),
+            const ProviderIncomeScreen(asTab: true),
             ProviderScheduleScreen(isActive: index == 3),
             const ProviderAccountScreen(),
           ],
         );
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      extendBody: true,
       backgroundColor: Colors.transparent,
       body: _ProviderShellBackground(
         child: Theme(
@@ -294,13 +290,9 @@ class _ProviderShellState extends State<ProviderShell> {
                       selected: activeIndex == tabIndex,
                       emphasized: tabIndex == 2,
                       onTap: () {
-                        if (tabIndex == 2) {
-                          context.push('/provider/income');
-                          return;
-                        }
                         if (widget.navigationShell case final shell?) {
                           shell.goBranch(
-                            tabIndex > 2 ? tabIndex - 1 : tabIndex,
+                            tabIndex,
                             initialLocation: tabIndex == activeIndex,
                           );
                         } else {
@@ -2339,24 +2331,6 @@ class ProviderAccountScreen extends ConsumerWidget {
                       subtitle: 'Theo dõi chất lượng dịch vụ của bạn',
                       iconAsset: '$accountIconPath/star.svg',
                       onTap: () => context.push('/provider/feedback'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                AccountSection(
-                  title: 'Quản lý công việc',
-                  items: [
-                    AccountMenuItem(
-                      label: 'Ví và thu nhập',
-                      subtitle: 'Số dư, giao dịch và yêu cầu rút tiền',
-                      iconAsset: '$accountIconPath/card.svg',
-                      onTap: () => context.push('/provider/wallet'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Tài khoản ngân hàng',
-                      subtitle: 'Quản lý tài khoản nhận tiền',
-                      iconAsset: '$accountIconPath/card.svg',
-                      onTap: () => context.push('/provider/banks'),
                     ),
                   ],
                 ),

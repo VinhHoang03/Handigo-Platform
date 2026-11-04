@@ -252,7 +252,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: '/provider',
                 builder: (context, _) => ProviderDashboardScreen(
                   onOrders: () => context.go('/provider/orders'),
-                  onIncome: () => context.push('/provider/income'),
+                  onIncome: () => context.go('/provider/income'),
                   onSchedule: () => context.go('/provider/schedule'),
                 ),
               ),
@@ -293,6 +293,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/provider/income',
+                builder: (_, __) => const ProviderIncomeScreen(asTab: true),
+              ),
+              GoRoute(
+                path: '/provider/wallet',
+                builder: (_, __) => const ProviderWalletScreen(),
+              ),
+              GoRoute(
+                path: '/provider/banks',
+                builder: (_, __) => const ProviderBankAccountsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/provider/schedule',
                 builder: (_, __) => const ProviderScheduleScreen(),
               ),
@@ -303,14 +319,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/provider/account',
                 builder: (_, __) => const ProviderAccountScreen(),
-              ),
-              GoRoute(
-                path: '/provider/wallet',
-                builder: (_, __) => const ProviderWalletScreen(),
-              ),
-              GoRoute(
-                path: '/provider/banks',
-                builder: (_, __) => const ProviderBankAccountsScreen(),
               ),
               GoRoute(
                 path: '/provider/profile',
@@ -360,10 +368,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
-      ),
-      GoRoute(
-        path: '/provider/income',
-        builder: (_, _) => const ProviderIncomeScreen(),
       ),
     ],
   );
