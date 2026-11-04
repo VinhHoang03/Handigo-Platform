@@ -15,6 +15,7 @@ import '../../features/provider_onboarding/presentation/provider_onboarding_scre
 import '../../features/provider/presentation/provider_screens.dart';
 import '../../features/provider/presentation/provider_order_detail_screen.dart';
 import '../../features/provider/presentation/provider_account_screens.dart';
+import '../../features/provider/presentation/provider_income_screen.dart';
 import '../providers/app_providers.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -251,6 +252,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: '/provider',
                 builder: (context, _) => ProviderDashboardScreen(
                   onOrders: () => context.go('/provider/orders'),
+                  onIncome: () => context.push('/provider/income'),
                   onSchedule: () => context.go('/provider/schedule'),
                 ),
               ),
@@ -325,6 +327,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/provider/income',
+        builder: (_, _) => const ProviderIncomeScreen(),
       ),
     ],
   );

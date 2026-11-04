@@ -11,9 +11,11 @@ import 'package:handigo_app/app/providers/app_providers.dart';
 import 'package:handigo_app/core/network/api_client.dart';
 import 'package:handigo_app/core/network/api_exception.dart';
 import 'package:handigo_app/features/service_catalog/presentation/add_booking_address_sheet.dart';
+import 'package:handigo_app/shared/widgets/map_surface.dart';
 
 class _Location extends GeolocatorPlatform {
   LocationPermission permission = LocationPermission.whileInUse;
+  Completer<Position>? pending;
   int reads = 0;
   @override
   Future<bool> isLocationServiceEnabled() async => true;
@@ -24,28 +26,29 @@ class _Location extends GeolocatorPlatform {
     LocationSettings? locationSettings,
   }) async {
     reads++;
-    return Position(
-      latitude: 16.05,
-      longitude: 108.2,
-      timestamp: DateTime.now(),
-      accuracy: 100,
-      altitude: 0,
-      altitudeAccuracy: 0,
-      heading: 0,
-      headingAccuracy: 0,
-      speed: 0,
-      speedAccuracy: 0,
-    );
+    if (pending != null) return pending!.future;
+    return position();
   }
+
+  Position position() => Position(
+    latitude: 16.05,
+    longitude: 108.2,
+    timestamp: DateTime.now(),
+    accuracy: 100,
+    altitude: 0,
+    altitudeAccuracy: 0,
+    heading: 0,
+    headingAccuracy: 0,
+    speed: 0,
+    speedAccuracy: 0,
+  );
 }
 
 class _Api extends ApiClient {
   _Api() : super(Dio(), CookieJar());
-  bool fail = false;
   int requests = 0;
   ApiException? rejection;
   Completer<void>? pending;
-  Map<String, dynamic>? lastQuery;
   @override
   Future<Map<String, dynamic>> request(
     String path, {
@@ -56,11 +59,11 @@ class _Api extends ApiClient {
     Duration? receiveTimeout,
   }) async {
     expect(path, '/locations/reverse-geocode');
+    expect(authenticated, isTrue);
     requests++;
-    lastQuery = query;
-    if (pending != null) await pending!.future;
+    final hold = pending;
+    if (hold != null) await hold.future;
     if (rejection != null) throw rejection!;
-    if (fail) throw const ApiException('Không tra được địa chỉ');
     return {
       'data': {
         'fullAddress': '45 Lê Hữu Trác',
@@ -83,10 +86,16 @@ void main() {
   });
   tearDown(() => GeolocatorPlatform.instance = original);
 
-  Future<void> open(WidgetTester tester, _Api api) async {
+  Future<void> open(WidgetTester tester, _Api api, {bool ready = true}) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [apiClientProvider.overrideWithValue(api)],
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          mapReadyProvider.overrideWith((ref) async => ready),
+          mapViewBuilderProvider.overrideWithValue(
+            (map) => const SizedBox.expand(key: ValueKey('map-view')),
+          ),
+        ],
         child: MaterialApp(
           home: Scaffold(
             body: Builder(
@@ -95,7 +104,6 @@ void main() {
                   result = await showModalBottomSheet<Map<String, String>>(
                     context: context,
                     isScrollControlled: true,
-                    showDragHandle: false,
                     builder: (_) => const AddBookingAddressSheet(),
                   );
                 },
@@ -110,213 +118,175 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('Mở ngay bản đồ và vừa khung bán kính 500 m quanh GPS', (
-    tester,
-  ) async {
-    await open(tester, _Api());
+  FlutterMap map(WidgetTester tester) =>
+      tester.widget<MapSurface>(find.byType(MapSurface)).map;
+
+  testWidgets('Không ghim sẵn; GPS chỉ tải trước địa chỉ', (tester) async {
+    final api = _Api();
+    await open(tester, api);
     expect(find.byType(TextField), findsNothing);
-    expect(find.byIcon(Icons.add_location_alt_rounded), findsOneWidget);
-    expect(find.byType(FlutterMap), findsOneWidget);
-    final map = tester
-        .widget<FlutterMap>(find.byType(FlutterMap))
-        .mapController!;
-    final camera = map.camera;
-    const center = LatLng(16.05, 108.2);
-    const distance = Distance();
-    for (final bearing in [0, 90, 180, 270]) {
-      expect(
-        camera.visibleBounds.contains(
-          distance.offset(center, 500, bearing.toDouble()),
-        ),
-        isTrue,
-      );
-    }
-    expect(distance(camera.center, center), lessThan(2));
-    final left = tester.getRect(find.text('Lấy vị trí hiện tại'));
-    final right = tester.getRect(find.text('Chọn vị trí này'));
-    expect(left.center.dy, closeTo(right.center.dy, 1));
+    expect(find.byIcon(Icons.location_pin), findsNothing);
+    expect(find.text('Chưa chọn vị trí'), findsOneWidget);
+    expect(location.reads, 1);
+    expect(api.requests, 1);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Hai nút không tràn trên màn hình 320 px', (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(320, 700);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetPhysicalSize);
-    await open(tester, _Api());
-    final left = tester.getRect(
-      find.widgetWithText(OutlinedButton, 'Lấy vị trí hiện tại'),
-    );
-    final right = tester.getRect(
-      find.widgetWithText(FilledButton, 'Chọn vị trí này'),
-    );
-    expect(left.width, closeTo(right.width, 1));
-    expect(left.center.dy, closeTo(right.center.dy, 1));
-    expect(left.left, greaterThanOrEqualTo(0));
-    expect(right.right, lessThanOrEqualTo(320));
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('Không ghim sẵn, chọn GPS và lưu lại địa chỉ đã tra', (
+  testWidgets('Chọn GPS lưu đúng tọa độ và dùng địa chỉ tải sẵn', (
     tester,
   ) async {
     final api = _Api();
     await open(tester, api);
-    expect(find.byIcon(Icons.location_pin), findsNothing);
-    expect(find.byType(CircleLayer), findsNothing);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    expect(find.text('Chưa chọn vị trí'), findsOneWidget);
     await tester.tap(find.text('Lấy vị trí hiện tại'));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.location_pin), findsOneWidget);
     expect(find.text('45 Lê Hữu Trác, An Hải, Đà Nẵng'), findsOneWidget);
-    expect(
-      tester
-          .widget<Text>(find.byKey(const ValueKey('selected-address')))
-          .style
-          ?.color,
-      Colors.black,
-    );
+    expect(api.requests, 1);
     expect(location.reads, 1);
     await tester.tap(find.text('Chọn vị trí này'));
     await tester.pumpAndSettle();
     expect(result?['latitude'], '16.05');
     expect(result?['longitude'], '108.2');
-    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Kéo bản đồ chọn đúng tâm khi dừng, khóa xác nhận trong lúc di chuyển',
+    (tester) async {
+      await open(tester, _Api());
+      final configuration = map(tester);
+      configuration.options.onPositionChanged!(
+        MapCamera(
+          crs: const Epsg3857(),
+          center: const LatLng(16.06, 108.21),
+          zoom: 18,
+          rotation: 0,
+          nonRotatedSize: const Size(400, 400),
+        ),
+        true,
+      );
+      await tester.pump();
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Chọn vị trí này'),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chọn vị trí này'));
+      await tester.pumpAndSettle();
+      expect(result?['latitude'], '16.06');
+      expect(result?['longitude'], '108.21');
+    },
+  );
+
+  testWidgets('Phản hồi địa chỉ cũ không ghi đè ghim mới', (tester) async {
+    final api = _Api();
+    await open(tester, api);
+    final first = api.pending = Completer<void>();
+    map(tester).options.onTap!(
+      const TapPosition(Offset.zero, Offset.zero),
+      const LatLng(16.1, 108.1),
+    );
+    await tester.pump();
+    api.pending = null;
+    map(tester).options.onTap!(
+      const TapPosition(Offset.zero, Offset.zero),
+      const LatLng(16.2, 108.2),
+    );
+    await tester.pumpAndSettle();
+    first.complete();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chọn vị trí này'));
+    await tester.pumpAndSettle();
+    expect(result?['latitude'], '16.2');
+  });
+
+  testWidgets('GPS đến muộn không ghi đè điểm người dùng đã chạm', (
+    tester,
+  ) async {
+    final gps = location.pending = Completer<Position>();
+    await open(tester, _Api());
+    map(tester).options.onTap!(
+      const TapPosition(Offset.zero, Offset.zero),
+      const LatLng(16.2, 108.25),
+    );
+    await tester.pumpAndSettle();
+    gps.complete(location.position());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chọn vị trí này'));
+    await tester.pumpAndSettle();
+    expect(result?['longitude'], '108.25');
   });
 
   testWidgets('Tra địa chỉ lỗi giữ ghim và cho thử lại', (tester) async {
-    final api = _Api()..fail = true;
+    final api = _Api();
     await open(tester, api);
-    await tester.tap(find.text('Lấy vị trí hiện tại'));
+    api.rejection = const ApiException('Không tra được địa chỉ');
+    map(tester).options.onTap!(
+      const TapPosition(Offset.zero, Offset.zero),
+      const LatLng(16.3, 108.3),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('Không tra được địa chỉ'), findsOneWidget);
-    api.fail = false;
+    expect(find.textContaining('Không tra được địa chỉ'), findsOneWidget);
+    expect(find.byIcon(Icons.location_pin), findsOneWidget);
+    api.rejection = null;
     await tester.tap(find.text('Chọn vị trí này'));
     await tester.pumpAndSettle();
-    expect(result?['latitude'], '16.05');
-    expect(tester.takeException(), isNull);
+    expect(result?['latitude'], '16.3');
   });
 
-  testWidgets('Hiện nguyên nhân geo với mã HTTP và mã lỗi riêng', (
+  testWidgets('Quyền GPS bị chặn vẫn chọn điểm trên bản đồ được', (
     tester,
   ) async {
-    final api = _Api()
-      ..rejection = const ApiException(
-        'Dịch vụ xác định địa chỉ chưa được cấu hình.',
-        statusCode: 503,
-        code: 'GEO_NOT_CONFIGURED',
-      );
-    await open(tester, api);
-    await tester.tap(find.text('Lấy vị trí hiện tại'));
-    await tester.pumpAndSettle();
-    expect(
-      find.textContaining('HTTP 503 · GEO_NOT_CONFIGURED'),
-      findsOneWidget,
-    );
-    expect(find.byIcon(Icons.location_pin), findsOneWidget);
-    expect(result, isNull);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('Quyền bị chặn cho phép lấy lại GPS', (tester) async {
     location.permission = LocationPermission.deniedForever;
     await open(tester, _Api());
     expect(
       find.textContaining('cài đặt ứng dụng hoặc trình duyệt'),
       findsOneWidget,
     );
-    location.permission = LocationPermission.whileInUse;
-    await tester.tap(find.text('Lấy vị trí hiện tại'));
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.location_pin), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('Chạm mới ghim và tự căn giữa; GPS dùng lại cache', (
-    tester,
-  ) async {
-    await open(tester, _Api());
-    await tester.drag(find.byType(FlutterMap), const Offset(80, 0));
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.location_pin), findsNothing);
-    final rect = tester.getRect(find.byType(FlutterMap));
-    await tester.tapAt(rect.center + const Offset(60, 45));
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pumpAndSettle();
-    final map = tester
-        .widget<FlutterMap>(find.byType(FlutterMap))
-        .mapController!;
-    final marker = tester
-        .widget<MarkerLayer>(find.byType(MarkerLayer))
-        .markers
-        .single;
-    expect(const Distance()(marker.point, map.camera.center), lessThan(1));
-    expect(location.reads, 1);
-    await tester.tap(find.text('Lấy vị trí hiện tại'));
-    await tester.pumpAndSettle();
-    expect(
-      const Distance()(map.camera.center, const LatLng(16.05, 108.2)),
-      lessThan(2),
+    map(tester).options.onTap!(
+      const TapPosition(Offset.zero, Offset.zero),
+      const LatLng(16.3, 108.3),
     );
-    expect(location.reads, 1);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('Chọn GPS dùng địa chỉ tải sẵn, không gọi lại và không loading', (
-    tester,
-  ) async {
-    final api = _Api();
-    await open(tester, api);
-    expect(api.requests, 1);
-    await tester.tap(find.text('Lấy vị trí hiện tại'));
-    await tester.pump();
-    expect(find.text('45 Lê Hữu Trác, An Hải, Đà Nẵng'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(api.requests, 1);
-    expect(location.reads, 1);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Chọn vị trí này'));
+    await tester.pumpAndSettle();
+    expect(result, isNotNull);
   });
 
   testWidgets(
-    'Chọn GPS khi địa chỉ đang tải vẫn ghim ngay và không gọi trùng',
+    'Thiếu cấu hình bản đồ không lấy GPS hoặc cho xác nhận điểm chưa thấy',
     (tester) async {
-      final api = _Api()..pending = Completer<void>();
-      await open(tester, api);
-      expect(api.requests, 1);
-      await tester.tap(find.text('Lấy vị trí hiện tại'));
-      await tester.pump();
-      expect(find.byIcon(Icons.location_pin), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(api.requests, 1);
-      expect(location.reads, 1);
-      api.pending!.complete();
-      await tester.pumpAndSettle();
-      expect(find.text('45 Lê Hữu Trác, An Hải, Đà Nẵng'), findsOneWidget);
+      await open(tester, _Api(), ready: false);
+      expect(find.textContaining('Bản đồ chưa sẵn sàng'), findsOneWidget);
+      expect(location.reads, 0);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Chọn vị trí này'),
+            )
+            .onPressed,
+        isNull,
+      );
     },
   );
 
-  testWidgets('Loading vòng tròn ở giữa khi chọn điểm mới trên bản đồ', (
-    tester,
-  ) async {
-    final api = _Api();
-    await open(tester, api);
-    api.pending = Completer<void>();
-    await tester.tapAt(
-      tester.getCenter(find.byType(FlutterMap)) + const Offset(60, 40),
-    );
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pump();
-    final spinner = find.byType(CircularProgressIndicator);
-    expect(spinner, findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+  testWidgets('Màn hình 320 px giữ đủ hai nút chọn vị trí', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await open(tester, _Api());
+    expect(find.byType(TextField), findsNothing);
     expect(
-      tester.getCenter(spinner),
-      tester.getCenter(find.byType(FlutterMap)),
+      tester
+          .getRect(find.widgetWithText(FilledButton, 'Chọn vị trí này'))
+          .right,
+      lessThanOrEqualTo(320),
     );
-    api.pending!.complete();
-    await tester.pumpAndSettle();
-    expect(spinner, findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

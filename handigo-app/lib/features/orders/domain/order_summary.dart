@@ -14,6 +14,9 @@ class OrderSummary {
     this.providerGender,
     this.customerName,
     this.customerAvatar,
+    this.serviceType,
+    this.addressLatitude,
+    this.addressLongitude,
     this.totalAmount,
     this.paymentStatus,
     this.bookingStatus,
@@ -28,6 +31,7 @@ class OrderSummary {
         ? provider['userId']
         : null;
     final pricing = json['pricing'];
+    final address = json['addressSnapshot'] ?? json['addressId'];
     return OrderSummary(
       id: (json['_id'] ?? json['id']) as String,
       code: json['orderCode'] as String? ?? '',
@@ -41,8 +45,8 @@ class OrderSummary {
       hasPendingAssignment: json['hasPendingAssignment'] == true,
       depositPaidAt: _date(json['depositPaidAt']),
       scheduledAt: _date(json['scheduledAt']),
-      addressLabel: json['addressId'] is Map<String, dynamic>
-          ? formatAddressData(json['addressId'] as Map<String, dynamic>)
+      addressLabel: address is Map<String, dynamic>
+          ? formatAddressData(address)
           : null,
       serviceImage: service is Map<String, dynamic>
           ? (service.containsKey('coverImage')
@@ -71,6 +75,13 @@ class OrderSummary {
       customerAvatar: json['customerId'] is Map<String, dynamic>
           ? (json['customerId'] as Map<String, dynamic>)['avatar'] as String?
           : null,
+      serviceType: service is Map ? service['serviceType'] as String? : null,
+      addressLatitude: address is Map
+          ? (address['latitude'] as num?)?.toDouble()
+          : null,
+      addressLongitude: address is Map
+          ? (address['longitude'] as num?)?.toDouble()
+          : null,
       totalAmount: pricing is Map<String, dynamic>
           ? ((json['quotationFinalAmount'] ?? pricing['totalPaidAmount'])
                     as num?)
@@ -90,6 +101,8 @@ class OrderSummary {
   final String? providerGender;
   final String? customerName;
   final String? customerAvatar;
+  final String? serviceType;
+  final double? addressLatitude, addressLongitude;
   final double? totalAmount;
   final String? paymentStatus, bookingStatus;
   final bool readyForMatching, hasPendingAssignment;
@@ -160,6 +173,9 @@ class OrderDetail {
     this.cancelledAt,
     this.addressLatitude,
     this.addressLongitude,
+    this.arrivalProviderId,
+    this.arrivedAt,
+    this.customerNoShowStatus,
   }) : _statusHistory = statusHistory;
 
   factory OrderDetail.fromJson(Map<String, dynamic> json) {
@@ -278,6 +294,15 @@ class OrderDetail {
       addressLongitude: location is Map
           ? (location['longitude'] as num?)?.toDouble()
           : null,
+      arrivalProviderId: json['arrival'] is Map
+          ? _stringValue(json['arrival']['providerId'])
+          : null,
+      arrivedAt: json['arrival'] is Map
+          ? _date(json['arrival']['arrivedAt'])
+          : null,
+      customerNoShowStatus: json['customerNoShow'] is Map
+          ? json['customerNoShow']['status'] as String?
+          : null,
     );
   }
 
@@ -318,6 +343,15 @@ class OrderDetail {
   final DateTime? createdAt, updatedAt, cancelledAt;
   final String? cancellationReason;
   final double? addressLatitude, addressLongitude;
+  final String? arrivalProviderId;
+  final DateTime? arrivedAt;
+  final String? customerNoShowStatus;
+  bool get noShowBlocksWork =>
+      customerNoShowStatus == 'pending' || customerNoShowStatus == 'approved';
+  bool get hasArrived =>
+      providerId != null &&
+      arrivalProviderId == providerId &&
+      arrivedAt != null;
   OrderSummary get summary => OrderSummary(
     id: id,
     code: code,
@@ -336,6 +370,7 @@ class OrderDetail {
       providerId != null && ['accepted', 'in_progress'].contains(status);
   bool get canEditQuotation =>
       inspectionRequired &&
+      !noShowBlocksWork &&
       appointmentConfirmed &&
       depositPaidAt != null &&
       ['accepted', 'in_progress'].contains(status);
@@ -346,6 +381,7 @@ class OrderDetail {
       : depositAmount;
   bool canStart(RepairQuotation? quotation) =>
       status == 'accepted' &&
+      !noShowBlocksWork &&
       appointmentConfirmed &&
       (inspectionRequired
           ? depositPaidAt != null &&

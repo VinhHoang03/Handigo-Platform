@@ -29,9 +29,17 @@ final realtimeConnectionProvider = Provider<RealtimeConnection?>((ref) {
     ref.invalidate(providerOverviewProvider);
     ref.invalidate(notificationListProvider);
     ref.invalidate(conversationListProvider);
+    ref.invalidate(providerNotificationBadgeProvider);
+    ref.invalidate(providerMessageBadgeProvider);
   }
 
   final connection = RealtimeConnection(ref.read(apiClientProvider), refresh);
+  final inboxEvents = connection.events.listen((event) {
+    if (event.name == 'message:new' || event.name == 'message:seen') {
+      ref.invalidate(providerMessageBadgeProvider);
+    }
+  });
+  ref.onDispose(() => unawaited(inboxEvents.cancel()));
   ref.onDispose(connection.dispose);
   return connection;
 });

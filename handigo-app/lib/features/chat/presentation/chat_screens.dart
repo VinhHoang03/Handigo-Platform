@@ -5,6 +5,7 @@ import '../../../core/network/realtime_connection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
+import '../../auth/domain/app_user.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/customer_page_header.dart';
@@ -44,20 +45,34 @@ class _ConversationListScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(conversationListProvider);
     final scheme = Theme.of(context).colorScheme;
+    final isProvider =
+        ref.watch(authControllerProvider).user?.role == UserRole.provider;
     return Scaffold(
       appBar: CustomerPageHeader(
         toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
         backgroundColor: Colors.white,
         title: 'Đoạn chat',
         centerTitle: false,
-        leading: Center(
-          child: CircleAvatar(
-            radius: 18,
-            backgroundColor: scheme.surfaceContainerLow,
-            foregroundColor: scheme.primary,
-            child: const Icon(Icons.forum_rounded, size: 19),
-          ),
-        ),
+        leading: isProvider
+            ? IconButton(
+                tooltip: 'Quay lại',
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/provider');
+                  }
+                },
+                icon: const Icon(Icons.arrow_back_rounded),
+              )
+            : Center(
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: scheme.surfaceContainerLow,
+                  foregroundColor: scheme.primary,
+                  child: const Icon(Icons.forum_rounded, size: 19),
+                ),
+              ),
       ),
       body: state.when(
         loading: () => const AppLoading(),

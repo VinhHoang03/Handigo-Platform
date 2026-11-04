@@ -10,6 +10,7 @@ import 'package:handigo_app/app/routing/app_router.dart';
 import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/core/network/api_client.dart';
 import 'package:handigo_app/core/network/api_exception.dart';
+import 'package:handigo_app/core/network/realtime_connection.dart';
 import 'package:handigo_app/features/auth/data/auth_repository.dart';
 import 'package:handigo_app/features/auth/domain/app_user.dart';
 import 'package:handigo_app/features/auth/presentation/auth_controller.dart';
@@ -18,6 +19,9 @@ import 'package:handigo_app/features/home/presentation/device_location_provider.
 import 'package:handigo_app/features/orders/domain/order_summary.dart';
 import 'package:handigo_app/features/orders/presentation/order_screens.dart';
 import 'package:handigo_app/features/provider/presentation/provider_screens.dart';
+import 'package:handigo_app/features/provider/presentation/provider_income_screen.dart';
+import 'package:handigo_app/features/provider/domain/provider_income.dart';
+import 'package:handigo_app/features/provider/presentation/provider_order_detail_screen.dart';
 import 'package:handigo_app/shared/widgets/app_feedback.dart';
 import 'package:handigo_app/shared/widgets/customer_page_header.dart';
 
@@ -34,7 +38,11 @@ class _Api extends ApiClient {
   }) async => throw const ApiException('Chưa có dữ liệu kiểm thử.');
 }
 
-Future<GoRouter> _show(WidgetTester tester, UserRole role) async {
+Future<GoRouter> _show(
+  WidgetTester tester,
+  UserRole role, {
+  bool withIncome = false,
+}) async {
   FlutterSecureStorage.setMockInitialValues({});
   final api = _Api();
   final auth = AuthController(AuthRepository(api), api)
@@ -49,12 +57,38 @@ Future<GoRouter> _show(WidgetTester tester, UserRole role) async {
   final container = ProviderContainer(
     retry: (_, _) => null,
     overrides: [
+      if (withIncome)
+        providerIncomeProvider.overrideWith(
+          (ref, range) async => const ProviderIncomeSummary(
+            amount: 80000,
+            completedOrders: 0,
+            byDay: {},
+            entries: [
+              ProviderFinanceEntry(
+                id: 'earning',
+                type: 'provider_earning',
+                amount: 80000,
+                direction: 'in',
+                status: 'success',
+                orderId: 'order',
+                orderCode: 'ORD-001',
+              ),
+            ],
+          ),
+        ),
+      realtimeConnectionProvider.overrideWithValue(null),
       apiClientProvider.overrideWithValue(api),
       authControllerProvider.overrideWith((ref) => auth),
       deviceLocationProvider.overrideWith(
         (ref) async => const DeviceLocationData(label: 'An Hải, Đà Nẵng'),
       ),
       providerCurrentLocationProvider.overrideWith((ref) async {}),
+      providerMessageBadgeProvider.overrideWith(
+        (ref) async => (count: 0, latestAt: null),
+      ),
+      providerNotificationBadgeProvider.overrideWith(
+        (ref) async => (count: 0, latestAt: null),
+      ),
       orderDetailProvider('order').overrideWith(
         (ref) async => const OrderDetail(
           id: 'order',
@@ -86,6 +120,46 @@ Finder _tab(String label) =>
     find.descendant(of: find.byType(SafeArea), matching: find.text(label)).last;
 
 void main() {
+  testWidgets('Mở đơn từ Thu nhập rồi quay lại giữ màn hình Thu nhập', (
+    tester,
+  ) async {
+    final router = await _show(tester, UserRole.provider, withIncome: true);
+    router.go('/provider');
+    await tester.pumpAndSettle();
+    await tester.tap(_tab('Thu nhập'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('ORD-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ORD-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xem đơn dịch vụ'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProviderOrderDetailScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(ProviderIncomeScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+    'Danh sách tin nhắn provider có nút quay lại, kể cả mở trực tiếp',
+    (tester) async {
+      final router = await _show(tester, UserRole.provider);
+      router.go('/provider');
+      await tester.pumpAndSettle();
+      router.push('/provider/chat');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Quay lại'));
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, '/provider');
+      router.go('/provider/chat');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Quay lại'));
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, '/provider');
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets(
     'Trang chủ dùng header vị trí, các tab còn lại dùng header trang',
     (tester) async {
@@ -289,12 +363,58 @@ void main() {
     ]) {
       router.push(path);
       await tester.pumpAndSettle();
-      for (final label in ['Tổng quan', 'Đơn hàng', 'Lịch hẹn', 'Tài khoản']) {
+      for (final label in [
+        'Trang chủ',
+        'Đơn dịch vụ',
+        'Thu nhập',
+        'Lịch',
+        'Hồ sơ',
+      ]) {
         expect(_tab(label).hitTestable(), findsOneWidget);
       }
       router.pop();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }
+  });
+
+  testWidgets('Năm tab provider mở đúng nhánh và giữ trang chi tiết đơn', (
+    tester,
+  ) async {
+    final router = await _show(tester, UserRole.provider);
+    for (final entry in const [
+      ('Trang chủ', '/provider', 0),
+      ('Đơn dịch vụ', '/provider/orders', 1),
+      ('Lịch', '/provider/schedule', 2),
+      ('Hồ sơ', '/provider/account', 3),
+    ]) {
+      await tester.tap(_tab(entry.$1));
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, entry.$2);
+      expect(
+        tester
+            .widget<ProviderShell>(find.byType(ProviderShell))
+            .navigationShell
+            ?.currentIndex,
+        entry.$3,
+      );
+    }
+    router.go('/provider/orders/order');
+    await tester.pumpAndSettle();
+    await tester.tap(_tab('Thu nhập'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProviderIncomeScreen), findsOneWidget);
+    expect(find.text('Đơn dịch vụ').hitTestable(), findsNothing);
+    expect(
+      tester
+          .widget<NavigationBar>(find.byType(NavigationBar))
+          .destinations
+          .length,
+      2,
+    );
+    await tester.tap(find.byTooltip('Quay lại'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProviderOrderDetailScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

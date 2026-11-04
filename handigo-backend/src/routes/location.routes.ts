@@ -1,10 +1,10 @@
 import { Router } from "express";
+import { routingRateLimit } from "../middlewares/rateLimit.middleware";
 import * as locationController from "../controllers/location.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { geocodeAddressSchema } from "../validations/address.validator";
-import { routingRateLimit } from "../middlewares/rateLimit.middleware";
 import {
   currentLocationSchema,
   reverseGeocodeQuerySchema,

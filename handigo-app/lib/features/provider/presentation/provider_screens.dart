@@ -22,6 +22,8 @@ import '../data/provider_location_service.dart';
 import '../domain/provider_models.dart';
 import 'provider_schedule_preview.dart';
 import 'provider_history_widgets.dart';
+import 'provider_inbox_visits.dart';
+import 'provider_assignment_customer_info.dart';
 
 bool _schedulePreviewRegistered = false;
 ValueChanged<bool>? _setActiveSchedulePreview;
@@ -55,6 +57,60 @@ final providerCurrentLocationProvider = FutureProvider<void>(
         );
   },
 );
+final providerWorkingAddressProvider = FutureProvider.autoDispose<String?>((
+  ref,
+) async {
+  if (ref.watch(providerUiPreviewProvider) != null) return null;
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  final position = ref.watch(
+    providerLocationServiceProvider.select(
+      (service) => (
+        service.synchronizedPosition?.latitude,
+        service.synchronizedPosition?.longitude,
+      ),
+    ),
+  );
+  if (position.$1 != null && position.$2 != null) {
+    return ref
+        .watch(providerRepositoryProvider)
+        .workingAddress(latitude: position.$1, longitude: position.$2);
+  }
+  await ref.watch(providerCurrentLocationProvider.future);
+  if (!ref.mounted) return null;
+  return ref.watch(providerRepositoryProvider).workingAddress();
+});
+
+final providerNotificationBadgeProvider =
+    FutureProvider.autoDispose<({int count, DateTime? latestAt})>(
+      retry: (_, _) => null,
+      (ref) async {
+        final userId = ref.watch(
+          authControllerProvider.select((auth) => auth.user?.id),
+        );
+        if (userId == null) return (count: 0, latestAt: null);
+        final visits = await ref.watch(providerInboxVisitsProvider.future);
+        if (!ref.mounted) return (count: 0, latestAt: null);
+        return ref
+            .watch(providerRepositoryProvider)
+            .notificationBadge(visits.notifications);
+      },
+    );
+
+final providerMessageBadgeProvider =
+    FutureProvider.autoDispose<({int count, DateTime? latestAt})>(
+      retry: (_, _) => null,
+      (ref) async {
+        final userId = ref.watch(
+          authControllerProvider.select((auth) => auth.user?.id),
+        );
+        if (userId == null) return (count: 0, latestAt: null);
+        final visits = await ref.watch(providerInboxVisitsProvider.future);
+        if (!ref.mounted) return (count: 0, latestAt: null);
+        return ref
+            .watch(providerRepositoryProvider)
+            .messageBadge(userId, visits.messages);
+      },
+    );
 final providerOverviewProvider = FutureProvider.autoDispose<ProviderOverview>((
   ref,
 ) {
@@ -138,24 +194,30 @@ class ProviderShell extends StatefulWidget {
 
 class _ProviderShellState extends State<ProviderShell> {
   int index = 0;
-  void _showSchedule() => setState(() => index = 2);
+  void _showSchedule() => setState(() => index = 3);
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final activeIndex = widget.navigationShell?.currentIndex ?? index;
+    final branchIndex = widget.navigationShell?.currentIndex;
+    final activeIndex = branchIndex == null
+        ? index
+        : branchIndex >= 2
+        ? branchIndex + 1
+        : branchIndex;
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body:
           widget.navigationShell ??
           IndexedStack(
-            index: index,
+            index: index >= 3 ? index - 1 : index,
             children: [
               ProviderDashboardScreen(
                 onOrders: () => setState(() => index = 1),
+                onIncome: () => context.push('/provider/income'),
                 onSchedule: _showSchedule,
               ),
               const ProviderOrdersScreen(),
-              ProviderScheduleScreen(isActive: index == 2),
+              ProviderScheduleScreen(isActive: index == 3),
               const ProviderAccountScreen(),
             ],
           ),
@@ -163,14 +225,15 @@ class _ProviderShellState extends State<ProviderShell> {
         top: false,
         child: Container(
           color: scheme.surfaceContainerLowest,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: Row(
             children: [
               for (final (tabIndex, label, icon) in const [
-                (0, 'Tổng quan', Icons.home_rounded),
-                (1, 'Đơn hàng', Icons.assignment_outlined),
-                (2, 'Lịch hẹn', Icons.calendar_month_outlined),
-                (3, 'Tài khoản', Icons.person_outline),
+                (0, 'Trang chủ', Icons.home_rounded),
+                (1, 'Đơn dịch vụ', Icons.assignment_outlined),
+                (2, 'Thu nhập', Icons.account_balance_wallet_outlined),
+                (3, 'Lịch', Icons.calendar_month_outlined),
+                (4, 'Hồ sơ', Icons.person_outline),
               ])
                 Expanded(
                   child: Semantics(
@@ -180,14 +243,20 @@ class _ProviderShellState extends State<ProviderShell> {
                       padding: const EdgeInsets.symmetric(horizontal: 3),
                       child: Material(
                         color: activeIndex == tabIndex
-                            ? scheme.primaryContainer
+                            ? scheme.primary
                             : scheme.surfaceContainerLowest,
                         borderRadius: BorderRadius.circular(12),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
                           onTap: () {
+                            if (tabIndex == 2) {
+                              context.push('/provider/income');
+                              return;
+                            }
                             if (widget.navigationShell case final shell?) {
-                              shell.goBranch(tabIndex);
+                              shell.goBranch(
+                                tabIndex > 2 ? tabIndex - 1 : tabIndex,
+                              );
                             } else {
                               setState(() => index = tabIndex);
                             }
@@ -208,8 +277,14 @@ class _ProviderShellState extends State<ProviderShell> {
                                 Text(
                                   label,
                                   textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textScaler: MediaQuery.textScalerOf(
+                                    context,
+                                  ).clamp(maxScaleFactor: 1.3),
                                   style: Theme.of(context).textTheme.labelSmall
                                       ?.copyWith(
+                                        fontSize: 11,
                                         color: activeIndex == tabIndex
                                             ? scheme.onPrimary
                                             : scheme.onSurfaceVariant,
@@ -235,14 +310,20 @@ class _ProviderShellState extends State<ProviderShell> {
 }
 
 class ProviderDashboardScreen extends ConsumerWidget {
-  const ProviderDashboardScreen({this.onOrders, this.onSchedule, super.key});
-  final VoidCallback? onOrders, onSchedule;
+  const ProviderDashboardScreen({
+    this.onOrders,
+    this.onIncome,
+    this.onSchedule,
+    super.key,
+  });
+  final VoidCallback? onOrders, onIncome, onSchedule;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(providerOverviewProvider);
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -264,17 +345,65 @@ class ProviderDashboardScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            tooltip: 'Tin nhắn',
+            onPressed: () {
+              ref
+                  .read(providerInboxVisitsProvider.notifier)
+                  .open(
+                    ProviderInboxSection.messages,
+                    latestAt: ref
+                        .read(providerMessageBadgeProvider)
+                        .asData
+                        ?.value
+                        .latestAt,
+                  );
+              context.push('/provider/chat');
+            },
+            icon: _InboxBadge(
+              count:
+                  ref.watch(providerMessageBadgeProvider).asData?.value.count ??
+                  0,
+              icon: Icons.chat_bubble_outline_rounded,
+            ),
+          ),
+          IconButton(
             tooltip: 'Thông báo',
-            onPressed: () => context.push('/provider/notifications'),
-            icon: const Icon(Icons.notifications_none_rounded),
+            onPressed: () {
+              ref
+                  .read(providerInboxVisitsProvider.notifier)
+                  .open(
+                    ProviderInboxSection.notifications,
+                    latestAt: ref
+                        .read(providerNotificationBadgeProvider)
+                        .asData
+                        ?.value
+                        .latestAt,
+                  );
+              context.push('/provider/notifications');
+            },
+            icon: _InboxBadge(
+              count:
+                  ref
+                      .watch(providerNotificationBadgeProvider)
+                      .asData
+                      ?.value
+                      .count ??
+                  0,
+              icon: Icons.notifications_none_rounded,
+            ),
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () {
+        onRefresh: () async {
           ref.invalidate(providerAssignmentsProvider);
           ref.invalidate(providerOrdersProvider);
-          return ref.refresh(providerOverviewProvider.future);
+          ref.invalidate(providerScheduleOrdersProvider);
+          await Future.wait([
+            ref.refresh(providerOverviewProvider.future),
+            ref.read(providerScheduleOrdersProvider.future),
+            ref.read(providerAssignmentsProvider.future),
+          ]).catchError((Object _) => <Object>[]);
         },
         child: state.when(
           loading: () => const AppLoading(),
@@ -288,23 +417,23 @@ class ProviderDashboardScreen extends ConsumerWidget {
             children: [
               _ProviderHero(data: data),
               const SizedBox(height: 16),
+              _HomeAssignments(onOrders: onOrders),
               _SectionHeading(
                 title: 'Đơn cần xử lý',
                 icon: Icons.assignment_outlined,
-                action: onOrders == null
-                    ? null
-                    : TextButton(
-                        onPressed: onOrders,
-                        child: const Text('Xem tất cả'),
-                      ),
+                action: TextButton(
+                  onPressed: onOrders ?? () => context.go('/provider/orders'),
+                  child: const Text('Xem tất cả'),
+                ),
               ),
               ref
-                  .watch(providerOrdersProvider)
+                  .watch(providerScheduleOrdersProvider)
                   .when(
                     loading: () => const LinearProgressIndicator(),
                     error: (error, _) => AppMessage(
                       message: _message(error),
-                      onRetry: () => ref.invalidate(providerOrdersProvider),
+                      onRetry: () =>
+                          ref.invalidate(providerScheduleOrdersProvider),
                     ),
                     data: (page) {
                       final active =
@@ -330,12 +459,11 @@ class ProviderDashboardScreen extends ConsumerWidget {
                       }
                       return Column(
                         children: [
-                          for (final order in active.take(3))
+                          for (final order in active.take(1))
                             Padding(
                               padding: const EdgeInsets.only(bottom: 12),
-                              child: _AppointmentCard(
+                              child: _HomeOrderCard(
                                 order: order,
-                                showDate: true,
                                 isPreview:
                                     ref.watch(providerUiPreviewProvider) !=
                                     null,
@@ -345,80 +473,26 @@ class ProviderDashboardScreen extends ConsumerWidget {
                       );
                     },
                   ),
-              const SizedBox(height: 16),
-              _WalletSummary(data: data),
-              const SizedBox(height: 16),
-              const _SectionHeading(
-                title: 'Hiệu suất công việc',
-                icon: Icons.insights_rounded,
-              ),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns =
-                      constraints.maxWidth < 340 ||
-                          MediaQuery.textScalerOf(context).scale(1) > 1.3
-                      ? 1
-                      : 2;
-                  final width =
-                      (constraints.maxWidth - (columns - 1) * 12) / columns;
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      SizedBox(
-                        width: width,
-                        child: _MetricCard(
-                          label: 'Thu nhập tháng',
-                          value: _money(data.monthlyEarnings),
-                          icon: Icons.payments_outlined,
-                        ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: _MetricCard(
-                          label: 'Đơn hoàn tất',
-                          value: '${data.completedOrders}',
-                          icon: Icons.task_alt,
-                        ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: _MetricCard(
-                          label: 'Đánh giá trung bình',
-                          value: data.averageRating.toStringAsFixed(1),
-                          icon: Icons.star_outline,
-                        ),
-                      ),
-                      SizedBox(
-                        width: width,
-                        child: _MetricCard(
-                          label: 'Yêu cầu rút chờ',
-                          value: '${data.pendingWithdrawals}',
-                          icon: Icons.account_balance_outlined,
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
+              _HomeSummary(data: data, onIncome: onIncome),
+              const SizedBox(height: 24),
               _SectionHeading(
                 title: 'Lịch hẹn hôm nay',
                 icon: Icons.event_note_outlined,
-                action: onSchedule == null
-                    ? null
-                    : TextButton(
-                        onPressed: onSchedule,
-                        child: const Text('Xem lịch'),
-                      ),
+                action: TextButton(
+                  onPressed:
+                      onSchedule ?? () => context.go('/provider/schedule'),
+                  child: const Text('Xem lịch'),
+                ),
               ),
               ref
-                  .watch(providerOrdersProvider)
+                  .watch(providerScheduleOrdersProvider)
                   .when(
                     loading: () => const LinearProgressIndicator(),
                     error: (error, _) => AppMessage(
                       message: _message(error),
-                      onRetry: () => ref.invalidate(providerOrdersProvider),
+                      onRetry: () =>
+                          ref.invalidate(providerScheduleOrdersProvider),
                     ),
                     data: (page) {
                       final today = _ordersOnDay(page.items, DateTime.now());
@@ -453,8 +527,169 @@ class ProviderDashboardScreen extends ConsumerWidget {
   }
 }
 
+class _InboxBadge extends StatelessWidget {
+  const _InboxBadge({required this.count, required this.icon});
+  final int count;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Badge(
+    isLabelVisible: count > 0,
+    backgroundColor: Theme.of(context).colorScheme.error,
+    textColor: Theme.of(context).colorScheme.onError,
+    label: Text(count > 99 ? '99+' : '$count'),
+    child: Icon(icon),
+  );
+}
+
+class _HomeAssignments extends ConsumerWidget {
+  const _HomeAssignments({this.onOrders});
+  final VoidCallback? onOrders;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(providerAssignmentsProvider)
+      .when(
+        loading: () => const Padding(
+          padding: EdgeInsets.only(bottom: 16),
+          child: LinearProgressIndicator(),
+        ),
+        error: (error, _) => Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: AppMessage(
+            message: 'Chưa tải được đề nghị nhận việc.',
+            onRetry: () => ref.invalidate(providerAssignmentsProvider),
+          ),
+        ),
+        data: (items) {
+          final pending = items
+              .where(
+                (item) =>
+                    item.responseDeadline == null ||
+                    item.responseDeadline!.isAfter(DateTime.now()),
+              )
+              .length;
+          if (pending == 0) return const SizedBox.shrink();
+          final scheme = Theme.of(context).colorScheme;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Card(
+              margin: EdgeInsets.zero,
+              color: scheme.secondaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bạn có $pending đề nghị nhận việc',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: scheme.onSecondaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Kiểm tra thông tin và phản hồi trước khi hết hạn.',
+                      style: TextStyle(color: scheme.onSecondaryContainer),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed:
+                          onOrders ?? () => context.go('/provider/orders'),
+                      icon: const Icon(Icons.arrow_forward_rounded),
+                      label: const Text('Xem đề nghị'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+}
+
+class _HomeOrderCard extends StatelessWidget {
+  const _HomeOrderCard({required this.order, this.isPreview = false});
+  final OrderSummary order;
+  final bool isPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final working = order.status == 'in_progress';
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: working ? scheme.primary : scheme.outlineVariant,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ProviderStatusBadge(status: order.status),
+                Text(order.code, style: Theme.of(context).textTheme.labelSmall),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              order.serviceName,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            _MetaLine(
+              icon: Icons.schedule_outlined,
+              text: order.scheduledAt == null
+                  ? 'Đặt ngay'
+                  : _dateLabel(order.scheduledAt),
+            ),
+            if (order.serviceType == 'variable_price') ...[
+              const SizedBox(height: 8),
+              ProviderAssignmentCustomerInfo(orderId: order.id, order: order),
+            ] else if (order.customerName?.isNotEmpty == true) ...[
+              const SizedBox(height: 8),
+              _MetaLine(icon: Icons.person_outline, text: order.customerName!),
+            ],
+            if (order.addressLabel?.isNotEmpty == true) ...[
+              const SizedBox(height: 8),
+              _MetaLine(
+                icon: Icons.location_on_outlined,
+                text: order.addressLabel!,
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: isPreview
+                    ? null
+                    : () => context.push('/provider/orders/${order.id}'),
+                icon: Icon(
+                  working ? Icons.handyman_outlined : Icons.arrow_forward,
+                ),
+                label: Text(working ? 'Tiếp tục xử lý' : 'Xem công việc'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AvailabilityCard extends ConsumerStatefulWidget {
-  const _AvailabilityCard({required this.data});
+  const _AvailabilityCard({required this.data, super.key});
   final ProviderOverview data;
   @override
   ConsumerState<_AvailabilityCard> createState() => _AvailabilityCardState();
@@ -462,23 +697,85 @@ class _AvailabilityCard extends ConsumerStatefulWidget {
 
 class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
   bool busy = false;
+  bool? _optimisticOnline;
+  String? _lastAddress;
+
+  @override
+  void didUpdateWidget(covariant _AvailabilityCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!busy && !identical(oldWidget.data, widget.data)) {
+      _optimisticOnline = null;
+    }
+  }
+
+  Future<void> _changeAvailability(bool value) async {
+    if (busy || ref.read(providerUiPreviewProvider) != null) return;
+    final userId = ref.read(authControllerProvider).user?.id;
+    if (userId == null) return;
+    bool isCurrent() =>
+        mounted && ref.read(authControllerProvider).user?.id == userId;
+    final previous = _optimisticOnline;
+    setState(() {
+      busy = true;
+      _optimisticOnline = value;
+    });
+    try {
+      if (value) {
+        ref.invalidate(providerCurrentLocationProvider);
+        await ref.read(providerCurrentLocationProvider.future);
+      }
+      if (!isCurrent()) return;
+      final result = await ref
+          .read(providerRepositoryProvider)
+          .setAvailability(value ? 'online' : 'offline', current: widget.data);
+      if (!isCurrent()) return;
+      setState(() => _optimisticOnline = result.availabilityStatus == 'online');
+      if (!value) ref.read(providerLocationServiceProvider).stop();
+      ref.invalidate(providerOverviewProvider);
+    } catch (error) {
+      if (mounted && isCurrent()) {
+        setState(() => _optimisticOnline = previous);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_message(error))));
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final location = widget.data.availabilityStatus == 'online'
-        ? ref.watch(providerCurrentLocationProvider)
-        : null;
-    final trackingError = widget.data.availabilityStatus == 'online'
-        ? ref.watch(providerLocationServiceProvider).error
-        : null;
+    final online =
+        _optimisticOnline ?? widget.data.availabilityStatus == 'online';
+    final location = online ? ref.watch(providerCurrentLocationProvider) : null;
+    final tracker = online ? ref.watch(providerLocationServiceProvider) : null;
+    final trackingError = tracker?.error;
+    final hasSyncedPosition = tracker?.synchronizedPosition != null;
+    final address = online ? ref.watch(providerWorkingAddressProvider) : null;
+    if (hasSyncedPosition ||
+        (location?.hasValue == true && location?.hasError != true)) {
+      final resolved = address?.asData?.value;
+      if (resolved != null && resolved.trim().isNotEmpty) {
+        _lastAddress = resolved;
+      }
+    }
+    final locationFailed =
+        (location?.hasError == true && !hasSyncedPosition) ||
+        trackingError != null;
+    final addressIsStale =
+        locationFailed ||
+        address?.hasError == true ||
+        location?.isLoading == true ||
+        address?.isLoading == true;
     return ColoredBox(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerLowest,
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Icon(
           Icons.circle,
           size: 12,
-          color: widget.data.availabilityStatus == 'online'
+          color: online
               ? AppTheme.successGreen
               : Theme.of(context).colorScheme.outline,
         ),
@@ -490,7 +787,17 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _availabilityLabel(widget.data.availabilityStatus),
+              busy
+                  ? online
+                        ? 'Đang bật nhận việc...'
+                        : 'Đang tắt nhận việc...'
+                  : _availabilityLabel(
+                      _optimisticOnline == null
+                          ? widget.data.availabilityStatus
+                          : online
+                          ? 'online'
+                          : 'offline',
+                    ),
               style: const TextStyle(fontSize: 13),
             ),
             if (location?.isLoading == true)
@@ -498,8 +805,30 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
                 'Đang cập nhật vị trí...',
                 style: TextStyle(fontSize: 13),
               ),
+            if (online && _lastAddress != null)
+              Text(
+                addressIsStale
+                    ? 'Vị trí gần nhất: $_lastAddress'
+                    : _lastAddress!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12),
+              ),
+            if (_lastAddress == null &&
+                location?.hasValue == true &&
+                !locationFailed)
+              Text(
+                address?.isLoading == true
+                    ? 'Đang tìm địa chỉ theo GPS...'
+                    : address?.asData?.value ??
+                          'Đã cập nhật GPS. Chưa lấy được địa chỉ.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12),
+              ),
             if (location?.isLoading != true &&
-                (location?.hasError == true || trackingError != null))
+                locationFailed &&
+                _lastAddress == null)
               Text(
                 'Chưa lấy được vị trí hiện tại.',
                 style: TextStyle(
@@ -512,7 +841,7 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (widget.data.availabilityStatus == 'online') ...[
+            if (online) ...[
               IconButton.outlined(
                 tooltip: 'Tải lại vị trí',
                 style: IconButton.styleFrom(shape: const CircleBorder()),
@@ -524,6 +853,9 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
                           await ref.read(
                             providerCurrentLocationProvider.future,
                           );
+                          if (mounted) {
+                            ref.invalidate(providerWorkingAddressProvider);
+                          }
                         } catch (error) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -542,50 +874,7 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
               ),
               const SizedBox(width: 8),
             ],
-            Switch(
-              value: widget.data.availabilityStatus == 'online',
-              onChanged: busy || location?.isLoading == true
-                  ? null
-                  : (value) async {
-                      if (ref.read(providerUiPreviewProvider) != null) return;
-                      final userId = ref.read(authControllerProvider).user?.id;
-                      setState(() => busy = true);
-                      try {
-                        if (value) {
-                          ref.invalidate(providerCurrentLocationProvider);
-                          await ref.read(
-                            providerCurrentLocationProvider.future,
-                          );
-                        }
-                        if (!mounted ||
-                            ref.read(authControllerProvider).user?.id !=
-                                userId) {
-                          return;
-                        }
-                        await ref
-                            .read(providerRepositoryProvider)
-                            .setAvailability(value ? 'online' : 'offline');
-                        if (!value) {
-                          ref.read(providerLocationServiceProvider).stop();
-                        }
-                        ref.invalidate(providerOverviewProvider);
-                      } catch (error) {
-                        if (context.mounted) {
-                          final failure = value
-                              ? ref
-                                        .read(providerCurrentLocationProvider)
-                                        .error ??
-                                    error
-                              : error;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(_message(failure))),
-                          );
-                        }
-                      } finally {
-                        if (mounted) setState(() => busy = false);
-                      }
-                    },
-            ),
+            Switch(value: online, onChanged: busy ? null : _changeAvailability),
           ],
         ),
       ),
@@ -644,112 +933,106 @@ class _ProviderHero extends ConsumerWidget {
               ],
             ),
           ),
-          const Divider(height: 1, thickness: 1, color: Colors.black),
-          _AvailabilityCard(data: data),
+          const Divider(height: 1),
+          _AvailabilityCard(key: ValueKey(user?.id), data: data),
         ],
       ),
     );
   }
 }
 
-class _WalletSummary extends StatelessWidget {
-  const _WalletSummary({required this.data});
+class _HomeSummary extends StatelessWidget {
+  const _HomeSummary({required this.data, this.onIncome});
   final ProviderOverview data;
+  final VoidCallback? onIncome;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.account_balance_wallet_outlined,
-                  color: scheme.primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Ví Handigo',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+    return Column(
+      children: [
+        Card(
+          margin: EdgeInsets.zero,
+          color: scheme.primaryContainer,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onIncome ?? () => context.push('/provider/income'),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Thu nhập tháng này',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(color: scheme.onPrimary),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        color: scheme.onPrimary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _money(data.monthlyEarnings),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: scheme.onPrimary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Theo kết quả quyết toán công việc',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: scheme.onPrimary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final stacked =
+                constraints.maxWidth < 300 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.3;
+            final width = stacked
+                ? constraints.maxWidth
+                : (constraints.maxWidth - 12) / 2;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                SizedBox(
+                  width: width,
+                  child: _MetricCard(
+                    label: 'Đơn hoàn tất',
+                    value: '${data.completedOrders}',
+                    icon: Icons.task_alt_rounded,
+                  ),
                 ),
-                TextButton(
-                  onPressed: () => context.push('/provider/wallet'),
-                  child: const Text('Xem ví'),
+                SizedBox(
+                  width: width,
+                  child: _MetricCard(
+                    label: 'Đánh giá trung bình',
+                    value: data.averageRating > 0
+                        ? '${data.averageRating.toStringAsFixed(1)}/5'
+                        : 'Chưa có',
+                    icon: Icons.star_outline_rounded,
+                  ),
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final stacked =
-                    constraints.maxWidth < 280 ||
-                    MediaQuery.textScalerOf(context).scale(1) > 1.3;
-                Widget balance(String label, double amount, Color color) =>
-                    Container(
-                      constraints: const BoxConstraints(minHeight: 116),
-                      width: stacked
-                          ? constraints.maxWidth
-                          : (constraints.maxWidth - 12) / 2,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            label,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 4),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                _money(amount),
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(
-                                      color: color,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    balance(
-                      'Số dư khả dụng',
-                      data.walletBalance,
-                      scheme.primary,
-                    ),
-                    balance(
-                      'Số dư chờ xử lý',
-                      data.pendingBalance,
-                      scheme.onSurface,
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
+            );
+          },
         ),
-      ),
+      ],
     );
   }
 }
@@ -872,6 +1155,7 @@ class _AssignmentCardState extends ConsumerState<_AssignmentCard> {
       reason = value;
     }
     setState(() => busy = true);
+    final ownerId = ref.read(authControllerProvider).user?.id;
     try {
       final repository = ref.read(providerRepositoryProvider);
       if (accept) {
@@ -879,19 +1163,23 @@ class _AssignmentCardState extends ConsumerState<_AssignmentCard> {
       } else {
         await repository.rejectAssignment(widget.item.id, reason);
       }
+      if (!mounted || ownerId != ref.read(authControllerProvider).user?.id) {
+        return;
+      }
       ref.invalidate(providerAssignmentsProvider);
       ref.invalidate(providerOrdersProvider);
+      ref.invalidate(providerOrderPageProvider);
+      ref.invalidate(providerScheduleOrdersProvider);
       ref.invalidate(providerOverviewProvider);
+      if (accept) {
+        ref.invalidate(orderDetailProvider(widget.item.orderId));
+        context.go('/provider/orders/${widget.item.orderId}');
+        return;
+      }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              accept
-                  ? 'Đã nhận đơn. Xem công việc trong mục Đơn hàng.'
-                  : 'Đã từ chối đơn.',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Đã từ chối đơn.')));
       }
     } catch (error) {
       if (mounted) {
@@ -989,6 +1277,11 @@ class _AssignmentCardState extends ConsumerState<_AssignmentCard> {
                       icon: Icons.location_on_outlined,
                       text: item.addressLabel!,
                     ),
+                  const SizedBox(height: 8),
+                  ProviderAssignmentCustomerInfo(
+                    orderId: item.orderId,
+                    assignment: item,
+                  ),
                   const SizedBox(height: 4),
                   _MetaLine(
                     icon: Icons.schedule_outlined,
@@ -1743,13 +2036,8 @@ class _WeekStrip extends StatelessWidget {
 }
 
 class _AppointmentCard extends StatelessWidget {
-  const _AppointmentCard({
-    required this.order,
-    this.showDate = false,
-    this.isPreview = false,
-  });
+  const _AppointmentCard({required this.order, this.isPreview = false});
   final OrderSummary order;
-  final bool showDate;
   final bool isPreview;
   @override
   Widget build(BuildContext context) => Card(
@@ -1773,7 +2061,7 @@ class _AppointmentCard extends StatelessWidget {
                   order.scheduledAt == null
                       ? 'Chưa có lịch hẹn'
                       : DateFormat(
-                          showDate ? 'dd/MM • HH:mm' : 'HH:mm',
+                          'HH:mm',
                         ).format(order.scheduledAt!.toLocal()),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),

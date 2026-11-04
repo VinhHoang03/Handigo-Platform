@@ -17,6 +17,7 @@ class ProviderLocationService extends ChangeNotifier {
   StreamSubscription<Position>? _positions;
   Timer? _watchdog;
   Position? _anchor;
+  Position? _currentPosition;
   DateTime? _lastSampleAt, _lastSentAt;
   Future<void>? _operation;
   bool Function()? _shouldUpload;
@@ -25,6 +26,8 @@ class ProviderLocationService extends ChangeNotifier {
   bool _tracking = false, _disposed = false;
   ApiException? error;
   bool get tracking => _tracking;
+  Position? get synchronizedPosition => _anchor;
+  Position? get currentPosition => _currentPosition ?? synchronizedPosition;
 
   LocationSettings get streamSettings {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
@@ -193,11 +196,23 @@ class ProviderLocationService extends ChangeNotifier {
         (!manual && position.accuracy > 25) ||
         age > const Duration(seconds: 60) ||
         age < const Duration(seconds: -10)) {
+      // Bỏ mẫu tự động nhiễu, giữ mốc vừa lưu; không gửi tọa độ kém chất lượng.
+      final syncAge = _lastSentAt == null
+          ? null
+          : _now().difference(_lastSentAt!);
+      if (!manual &&
+          syncAge != null &&
+          !syncAge.isNegative &&
+          syncAge <= const Duration(seconds: 60)) {
+        return;
+      }
       throw const ApiException(
         'Vị trí chưa đủ chính xác hoặc đã cũ. Vui lòng ra nơi thoáng và thử lại.',
       );
     }
     if (!allowed() || _disposed) return;
+    _currentPosition = position;
+    notifyListeners();
     _lastSampleAt = _now();
     _scheduleCheck();
     final previous = _anchor;
@@ -238,6 +253,7 @@ class ProviderLocationService extends ChangeNotifier {
     if (_disposed || generation != _generation || !allowed()) return;
     if (moved) _anchor = position;
     _lastSentAt = _now();
+    if (moved && error == null) notifyListeners();
     _clearError();
   }
 

@@ -13,18 +13,22 @@ import 'provider_screens.dart';
 final providerProfileProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(providerRepositoryProvider).profile(),
 );
-final providerWalletProvider = FutureProvider.autoDispose<WalletInfo>(
-  (ref) => ref.watch(providerRepositoryProvider).wallet(),
-);
-final providerWalletTransactionsProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(providerRepositoryProvider).walletTransactions(),
-);
-final providerWithdrawalsProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(providerRepositoryProvider).withdrawals(),
-);
-final providerBanksProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(providerRepositoryProvider).bankAccounts(),
-);
+final providerWalletProvider = FutureProvider.autoDispose<WalletInfo>((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerRepositoryProvider).wallet();
+});
+final providerWalletTransactionsProvider = FutureProvider.autoDispose((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerRepositoryProvider).walletTransactions();
+});
+final providerWithdrawalsProvider = FutureProvider.autoDispose((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerRepositoryProvider).withdrawals();
+});
+final providerBanksProvider = FutureProvider.autoDispose((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerRepositoryProvider).bankAccounts();
+});
 final providerFeedbacksProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(providerRepositoryProvider).feedbacks(),
 );
@@ -373,7 +377,7 @@ class ProviderWalletScreen extends ConsumerWidget {
                 message: _message(error),
                 onRetry: () => ref.invalidate(providerWalletProvider),
               ),
-              data: (wallet) => _WalletBalanceCard(wallet: wallet),
+              data: (wallet) => ProviderWalletBalanceCard(wallet: wallet),
             ),
         const SizedBox(height: 12),
         Text(
@@ -454,9 +458,14 @@ class ProviderWalletScreen extends ConsumerWidget {
   );
 }
 
-class _WalletBalanceCard extends StatelessWidget {
-  const _WalletBalanceCard({required this.wallet});
+class ProviderWalletBalanceCard extends StatelessWidget {
+  const ProviderWalletBalanceCard({
+    required this.wallet,
+    this.onBankAccounts,
+    super.key,
+  });
   final WalletInfo wallet;
+  final VoidCallback? onBankAccounts;
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -508,7 +517,7 @@ class _WalletBalanceCard extends StatelessWidget {
               foregroundColor: scheme.onPrimary,
               side: BorderSide(color: scheme.onPrimary.withValues(alpha: .4)),
             ),
-            onPressed: () => context.push('/provider/banks'),
+            onPressed: onBankAccounts ?? () => context.push('/provider/banks'),
             icon: const Icon(Icons.account_balance_outlined, size: 20),
             label: const Text('Tài khoản ngân hàng'),
           ),

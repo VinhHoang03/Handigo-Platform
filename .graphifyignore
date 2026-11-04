@@ -6,6 +6,7 @@
 .env*
 **/.env*
 *.local
+handigo-app/config/*.local.json
 .npmrc
 .yarnrc
 .yarnrc.yml
