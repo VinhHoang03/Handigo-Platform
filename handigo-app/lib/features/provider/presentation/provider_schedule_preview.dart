@@ -31,6 +31,9 @@ List<OrderSummary> createSchedulePreviewOrders(DateTime now) {
       addressLabel: 'Phường Tân Phong, Quận 7',
       customerName: 'Chị Hạnh',
       totalAmount: 180000,
+      providerAmount: 153000,
+      durationMinutes: 60,
+      problemDescription: 'Vòi sen bị rò nước và áp lực nước yếu.',
     ),
     OrderSummary(
       id: 'preview-schedule-completed',
@@ -41,6 +44,9 @@ List<OrderSummary> createSchedulePreviewOrders(DateTime now) {
       addressLabel: 'Chung cư Riviera Point, Quận 7',
       customerName: 'Anh Minh',
       totalAmount: 420000,
+      providerAmount: 357000,
+      durationMinutes: 120,
+      problemDescription: 'Căn hộ cần tổng vệ sinh trước khi bàn giao.',
     ),
     OrderSummary(
       id: 'preview-schedule-1',
@@ -51,6 +57,9 @@ List<OrderSummary> createSchedulePreviewOrders(DateTime now) {
       addressLabel: 'Đỗ Xuân Hợp, Quận 9, TP. Thủ Đức',
       customerName: 'Chị Lan',
       totalAmount: 250000,
+      providerAmount: 212500,
+      durationMinutes: 90,
+      problemDescription: 'Máy giặt rung mạnh và có tiếng ồn khi vắt.',
     ),
     OrderSummary(
       id: 'preview-schedule-2',
@@ -61,6 +70,9 @@ List<OrderSummary> createSchedulePreviewOrders(DateTime now) {
       addressLabel: 'Chung cư Sunrise City, Nguyễn Hữu Thọ, Quận 7',
       customerName: 'Anh Tuấn',
       totalAmount: 150000,
+      providerAmount: 127500,
+      durationMinutes: 90,
+      problemDescription: 'Bồn rửa bị rò nước ở khớp nối phía dưới.',
     ),
     OrderSummary(
       id: 'preview-schedule-3',
@@ -71,6 +83,9 @@ List<OrderSummary> createSchedulePreviewOrders(DateTime now) {
       addressLabel: 'KDC Him Lam, Đường số 4, Quận 7',
       customerName: 'Anh Nam',
       totalAmount: 360000,
+      providerAmount: 306000,
+      durationMinutes: 90,
+      problemDescription: 'Hai máy lạnh cần vệ sinh và kiểm tra gas.',
     ),
     OrderSummary(
       id: 'preview-schedule-4',
@@ -81,6 +96,9 @@ List<OrderSummary> createSchedulePreviewOrders(DateTime now) {
       addressLabel: 'Phường Tân Phong, Quận 7',
       customerName: 'Chị Mai',
       totalAmount: 280000,
+      providerAmount: 238000,
+      durationMinutes: 90,
+      problemDescription: 'Một số ổ cắm chập chờn, cần kiểm tra đường dây.',
     ),
     OrderSummary(
       id: 'preview-schedule-5',
@@ -91,6 +109,9 @@ List<OrderSummary> createSchedulePreviewOrders(DateTime now) {
       addressLabel: 'Phường An Phú, TP. Thủ Đức',
       customerName: 'Anh Minh',
       totalAmount: 240000,
+      providerAmount: 204000,
+      durationMinutes: 90,
+      problemDescription: 'Điều hòa có mùi và làm lạnh chậm.',
     ),
   ];
 }

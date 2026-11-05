@@ -58,6 +58,9 @@ final orders = [
     scheduledAt: today.add(const Duration(hours: 9)),
     addressLabel: 'Phường Tân Phong, Thành phố Hồ Chí Minh',
     totalAmount: 350000,
+    providerAmount: 297500,
+    durationMinutes: 90,
+    problemDescription: 'Máy lạnh làm lạnh chậm và có mùi.',
   ),
   OrderSummary(
     id: 'progress',
@@ -67,6 +70,9 @@ final orders = [
     scheduledAt: today.add(const Duration(hours: 14)),
     addressLabel: 'Địa chỉ thực hiện dịch vụ cần hiển thị trên màn hình nhỏ',
     totalAmount: 150000,
+    providerAmount: 127500,
+    durationMinutes: 90,
+    problemDescription: 'Đường nước dưới bồn rửa đang bị rò.',
   ),
   OrderSummary(
     id: 'tomorrow',
@@ -74,6 +80,8 @@ final orders = [
     serviceName: 'Bảo dưỡng máy giặt',
     status: 'accepted',
     scheduledAt: today.add(const Duration(days: 1, hours: 10)),
+    providerAmount: 204000,
+    durationMinutes: 90,
   ),
   OrderSummary(
     id: 'cancelled',
@@ -81,6 +89,7 @@ final orders = [
     serviceName: 'Đơn đã hủy',
     status: 'cancelled',
     scheduledAt: today.add(const Duration(hours: 16)),
+    providerAmount: 0,
   ),
 ];
 final assignment = ProviderAssignment(
@@ -494,6 +503,17 @@ Future<void> _showScreen(
         accountComplaintsProvider.overrideWith(
           (ref) async =>
               const PagedResult<SupportItem>(items: [], page: 1, totalPages: 1),
+        ),
+        accountReportsProvider.overrideWith(
+          (ref) async =>
+              const PagedResult<SupportItem>(items: [], page: 1, totalPages: 1),
+        ),
+        orderListProvider.overrideWith(
+          (ref) async => PagedResult(
+            items: currentOrders ?? orders,
+            page: 1,
+            totalPages: 1,
+          ),
         ),
         orderDetailProvider('detail').overrideWith(
           (ref) async => OrderDetail(
@@ -919,7 +939,8 @@ Future<void> main() async {
     expect(find.text('Tài khoản ngân hàng'), findsOneWidget);
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
+    expect(find.text('Tháng'), findsOneWidget);
+    expect(find.text('Tuần'), findsOneWidget);
     await tester.tap(find.text('Tài khoản').last);
     await tester.pumpAndSettle();
     expect(find.text('Hồ sơ đối tác'), findsOneWidget);
@@ -974,6 +995,37 @@ Future<void> main() async {
       );
       expect(find.text(label), findsOneWidget);
     }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Trung tâm hỗ trợ mở form gửi yêu cầu đầy đủ', (tester) async {
+    await _showScreen(tester, const SupportScreen());
+    await tester.tap(find.byTooltip('Tạo mới'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tạo yêu cầu hỗ trợ'), findsOneWidget);
+    expect(find.text('Loại hỗ trợ'), findsOneWidget);
+    expect(find.text('Tiêu đề'), findsOneWidget);
+    expect(find.text('Mô tả cần hỗ trợ'), findsOneWidget);
+    expect(find.textContaining('Thêm ảnh'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Báo cáo sự cố mở form đúng nghiệp vụ report', (tester) async {
+    await _showScreen(
+      tester,
+      const ComplaintScreen(),
+      size: const Size(320, 640),
+      scale: 2,
+    );
+    await tester.tap(find.byTooltip('Tạo mới'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gửi báo cáo sự cố'), findsOneWidget);
+    expect(find.text('Loại báo cáo'), findsOneWidget);
+    expect(find.text('Đối tượng báo cáo'), findsOneWidget);
+    expect(find.text('Đơn dịch vụ'), findsWidgets);
+    expect(find.text('Nội dung chi tiết'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -1035,121 +1087,129 @@ Future<void> main() async {
     tester,
   ) async {
     await _showScreen(tester, const ProviderScheduleScreen());
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
+    expect(find.text('Lịch làm việc'), findsOneWidget);
     setSchedulePreviewForDebug(true);
     await tester.pumpAndSettle();
-    expect(find.text('3 lịch hẹn'), findsOneWidget);
-    expect(find.textContaining('760.000'), findsOneWidget);
+    final previewAmount = find.textContaining('212.500');
+    await tester.scrollUntilVisible(
+      previewAmount,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(previewAmount, findsOneWidget);
     await savePreview(tester, 'schedule-sample');
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
     await _showScreen(tester, const ProviderScheduleScreen());
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
+    expect(find.text('Lịch làm việc'), findsOneWidget);
     expect(find.textContaining('Dữ liệu xem thử •'), findsNothing);
   });
 
-  testWidgets('Vào lại lịch hẹn chọn hôm nay và đưa ô ngày sát trái', (
-    tester,
-  ) async {
+  testWidgets('Vào lại lịch hẹn tự chọn lại hôm nay', (tester) async {
     await _showScreen(tester, const ProviderShell());
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
     final next = DateTime(today.year, today.month, today.day + 1);
-    final nextLabel = find.text('${next.day}/${next.month}');
-    await tester.ensureVisible(nextLabel);
-    await tester.tap(nextLabel);
+    final nextDay = find.byKey(
+      ValueKey(
+        'schedule-day-${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}',
+      ),
+    );
+    await tester.ensureVisible(nextDay);
+    await tester.tap(nextDay);
     await tester.pumpAndSettle();
-    expect(find.text('1 lịch hẹn'), findsOneWidget);
+    expect(find.text('1 công việc'), findsOneWidget);
     await tester.tap(find.text('Tổng quan').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
-    final todayCard = find
-        .ancestor(
-          of: find.text('${today.day}/${today.month}'),
-          matching: find.byType(TextButton),
-        )
-        .first;
-    expect(tester.getTopLeft(todayCard).dx, 16);
+    expect(find.text('3 công việc'), findsOneWidget);
+    expect(
+      find.byKey(
+        ValueKey(
+          'schedule-day-${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}',
+        ),
+      ),
+      findsWidgets,
+    );
     expect(find.byIcon(Icons.science_outlined), findsNothing);
     expect(find.text('Hôm nay'), findsOneWidget);
   });
 
-  testWidgets('Nút tháng mở lịch, hủy giữ ngày và chọn được tháng khác', (
+  testWidgets('Lịch tháng chuyển được sang tháng khác', (tester) async {
+    await _showScreen(tester, const ProviderScheduleScreen());
+    await tester.tap(find.byTooltip('Kỳ sau'));
+    await tester.pumpAndSettle();
+
+    final next = DateTime(today.year, today.month + 1);
+    expect(find.text('Tháng ${next.month}, ${next.year}'), findsWidgets);
+    expect(find.text('0 công việc'), findsOneWidget);
+    expect(find.text('Ngày này chưa có lịch hẹn.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Lịch tuần hiển thị công việc và thu nhập provider', (
     tester,
   ) async {
     await _showScreen(tester, const ProviderScheduleScreen());
-    final month = '${today.month.toString().padLeft(2, '0')}/${today.year}';
-    await tester.tap(find.widgetWithText(OutlinedButton, month));
-    await tester.pumpAndSettle();
-    expect(find.byType(CalendarDatePicker), findsOneWidget);
-    await tester.tap(find.text('Hủy'));
-    await tester.pumpAndSettle();
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(OutlinedButton, month));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Next month'));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(CalendarDatePicker),
-        matching: find.text('15'),
-      ),
-    );
-    await tester.tap(find.text('Chọn'));
+    await tester.tap(find.text('Tuần'));
     await tester.pumpAndSettle();
 
-    final next = DateTime(today.year, today.month + 1, 15);
-    expect(
-      find.widgetWithText(
-        OutlinedButton,
-        '${next.month.toString().padLeft(2, '0')}/${next.year}',
-      ),
-      findsOneWidget,
+    expect(find.byKey(const ValueKey('week-calendar')), findsOneWidget);
+    expect(find.text('+425k'), findsOneWidget);
+    final amount = find.textContaining('297.500');
+    await tester.scrollUntilVisible(
+      amount,
+      300,
+      scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('${next.day}/${next.month}'), findsOneWidget);
-    expect(find.text('0 lịch hẹn'), findsOneWidget);
-    expect(find.text('Không có lịch hẹn trong ngày này.'), findsOneWidget);
+    expect(amount, findsOneWidget);
+    expect(find.textContaining('350.000'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('Lịch chọn đúng ngày và loại đơn hủy', (tester) async {
     await _showScreen(tester, const ProviderScheduleScreen());
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
-    expect(find.text('Đơn đã hủy'), findsNothing);
-    await savePreview(tester, 'schedule');
+    expect(find.text('3 công việc'), findsOneWidget);
+    await savePreview(tester, 'schedule-top');
     final next = today.add(const Duration(days: 1));
     final dot = find.byKey(
       ValueKey(
         'schedule-dot-${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}',
       ),
     );
-    if (next.weekday != 1) {
-      expect(
-        (tester.widget<Container>(dot).decoration as BoxDecoration).color,
-        AppTheme.error,
-      );
-    }
-    final day = find.text('${next.day}/${next.month}');
+    expect(dot, findsOneWidget);
+    final day = find.byKey(
+      ValueKey(
+        'schedule-day-${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}',
+      ),
+    );
     await tester.ensureVisible(day);
     await tester.tap(day);
     await tester.pumpAndSettle();
-    expect(find.text('1 lịch hẹn'), findsOneWidget);
+    expect(find.text('1 công việc'), findsOneWidget);
+    expect(
+      find.text('Lịch ngày ${next.day}/${next.month}').hitTestable(),
+      findsOneWidget,
+    );
     expect(find.text('Bảo dưỡng máy giặt'), findsOneWidget);
     expect(find.text('Vệ sinh máy lạnh'), findsNothing);
-    expect(find.text('Ngày mai'), findsOneWidget);
-    expect(dot, findsNothing);
-    await tester.ensureVisible(find.text('${today.day}/${today.month}'));
-    await tester.tap(find.text('${today.day}/${today.month}'));
+    final todayDay = find.byKey(
+      ValueKey(
+        'schedule-day-${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}',
+      ),
+    );
+    await tester.ensureVisible(todayDay);
+    await tester.tap(todayDay);
     await tester.pumpAndSettle();
-    if (next.weekday != 1) {
-      expect(
-        (tester.widget<Container>(dot).decoration as BoxDecoration).color,
-        AppTheme.outlineVariant,
-      );
-    }
+    expect(find.text('3 công việc'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Đơn đã hủy'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Đơn đã hủy'), findsOneWidget);
+    await savePreview(tester, 'schedule');
   });
 
   testWidgets('Bộ lọc đơn và card chờ phản hồi dùng thao tác rõ ràng', (

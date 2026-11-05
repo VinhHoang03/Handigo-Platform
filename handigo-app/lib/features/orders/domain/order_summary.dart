@@ -10,9 +10,11 @@ class OrderSummary {
     this.addressLabel,
     this.serviceImage,
     this.providerName,
+    this.providerId,
     this.providerAvatar,
     this.providerGender,
     this.customerName,
+    this.customerId,
     this.customerAvatar,
     this.serviceType,
     this.addressLatitude,
@@ -21,6 +23,10 @@ class OrderSummary {
     this.providerAmount,
     this.inspectionRequired = false,
     this.createdAt,
+    this.expectedStartAt,
+    this.expectedEndAt,
+    this.durationMinutes,
+    this.problemDescription,
     this.paymentStatus,
     this.bookingStatus,
     this.readyForMatching = false,
@@ -34,6 +40,7 @@ class OrderSummary {
         ? provider['userId']
         : null;
     final pricing = json['pricing'];
+    final schedule = json['schedule'];
     final address = json['addressSnapshot'] ?? json['addressId'];
     return OrderSummary(
       id: (json['_id'] ?? json['id']) as String,
@@ -49,6 +56,16 @@ class OrderSummary {
       depositPaidAt: _date(json['depositPaidAt']),
       scheduledAt: _date(json['scheduledAt']),
       createdAt: _date(json['createdAt']),
+      expectedStartAt: schedule is Map<String, dynamic>
+          ? _date(schedule['expectedStartAt'])
+          : null,
+      expectedEndAt: schedule is Map<String, dynamic>
+          ? _date(schedule['expectedEndAt'])
+          : null,
+      durationMinutes: schedule is Map<String, dynamic>
+          ? (schedule['durationMinutes'] as num?)?.toInt()
+          : null,
+      problemDescription: json['problemDescription'] as String?,
       addressLabel: address is Map<String, dynamic>
           ? formatAddressData(address)
           : null,
@@ -61,6 +78,9 @@ class OrderSummary {
       providerName: providerUser is Map<String, dynamic>
           ? providerUser['fullName'] as String?
           : null,
+      providerId: provider is Map<String, dynamic>
+          ? _stringValue(provider['_id'] ?? provider['id'])
+          : _stringValue(provider),
       providerAvatar: providerUser is Map<String, dynamic>
           ? providerUser['avatar'] as String?
           : null,
@@ -76,6 +96,12 @@ class OrderSummary {
       customerName: json['customerId'] is Map<String, dynamic>
           ? (json['customerId'] as Map<String, dynamic>)['fullName'] as String?
           : null,
+      customerId: json['customerId'] is Map<String, dynamic>
+          ? _stringValue(
+              (json['customerId'] as Map<String, dynamic>)['_id'] ??
+                  (json['customerId'] as Map<String, dynamic>)['id'],
+            )
+          : _stringValue(json['customerId']),
       customerAvatar: json['customerId'] is Map<String, dynamic>
           ? (json['customerId'] as Map<String, dynamic>)['avatar'] as String?
           : null,
@@ -105,9 +131,11 @@ class OrderSummary {
   final String? addressLabel;
   final String? serviceImage;
   final String? providerName;
+  final String? providerId;
   final String? providerAvatar;
   final String? providerGender;
   final String? customerName;
+  final String? customerId;
   final String? customerAvatar;
   final String? serviceType;
   final double? addressLatitude, addressLongitude;
@@ -115,9 +143,15 @@ class OrderSummary {
   final double? providerAmount;
   final bool inspectionRequired;
   final DateTime? createdAt;
+  final DateTime? expectedStartAt;
+  final DateTime? expectedEndAt;
+  final int? durationMinutes;
+  final String? problemDescription;
   final String? paymentStatus, bookingStatus;
   final bool readyForMatching, hasPendingAssignment;
   final DateTime? depositPaidAt;
+
+  DateTime? get calendarAt => scheduledAt ?? expectedStartAt ?? createdAt;
 
   String get customerDisplayStatus {
     if (status != 'created') return status;
