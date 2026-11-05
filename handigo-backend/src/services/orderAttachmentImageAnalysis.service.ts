@@ -1,4 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, GoogleGenerativeAIFetchError } from "@google/generative-ai";
+import { AppError } from "../utils/appError";
+import { createLogger } from "../utils/logger";
+import { setTimeout as delay } from "node:timers/promises";
 
 export interface OrderAttachmentImageAnalysisResult {
   isRelevant: boolean;
@@ -9,8 +12,10 @@ export interface OrderAttachmentImageAnalysisResult {
 
 const IMAGE_VALIDATION_MODEL = "gemini-3.5-flash-lite";
 const MIN_ACCEPTED_CONFIDENCE = 0.65;
+const imageAnalysisLogger = createLogger("OrderAttachmentImageAnalysis");
 
-const getGeminiApiKey = () => process.env.GEMINI_API_KEY_1?.trim();
+const getGeminiApiKey = () =>
+  process.env.GEMINI_API_KEY_1?.trim() || process.env.GEMINI_API_KEY?.trim();
 
 const extractJsonObject = (text: string) => {
   const cleaned = text.replace(/```json|```/gi, "").trim();
@@ -43,7 +48,7 @@ export const analyzeOrderProblemImage = async (
 ): Promise<OrderAttachmentImageAnalysisResult> => {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
-    throw new Error("Thiếu cấu hình GEMINI_API_KEY_1");
+    throw new AppError("Hệ thống chưa cấu hình dịch vụ kiểm tra ảnh. Vui lòng liên hệ hỗ trợ.", 503);
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -68,21 +73,50 @@ export const analyzeOrderProblemImage = async (
   let analysis: OrderAttachmentImageAnalysisResult;
 
   try {
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: buffer.toString("base64"),
-          mimeType,
-        },
-      },
-    ]);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const result = await model.generateContent([
+          prompt,
+          {
+            inlineData: {
+              data: buffer.toString("base64"),
+              mimeType,
+            },
+          },
+        ], { timeout: 20_000 });
 
-    const text = result.response.text();
-    const parsed = JSON.parse(extractJsonObject(text));
-    analysis = normalizeAnalysis(parsed);
-  } catch {
-    throw new Error("Gemini không thể phân tích ảnh");
+        const text = result.response.text();
+        const parsed = JSON.parse(extractJsonObject(text));
+        analysis = normalizeAnalysis(parsed);
+        break;
+      } catch (error) {
+        const status = error instanceof GoogleGenerativeAIFetchError ? error.status : undefined;
+        if (attempt >= 2 || ![502, 503, 504].includes(status ?? 0)) throw error;
+        const retryDelayMs = 1000 * 2 ** attempt;
+        imageAnalysisLogger.warn("Dịch vụ kiểm tra ảnh tạm gián đoạn, đang thử lại.", {
+          upstreamStatus: status,
+          nextAttempt: attempt + 2,
+          retryDelayMs,
+        });
+        await delay(retryDelayMs);
+      }
+    }
+  } catch (error) {
+    const status = error instanceof GoogleGenerativeAIFetchError ? error.status : undefined;
+    imageAnalysisLogger.error("Kiểm tra ảnh mô tả thất bại.", undefined, {
+      model: IMAGE_VALIDATION_MODEL,
+      upstreamStatus: status,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
+    let message = "Dịch vụ kiểm tra ảnh đang gặp sự cố. Vui lòng thử lại sau.";
+    if (status === 400 || status === 401 || status === 403) {
+      message = "Dịch vụ kiểm tra ảnh đang lỗi cấu hình hoặc quyền truy cập. Vui lòng liên hệ hỗ trợ.";
+    } else if (status === 404) {
+      message = "Mô hình kiểm tra ảnh hiện không khả dụng. Vui lòng liên hệ hỗ trợ.";
+    } else if (status === 429) {
+      message = "Dịch vụ kiểm tra ảnh đang quá hạn mức. Vui lòng thử lại sau.";
+    }
+    throw new AppError(message, 503);
   }
 
   if (analysis.confidence < MIN_ACCEPTED_CONFIDENCE) {

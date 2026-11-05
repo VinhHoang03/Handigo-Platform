@@ -50,9 +50,36 @@ class _Repository extends ChatRepository {
 }
 
 void main() {
+  test(
+    'Tin nhắn đọc avatar người gửi và hỗ trợ dữ liệu chỉ có mã người gửi',
+    () {
+      final message = ChatMessage.fromJson({
+        '_id': 'message',
+        'senderId': {
+          '_id': 'provider',
+          'avatar': 'https://example.test/avatar.jpg',
+        },
+        'content': greeting,
+      }, 'customer');
+      expect(message.senderAvatar, 'https://example.test/avatar.jpg');
+      expect(message.isMine, isFalse);
+      expect(
+        ChatMessage.fromJson({
+          '_id': 'message',
+          'senderId': 'customer',
+        }, 'customer').senderAvatar,
+        isNull,
+      );
+    },
+  );
+
   testWidgets(
     'Hội thoại giữ lời chào, bỏ nút dịch vụ và gọi điện, vẫn gửi trả lời được',
     (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
       final api = ApiClient(Dio(), CookieJar());
       addTearDown(api.close);
       final repository = _Repository(api);
@@ -82,6 +109,21 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text(greeting), findsOneWidget);
+      final avatar = find
+          .ancestor(
+            of: find.byIcon(Icons.person_outline),
+            matching: find.byType(SizedBox),
+          )
+          .first;
+      final bubble = find
+          .ancestor(of: find.text(greeting), matching: find.byType(Container))
+          .first;
+      final avatarRect = tester.getRect(avatar);
+      final bubbleRect = tester.getRect(bubble);
+      expect(avatarRect.size, const Size(32, 32));
+      expect(bubbleRect.left - avatarRect.right, 8);
+      expect(avatarRect.bottom, bubbleRect.bottom);
+      expect(bubbleRect.right, lessThanOrEqualTo(304));
       expect(find.text('Trao đổi về đơn dịch vụ'), findsNothing);
       expect(find.byTooltip('Gọi điện'), findsNothing);
       expect(find.byIcon(Icons.phone_outlined), findsNothing);
@@ -93,6 +135,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(repository.sent, ['Cảm ơn anh, hẹn gặp anh.']);
       expect(find.text('Cảm ơn anh, hẹn gặp anh.'), findsOneWidget);
+      expect(find.byIcon(Icons.person_outline), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

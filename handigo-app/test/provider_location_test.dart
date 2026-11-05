@@ -107,6 +107,39 @@ void main() {
   });
 
   test(
+    'Bật nhận việc dùng lại mẫu GPS mới, còn tải lại thủ công vẫn lấy mẫu mới',
+    () async {
+      await service.synchronize(shouldUpload: () => true);
+      expect(location.reads, 1);
+      await service.synchronize(
+        shouldUpload: () => true,
+        useCachedPosition: true,
+      );
+      expect(location.reads, 1);
+      await service.synchronize(shouldUpload: () => true);
+      expect(location.reads, 2);
+    },
+  );
+
+  test('Không dùng mẫu GPS cũ hoặc sai số lớn để bật nhanh', () async {
+    final time = DateTime.now();
+    var current = time;
+    final cached = ProviderLocationService(api, now: () => current);
+    addTearDown(cached.dispose);
+    location.now = () => current;
+    await cached.synchronize(shouldUpload: () => true);
+    final before = location.reads;
+    current = time.add(const Duration(seconds: 31));
+    await cached.synchronize(shouldUpload: () => true, useCachedPosition: true);
+    expect(location.reads, before + 1);
+    location.accuracy = 100;
+    await cached.synchronize(shouldUpload: () => true);
+    final beforeCoarse = location.reads;
+    await cached.synchronize(shouldUpload: () => true, useCachedPosition: true);
+    expect(location.reads, beforeCoarse + 1);
+  });
+
+  test(
     'Vị trí tính khoảng cách vẫn có khi lưu máy chủ lỗi và khi dừng theo dõi',
     () async {
       api.fail = true;

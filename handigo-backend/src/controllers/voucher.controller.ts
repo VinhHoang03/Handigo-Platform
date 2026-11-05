@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { requireRequestUser } from "../middlewares/authContext";
 import * as voucherService from "../services/voucher.service";
 import { sendControllerError } from "../utils/controllerError";
+import { rewardPageSchema } from "../validations/reward.validator";
 import {
   adminVoucherQuerySchema,
   availableVoucherQuerySchema,
@@ -49,6 +50,15 @@ export const getAvailableVouchers = async (req: Request, res: Response) => {
       data: result,
       message: "Lấy danh sách voucher khả dụng thành công",
     });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
+
+export const getVoucherUsageHistory = async (req: Request, res: Response) => {
+  try {
+    const { page } = rewardPageSchema.parse(req.query);
+    return res.json({ success: true, data: await voucherService.getVoucherUsageHistory(requireRequestUser(req), page) });
   } catch (error: unknown) {
     return sendControllerError(res, error);
   }

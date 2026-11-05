@@ -12,7 +12,6 @@ import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart' as speech;
 import '../../../app/theme/app_theme.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/network/api_exception.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/utils/category_color.dart';
 import '../../ai_chat/presentation/ai_chat_sheet.dart';
@@ -26,6 +25,7 @@ import '../../chat/presentation/chat_screens.dart';
 import '../../account/presentation/account_screens.dart';
 import '../domain/customer_home_data.dart';
 import 'customer_home_provider.dart';
+import 'reward_redemption.dart';
 import 'device_location_provider.dart';
 
 class CustomerShell extends StatefulWidget {
@@ -58,10 +58,10 @@ class _CustomerShellState extends State<CustomerShell> {
           (widget.navigationShell == null
               ? activeIndex != 2
               : const [
-                '/customer',
-                '/customer/orders',
-                '/customer/account',
-              ].contains(GoRouterState.of(context).uri.path))
+                  '/customer',
+                  '/customer/orders',
+                  '/customer/account',
+                ].contains(GoRouterState.of(context).uri.path))
           ? FloatingActionButton(
               heroTag: 'handigo-ai-chat',
               tooltip: 'Trò chuyện với trợ lý AI Handigo',
@@ -1172,101 +1172,107 @@ class _HomeRewardsSection extends ConsumerWidget {
     final numbers = NumberFormat.decimalPattern('vi');
     final scheme = theme.colorScheme;
     final scrollBehavior = ScrollConfiguration.of(context);
-    return ref.watch(customerHomeRewardsProvider).when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(16),
-        child: AppLoading(),
-      ),
-      error: (_, _) => AppMessage(
-        message: 'Không thể tải điểm tích lũy và voucher đổi điểm.',
-        onRetry: () => ref.invalidate(customerHomeRewardsProvider),
-      ),
-      data: (rewards) {
-        final nextOffer = rewards.offers
-            .where((offer) => offer.points > rewards.balance)
-            .firstOrNull;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ListTile(
-              tileColor: Colors.white,
-              iconColor: scheme.primary,
-              textColor: scheme.onSurface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: scheme.outlineVariant),
-              ),
-              leading: const Icon(Icons.stars_outlined),
-              title: const Text('Điểm tích lũy hiện có'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (nextOffer == null)
-                    Text(
-                      '${numbers.format(rewards.balance)} điểm',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  if (nextOffer != null) ...[
-                    const SizedBox(height: 6),
-                    LinearProgressIndicator(
-                      value: (rewards.balance / nextOffer.points).clamp(0.0, 1.0),
-                      minHeight: 8,
-                      borderRadius: BorderRadius.circular(999),
-                      backgroundColor: scheme.outlineVariant.withValues(alpha: .4),
-                      color: scheme.primary,
-                      semanticsLabel: 'Tiến độ đổi voucher ${nextOffer.name}',
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${numbers.format(rewards.balance)} / '
-                      '${numbers.format(nextOffer.points)} điểm',
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (rewards.offers.isEmpty)
-              const _HomeEmpty(message: 'Hiện chưa có voucher đổi điểm.')
-            else
-              ScrollConfiguration(
-                behavior: scrollBehavior.copyWith(
-                  dragDevices: {
-                    ...scrollBehavior.dragDevices,
-                    PointerDeviceKind.mouse,
-                  },
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      spacing: 12,
-                      children: [
-                        for (final offer in rewards.offers)
-                          _HomeRewardCard(
-                            offer: offer,
-                            onTap: () => _confirmRedeem(
-                              context,
-                              ref,
-                              offer,
-                              rewards.balance,
-                            ),
+    return ref
+        .watch(customerHomeRewardsProvider)
+        .when(
+          loading: () =>
+              const Padding(padding: EdgeInsets.all(16), child: AppLoading()),
+          error: (_, _) => AppMessage(
+            message: 'Không thể tải điểm tích lũy và voucher đổi điểm.',
+            onRetry: () => ref.invalidate(customerHomeRewardsProvider),
+          ),
+          data: (rewards) {
+            final nextOffer = rewards.offers
+                .where((offer) => offer.points > rewards.balance)
+                .firstOrNull;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  tileColor: Colors.white,
+                  iconColor: scheme.primary,
+                  textColor: scheme.onSurface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: scheme.outlineVariant),
+                  ),
+                  leading: const Icon(Icons.stars_outlined),
+                  title: const Text('Điểm tích lũy hiện có'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (nextOffer == null)
+                        Text(
+                          '${numbers.format(rewards.balance)} điểm',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w700,
                           ),
+                        ),
+                      if (nextOffer != null) ...[
+                        const SizedBox(height: 6),
+                        LinearProgressIndicator(
+                          value: (rewards.balance / nextOffer.points).clamp(
+                            0.0,
+                            1.0,
+                          ),
+                          minHeight: 8,
+                          borderRadius: BorderRadius.circular(999),
+                          backgroundColor: scheme.outlineVariant.withValues(
+                            alpha: .4,
+                          ),
+                          color: scheme.primary,
+                          semanticsLabel:
+                              'Tiến độ đổi voucher ${nextOffer.name}',
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${numbers.format(rewards.balance)} / '
+                          '${numbers.format(nextOffer.points)} điểm',
+                          textAlign: TextAlign.end,
+                          style: theme.textTheme.bodySmall,
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-              ),
-          ],
+                const SizedBox(height: 10),
+                if (rewards.offers.isEmpty)
+                  const _HomeEmpty(message: 'Hiện chưa có voucher đổi điểm.')
+                else
+                  ScrollConfiguration(
+                    behavior: scrollBehavior.copyWith(
+                      dragDevices: {
+                        ...scrollBehavior.dragDevices,
+                        PointerDeviceKind.mouse,
+                      },
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          spacing: 12,
+                          children: [
+                            for (final offer in rewards.offers)
+                              _HomeRewardCard(
+                                offer: offer,
+                                onTap: () => _confirmRedeem(
+                                  context,
+                                  ref,
+                                  offer,
+                                  rewards.balance,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         );
-      },
-    );
   }
 
   Future<void> _confirmRedeem(
@@ -1275,80 +1281,10 @@ class _HomeRewardsSection extends ConsumerWidget {
     HomeRewardOffer offer,
     int balance,
   ) async {
-    final repository = ref.read(customerHomeRepositoryProvider);
-    final numbers = NumberFormat.decimalPattern('vi');
-    final canRedeem = balance >= offer.points;
-    String? requestId;
-    String? errorMessage;
-    var busy = false;
-    final redeemed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => PopScope(
-          canPop: !busy,
-          child: AlertDialog(
-            backgroundColor: _rewardSurface(context),
-            surfaceTintColor: Colors.transparent,
-            scrollable: true,
-            title: Text('Đổi voucher ${_rewardOfferName(offer, numbers)}'),
-            content: Text(
-              'Điều kiện áp dụng\n'
-              '${_rewardOfferConditions(offer, numbers)}\n\n'
-              'Điểm cần dùng: ${numbers.format(offer.points)}\n'
-              'Điểm hiện có: ${numbers.format(balance)}'
-              '${canRedeem ? '' : '\nBạn chưa đủ điểm để đổi voucher này.'}'
-              '${errorMessage == null ? '' : '\n$errorMessage'}',
-            ),
-            actions: [
-              TextButton(
-                onPressed: busy ? null : () => Navigator.of(context).pop(),
-                child: const Text('Đóng'),
-              ),
-              FilledButton(
-                onPressed: busy || !canRedeem
-                    ? null
-                    : () async {
-                        setState(() {
-                          busy = true;
-                          errorMessage = null;
-                        });
-                        try {
-                          await repository.redeemReward(
-                            offer,
-                            requestId ??= _rewardRequestId(),
-                          );
-                          if (context.mounted) Navigator.of(context).pop(true);
-                        } on ApiException catch (error) {
-                          if (!context.mounted) return;
-                          setState(() {
-                            busy = false;
-                            errorMessage = error.message;
-                          });
-                        }
-                      },
-                child: Text(busy ? 'Đang đổi…' : 'Xác nhận đổi'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (redeemed != true || !context.mounted) return;
-    ref.invalidate(customerHomeRewardsProvider);
-    ref.invalidate(customerHomeProvider);
-    ref.invalidate(accountVouchersProvider);
-    AppToast.show(context, 'Đã đổi voucher thành công.', type: AppToastType.success);
+    if (await confirmRewardRedemption(context, ref, offer, balance)) {
+      ref.invalidate(accountVouchersProvider);
+    }
   }
-}
-
-String _rewardRequestId() {
-  final random = math.Random.secure();
-  final bytes = List.generate(16, (_) => random.nextInt(256));
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  final hex = bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
-  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
 }
 
 class _HomeRewardCard extends StatelessWidget {
@@ -1376,7 +1312,7 @@ class _HomeRewardCard extends StatelessWidget {
               constraints: const BoxConstraints(minHeight: 170),
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 48),
               decoration: BoxDecoration(
-                color: _rewardSurface(context),
+                color: rewardSurface(context),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: scheme.outlineVariant),
               ),
@@ -1385,7 +1321,10 @@ class _HomeRewardCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.confirmation_num_outlined, color: scheme.primary),
+                      Icon(
+                        Icons.confirmation_num_outlined,
+                        color: scheme.primary,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -1401,7 +1340,7 @@ class _HomeRewardCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    _rewardOfferName(offer, numbers),
+                    rewardOfferName(offer, numbers),
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: scheme.onSurface,
                       fontWeight: FontWeight.w700,
@@ -1409,7 +1348,7 @@ class _HomeRewardCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _rewardOfferConditions(offer, numbers),
+                    rewardOfferConditions(offer, numbers),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -1432,34 +1371,6 @@ class _HomeRewardCard extends StatelessWidget {
       ),
     );
   }
-}
-
-Color _rewardSurface(BuildContext context) {
-  final theme = Theme.of(context);
-  return theme.brightness == Brightness.light
-      ? Colors.white
-      : theme.colorScheme.surfaceContainerLowest;
-}
-
-String _rewardOfferName(HomeRewardOffer offer, NumberFormat numbers) {
-  final name = offer.name.trim();
-  if (name.isNotEmpty) return name;
-  final unit = offer.discountType == 'PERCENT' ? '%' : ' đ';
-  return 'giảm ${numbers.format(offer.discountValue)}$unit';
-}
-
-String _rewardOfferConditions(HomeRewardOffer offer, NumberFormat numbers) {
-  final maximum = offer.maxDiscountAmount;
-  final orderExample = offer.applicableOrderType == 'variable_price'
-      ? 'đơn báo giá (ví dụ: sửa chữa)'
-      : 'đơn giá cố định (ví dụ: vệ sinh)';
-  final minimum = offer.minOrderAmount > 0
-      ? ' từ ${numbers.format(offer.minOrderAmount)} đ'
-      : '';
-  final discountLimit = maximum != null && maximum > 0
-      ? ' Giảm tối đa ${numbers.format(maximum)} đ.'
-      : '';
-  return 'Áp dụng cho $orderExample$minimum.$discountLimit';
 }
 
 class _VoucherHorizontalList extends StatelessWidget {
@@ -1678,7 +1589,9 @@ class _HomeNewsCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: scheme.primary.withValues(alpha: .14),
                       borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: scheme.primary.withValues(alpha: .22)),
+                      border: Border.all(
+                        color: scheme.primary.withValues(alpha: .22),
+                      ),
                     ),
                     child: Text(
                       article.category,

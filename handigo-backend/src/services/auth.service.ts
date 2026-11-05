@@ -23,7 +23,7 @@ import {
   normalizeExternalPersonName,
 } from "../utils/profileValidation";
 import { markProviderOffline } from "./providerPresence.service";
-import { disconnectUserSockets } from "../sockets/socketServer";
+import { disconnectUserSockets, disconnectSessionSockets } from "../sockets/socketServer";
 import { refreshAccountLock } from "./penaltyPolicy.service";
 import { getEffectiveUserRole } from "../utils/userRole";
 
@@ -171,7 +171,7 @@ const issueSessionTokens = async (
   );
 
   return {
-    token: signAccessToken(user),
+    token: signAccessToken(user, sessionObjectId.toString()),
     refreshToken,
     refreshTokenExpiresAt,
   };
@@ -370,9 +370,6 @@ export const login = async (
     throw new AppError("Email hoặc mật khẩu không đúng", 401);
   }
 
-  if (user.role === "PROVIDER") {
-    await markProviderOffline(user._id.toString());
-  }
   const tokens = await issueSessionTokens(user);
 
   return {
@@ -531,9 +528,6 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
 
   await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
 
-  if (authenticatedUser.role === "PROVIDER") {
-    await markProviderOffline(authenticatedUser._id.toString());
-  }
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
@@ -609,9 +603,6 @@ export const facebookLogin = async (accessToken: string) => {
 
   await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
 
-  if (authenticatedUser.role === "PROVIDER") {
-    await markProviderOffline(authenticatedUser._id.toString());
-  }
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
@@ -763,7 +754,10 @@ export const logout = async (refreshToken?: string): Promise<void> => {
     );
 
     if (revokedSession) {
-      await markProviderOffline(decoded.id);
+      disconnectSessionSockets(decoded.sessionId);
+      if (!await Session.exists({ userId: decoded.id, revokedAt: null, expiresAt: { $gt: new Date() }, isDeleted: false })) {
+        await markProviderOffline(decoded.id, true);
+      }
     }
   } catch (error) {
     return;

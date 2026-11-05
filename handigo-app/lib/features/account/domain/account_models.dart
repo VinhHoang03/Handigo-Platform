@@ -144,6 +144,11 @@ class VoucherItem {
     this.startAt,
     this.endAt,
     this.applicableOrderType,
+    this.maxDiscountAmount,
+    this.neverExpires = false,
+    this.isActive = true,
+    this.status = 'ACTIVE',
+    this.reservedOrderId,
   });
   factory VoucherItem.fromJson(Map<String, dynamic> json) => VoucherItem(
     code: '${json['code'] ?? ''}',
@@ -155,11 +160,56 @@ class VoucherItem {
     startAt: json['startAt'] as String?,
     endAt: json['endAt'] as String?,
     applicableOrderType: json['applicableOrderType'] as String?,
+    maxDiscountAmount: _nullableNum(json['maxDiscountAmount']),
+    neverExpires: json['neverExpires'] == true,
+    isActive: json['isActive'] != false,
+    status: '${json['status'] ?? 'ACTIVE'}',
+    reservedOrderId: _valueId(json['reservedOrderId']),
   );
   final String code, name;
   final String? description, discountType, startAt, endAt;
   final String? applicableOrderType;
   final double discountValue, minOrderAmount;
+  final double? maxDiscountAmount;
+  final bool neverExpires, isActive;
+  final String status;
+  final String? reservedOrderId;
+
+  bool get expired =>
+      !neverExpires &&
+      endAt != null &&
+      DateTime.tryParse(endAt!)?.isBefore(DateTime.now()) == true;
+  bool get usable =>
+      isActive &&
+      !expired &&
+      !['INACTIVE', 'EXPIRED'].contains(status.toUpperCase()) &&
+      (startAt == null ||
+          DateTime.tryParse(startAt!)?.isAfter(DateTime.now()) != true);
+}
+
+class VoucherUsageItem {
+  const VoucherUsageItem({
+    required this.name,
+    required this.code,
+    required this.discountAmount,
+    required this.status,
+    this.orderId,
+    this.orderCode,
+    this.usedAt,
+  });
+  factory VoucherUsageItem.fromJson(Map<String, dynamic> json) =>
+      VoucherUsageItem(
+        name: '${json['name'] ?? 'Voucher đã sử dụng'}',
+        code: '${json['code'] ?? ''}',
+        discountAmount: _num(json['discountAmount']),
+        status: '${json['status'] ?? 'used'}',
+        orderId: json['orderId'] as String?,
+        orderCode: json['orderCode'] as String?,
+        usedAt: json['usedAt'] as String?,
+      );
+  final String name, code, status;
+  final double discountAmount;
+  final String? orderId, orderCode, usedAt;
 }
 
 class FeedbackItem {

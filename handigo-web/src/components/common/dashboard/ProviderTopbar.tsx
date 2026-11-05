@@ -12,6 +12,9 @@ import { ChevronRight, House, LogOut, User, Wallet } from "lucide-react";
 interface ProviderTopbarProps {
   userAvatar?: string | null;
   isOnline?: boolean;
+  statusUpdating?: boolean;
+  statusConnected?: boolean;
+  statusBusy?: boolean;
   onStatusToggle?: () => void;
   switchLabel?: string;
   onSwitch?: () => void;
@@ -21,6 +24,9 @@ interface ProviderTopbarProps {
 export function ProviderTopbar({
   userAvatar,
   isOnline = false,
+  statusUpdating = false,
+  statusConnected = true,
+  statusBusy = false,
   onStatusToggle,
   switchLabel,
   onSwitch,
@@ -89,12 +95,17 @@ export function ProviderTopbar({
                 isOnline ? "text-primary" : "text-on-surface-variant"
               }`}
             >
-              {isOnline ? "Trực tuyến" : "Ngoại tuyến"}
+              {statusUpdating ? (isOnline ? "Đang bật nhận việc…" : "Đang tắt nhận việc…")
+                : statusBusy ? "Đang bận" : isOnline && !statusConnected ? "Đang kết nối lại…"
+                : isOnline ? "Trực tuyến" : "Ngoại tuyến"}
             </span>
             <label className="relative inline-flex cursor-pointer items-center">
               <input
                 type="checkbox"
                 checked={isOnline}
+                disabled={statusUpdating || statusBusy}
+                aria-label="Trạng thái nhận việc"
+                aria-busy={statusUpdating}
                 onChange={onStatusToggle}
                 className="peer sr-only"
               />

@@ -12,11 +12,18 @@ const code = ts.transpileModule(source, {
 
 function setup({ locationError, updateLocationError, availabilityStatus = 'offline', supported = true,
   permissionState, permissionQueryError = false, secureContext = true, policyAllowed = true,
-  deactivateError = false, connected = true, overviewStatus = availabilityStatus, overview } = {}) {
+  deactivateError = false, connected = true, overviewStatus = availabilityStatus, overview, location, updateAvailability } = {}) {
   const calls = [];
   const toasts = [];
   const effects = [], cleanups = [], listeners = new Map(), socketListeners = new Map();
+  const addListener = (event, handler) => {
+    if (!listeners.has(event)) listeners.set(event, new Set());
+    listeners.get(event).add(handler);
+  };
+  const removeListener = (event, handler) => listeners.get(event)?.delete(handler);
   const state = { providerUserId: 'tho', availabilityStatus, isUpdating: false,
+    isConnected: connected,
+    setIsConnected(value) { this.isConnected = value; },
     startInitialization() { return false; },
     completeInitialization(userId, value) { if (this.providerUserId === userId) this.availabilityStatus = value; },
     setAvailabilityStatus(value) { this.availabilityStatus = value; },
@@ -30,7 +37,7 @@ function setup({ locationError, updateLocationError, availabilityStatus = 'offli
       if (updateLocationError) throw typeof updateLocationError === 'object' ? updateLocationError : new Error('Không thể lưu vị trí');
     },
     deactivateCurrentLocation: async () => { calls.push(['deactivate']); if (deactivateError) throw new Error('Mất kết nối'); },
-    updateAvailability: async value => { calls.push(['availability', value]); return { availabilityStatus: value }; },
+    updateAvailability: async value => { calls.push(['availability', value]); return updateAvailability ? updateAvailability(value) : { availabilityStatus: value }; },
   };
   const modules = {
     react: { useEffect: fn => effects.push(fn), useCallback: fn => fn, useRef: value => ({ current: value }) },
@@ -47,6 +54,7 @@ function setup({ locationError, updateLocationError, availabilityStatus = 'offli
   const exports = {};
   const navigator = supported ? { geolocation: { getCurrentPosition(resolve, reject) {
     calls.push(['geolocation']);
+    if (location) { location(resolve, reject); return; }
     if (locationError) reject(locationError);
     else resolve({ coords: { latitude: 10, longitude: 106 } });
   } } } : {};
@@ -55,8 +63,8 @@ function setup({ locationError, updateLocationError, availabilityStatus = 'offli
     return { state: permissionState };
   } };
   vm.runInNewContext(code, { exports, navigator, Error,
-    window: { isSecureContext: secureContext, addEventListener: (event, handler) => listeners.set(event, handler), removeEventListener: event => listeners.delete(event) },
-    document: { permissionsPolicy: { allowsFeature: () => policyAllowed } },
+    window: { isSecureContext: secureContext, setInterval: () => 1, clearInterval() {}, addEventListener: addListener, removeEventListener: removeListener },
+    document: { visibilityState: 'visible', addEventListener: addListener, removeEventListener: removeListener, permissionsPolicy: { allowsFeature: () => policyAllowed } },
     console: { warn() {} }, require: name => {
     assert.ok(name in modules, `Chưa giả lập module ${name}`);
     return modules[name];
@@ -65,7 +73,7 @@ function setup({ locationError, updateLocationError, availabilityStatus = 'offli
   return { state, calls, toasts, toggle: hook.toggleAvailability,
     mount: () => effects.forEach(effect => cleanups.push(effect())),
     unmount: () => cleanups.forEach(cleanup => cleanup?.()),
-    network: event => listeners.get(event)?.(), socket: (event, payload) => socketListeners.get(event)?.(payload),
+    network: event => listeners.get(event)?.forEach(handler => handler()), socket: (event, payload) => socketListeners.get(event)?.(payload),
   };
 }
 
@@ -75,7 +83,7 @@ for (const [errorCode, message] of [[1, /Trình duyệt chưa lấy được v�
     await runtime.toggle();
     assert.equal(runtime.state.availabilityStatus, 'offline');
     assert.equal(runtime.state.isUpdating, false);
-    assert.deepEqual(runtime.calls, [['geolocation'], ['deactivate']]);
+    assert.deepEqual(runtime.calls, [['geolocation']]);
     assert.equal(runtime.toasts.length, 1);
     assert.equal(runtime.toasts[0].type, 'error');
     assert.match(runtime.toasts[0].message, message);
@@ -227,4 +235,50 @@ test('Rời dashboard không nhận phản hồi cũ rồi ghi đè trạng thá
   runtime.mount(); runtime.socket('connect'); runtime.unmount();
   resolve({ availabilityStatus: 'offline' }); await flush();
   assert.equal(runtime.state.availabilityStatus, 'online');
+});
+
+test('Công tắc phản hồi ngay, chặn bấm lặp trong lúc GPS đang chờ', async () => {
+  let locate;
+  const runtime = setup({ location: resolve => { locate = resolve; } });
+  const updating = runtime.toggle();
+  assert.equal(runtime.state.availabilityStatus, 'online');
+  assert.equal(runtime.state.isUpdating, true);
+  await runtime.toggle();
+  assert.equal(runtime.calls.length, 1);
+  locate({ coords: { latitude: 10, longitude: 106 } });
+  await updating;
+  assert.equal(runtime.calls.filter(([name]) => name === 'availability').length, 1);
+});
+
+test('Đổi từ thiết bị khác trong lúc đang gửi được đồng bộ sau khi gửi xong', async () => {
+  let complete;
+  const runtime = setup({ updateAvailability: () => new Promise(resolve => { complete = resolve; }), overviewStatus: 'offline' });
+  runtime.mount();
+  const updating = runtime.toggle();
+  await flush();
+  runtime.socket('provider:availability');
+  complete({ availabilityStatus: 'online' });
+  await updating;
+  await flush();
+  assert.equal(runtime.state.availabilityStatus, 'offline');
+});
+
+test('Mất kết nối hiển thị đang nối lại và giữ lựa chọn nhận việc', async () => {
+  const runtime = setup({ availabilityStatus: 'online' });
+  runtime.mount();
+  runtime.socket('disconnect');
+  assert.equal(runtime.state.isConnected, false);
+  assert.equal(runtime.state.availabilityStatus, 'online');
+  runtime.socket('connect');
+  await flush();
+  assert.equal(runtime.state.isConnected, true);
+});
+
+test('Quay lại trang đồng bộ trạng thái, provider bận không bật hoặc tắt thủ công', async () => {
+  const runtime = setup({ availabilityStatus: 'online', overviewStatus: 'offline' });
+  runtime.mount(); runtime.network('visibilitychange'); await flush();
+  assert.equal(runtime.state.availabilityStatus, 'offline');
+  const busy = setup({ availabilityStatus: 'busy' });
+  await busy.toggle();
+  assert.equal(busy.calls.length, 0);
 });

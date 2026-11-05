@@ -15,7 +15,11 @@ export const isRetryableWriteConflict = (error: unknown) => {
 export async function withTransactionRetry<T>(session: ClientSession, operation: (session: ClientSession) => Promise<T>) {
   const startedAt = Date.now();
   for (let attempt = 1; ; attempt++) {
-    try { return await session.withTransaction(operation); }
+    try {
+      // Giới hạn cả vòng thử lại nội bộ của driver, dùng chung ngân sách cho các lượt bên ngoài.
+      const remainingMS = Math.max(1, 5000 - (Date.now() - startedAt));
+      return await session.withTransaction(operation, { timeoutMS: remainingMS });
+    }
     catch (error) {
       const failure = error as { code?: number; codeName?: string; errorLabels?: string[]; hasErrorLabel?: (label: string) => boolean } | null;
       if (!isRetryableWriteConflict(error) || attempt >= 3 || Date.now() - startedAt >= 5000) throw error;

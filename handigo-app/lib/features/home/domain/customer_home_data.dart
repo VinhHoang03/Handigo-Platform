@@ -21,12 +21,17 @@ class CustomerHomeData {
 }
 
 class HomeRewards {
-  const HomeRewards({required this.balance, required this.offers});
+  const HomeRewards({
+    required this.balance,
+    required this.offers,
+    this.validityDays,
+  });
 
   factory HomeRewards.fromJson(Map<String, dynamic> json) {
     final policy = json['policy'] as Map<String, dynamic>;
     final offers = policy['offers'] as List<dynamic>;
     return HomeRewards(
+      validityDays: (policy['validityDays'] as num?)?.toInt(),
       balance: (json['balance'] as num).toInt(),
       offers: offers
           .cast<Map<String, dynamic>>()
@@ -36,6 +41,7 @@ class HomeRewards {
   }
 
   final int balance;
+  final int? validityDays;
   final List<HomeRewardOffer> offers;
 }
 
@@ -52,17 +58,18 @@ class HomeRewardOffer {
     this.applicableOrderType,
   });
 
-  factory HomeRewardOffer.fromJson(Map<String, dynamic> json) => HomeRewardOffer(
-    id: json['id'] as String,
-    termsVersion: json['termsVersion'] as String,
-    name: json['name'] as String? ?? '',
-    points: (json['points'] as num).toInt(),
-    discountType: json['discountType'] as String? ?? 'AMOUNT',
-    discountValue: (json['discountValue'] as num).toDouble(),
-    minOrderAmount: (json['minOrderAmount'] as num?)?.toDouble() ?? 0,
-    maxDiscountAmount: (json['maxDiscountAmount'] as num?)?.toDouble(),
-    applicableOrderType: json['applicableOrderType'] as String?,
-  );
+  factory HomeRewardOffer.fromJson(Map<String, dynamic> json) =>
+      HomeRewardOffer(
+        id: json['id'] as String,
+        termsVersion: json['termsVersion'] as String,
+        name: json['name'] as String? ?? '',
+        points: (json['points'] as num).toInt(),
+        discountType: json['discountType'] as String? ?? 'AMOUNT',
+        discountValue: (json['discountValue'] as num).toDouble(),
+        minOrderAmount: (json['minOrderAmount'] as num?)?.toDouble() ?? 0,
+        maxDiscountAmount: (json['maxDiscountAmount'] as num?)?.toDouble(),
+        applicableOrderType: json['applicableOrderType'] as String?,
+      );
 
   final String id;
   final String termsVersion;
