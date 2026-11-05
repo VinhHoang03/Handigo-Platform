@@ -201,7 +201,7 @@ class SupportItem {
     title: '${json['subject'] ?? json['title'] ?? ''}',
     description: '${json['description'] ?? ''}',
     status: '${json['status'] ?? ''}',
-    category: json['category'] as String?,
+    category: (json['category'] ?? json['reportType']) as String?,
     createdAt: json['createdAt'] as String?,
   );
   final String id, title, description, status;
