@@ -65,9 +65,7 @@ class _ConversationListScreenState
                 },
                 icon: const Icon(Icons.arrow_back_rounded),
               )
-            : const Center(
-                child: CustomerHeaderIcon(Icons.forum_outlined),
-              ),
+            : const Center(child: CustomerHeaderIcon(Icons.forum_outlined)),
       ),
       body: state.when(
         loading: () => const AppLoading(),
@@ -486,41 +484,79 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   itemCount: messages.length,
                   itemBuilder: (_, index) {
                     final message = messages[index];
+                    final avatarUrl = usableMediaUrl(message.senderAvatar);
                     return Align(
                       alignment: message.isMine
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.sizeOf(context).width * .78,
-                        ),
-                        decoration: BoxDecoration(
-                          color: message.isMine
-                              ? scheme.primary
-                              : scheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(18),
-                            topRight: const Radius.circular(18),
-                            bottomLeft: Radius.circular(
-                              message.isMine ? 18 : 4,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            if (!message.isMine) ...[
+                              SizedBox.square(
+                                dimension: 32,
+                                child: ClipOval(
+                                  child: ColoredBox(
+                                    color: scheme.primaryContainer,
+                                    child: avatarUrl == null
+                                        ? Icon(
+                                            Icons.person_outline,
+                                            size: 20,
+                                            color: scheme.onPrimaryContainer,
+                                          )
+                                        : Image.network(
+                                            avatarUrl,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, _, _) => Icon(
+                                              Icons.person_outline,
+                                              size: 20,
+                                              color: scheme.onPrimaryContainer,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.sizeOf(context).width * .78,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: message.isMine
+                                      ? scheme.primary
+                                      : scheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: const Radius.circular(18),
+                                    topRight: const Radius.circular(18),
+                                    bottomLeft: Radius.circular(
+                                      message.isMine ? 18 : 4,
+                                    ),
+                                    bottomRight: Radius.circular(
+                                      message.isMine ? 4 : 18,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  message.content,
+                                  style: TextStyle(
+                                    color: message.isMine
+                                        ? scheme.onPrimary
+                                        : scheme.onSurface,
+                                  ),
+                                ),
+                              ),
                             ),
-                            bottomRight: Radius.circular(
-                              message.isMine ? 4 : 18,
-                            ),
-                          ),
-                        ),
-                        child: Text(
-                          message.content,
-                          style: TextStyle(
-                            color: message.isMine
-                                ? scheme.onPrimary
-                                : scheme.onSurface,
-                          ),
+                          ],
                         ),
                       ),
                     );

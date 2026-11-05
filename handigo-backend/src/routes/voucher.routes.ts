@@ -8,6 +8,7 @@ import {
   getAdminVoucherById,
   getAdminVouchers,
   getAvailableVouchers,
+  getVoucherUsageHistory,
   removeVoucher,
   updateAdminVoucher,
 } from "../controllers/voucher.controller";
@@ -26,6 +27,7 @@ const router = Router();
 router.post("/apply", authMiddleware, validate(applyVoucherSchema), applyVoucher);
 router.post("/remove", authMiddleware, validate(removeVoucherSchema), removeVoucher);
 router.get("/available", authMiddleware, getAvailableVouchers);
+router.get("/history", authMiddleware, roleMiddleware("CUSTOMER"), getVoucherUsageHistory);
 
 router.post("/", authMiddleware, roleMiddleware("ADMIN"), validate(createAdminVoucherSchema), createAdminVoucher);
 router.get("/", authMiddleware, roleMiddleware("ADMIN"), getAdminVouchers);

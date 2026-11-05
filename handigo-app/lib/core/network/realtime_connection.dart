@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -6,6 +7,7 @@ import '../../app/providers/app_providers.dart';
 import '../../features/orders/presentation/order_screens.dart';
 import '../../features/orders/presentation/order_payment_panel.dart';
 import '../../features/provider/presentation/provider_screens.dart';
+import '../../features/auth/domain/app_user.dart';
 import '../../features/notifications/presentation/notification_screens.dart';
 import '../../features/chat/presentation/chat_screens.dart';
 import '../config/app_config.dart';
@@ -33,7 +35,18 @@ final realtimeConnectionProvider = Provider<RealtimeConnection?>((ref) {
     ref.invalidate(providerMessageBadgeProvider);
   }
 
-  final connection = RealtimeConnection(ref.read(apiClientProvider), refresh);
+  final connection = RealtimeConnection(
+    ref.read(apiClientProvider),
+    refresh,
+    keepAliveInBackground: () =>
+        !kIsWeb &&
+        ref.read(authControllerProvider).user?.role == UserRole.provider &&
+        ref.read(authControllerProvider).user?.providerOnboardingStatus ==
+            'APPROVED' &&
+        ['online', 'busy'].contains(
+          ref.read(providerOverviewProvider).asData?.value.availabilityStatus,
+        ),
+  );
   final inboxEvents = connection.events.listen((event) {
     if (event.name == 'message:new' || event.name == 'message:seen') {
       ref.invalidate(providerMessageBadgeProvider);
@@ -45,15 +58,19 @@ final realtimeConnectionProvider = Provider<RealtimeConnection?>((ref) {
 });
 
 class RealtimeConnection with WidgetsBindingObserver {
-  RealtimeConnection(this.api, this.refresh) {
+  RealtimeConnection(this.api, this.refresh, {this.keepAliveInBackground}) {
     WidgetsBinding.instance.addObserver(this);
     unawaited(connect());
     _fallback = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (!_disposed && _active && !connected) refresh();
+      if (!_disposed && _active && !connected) {
+        refresh();
+        unawaited(connect());
+      }
     });
   }
   final ApiClient api;
   final VoidCallback refresh;
+  final bool Function()? keepAliveInBackground;
   final _events = StreamController<({String name, dynamic data})>.broadcast();
   Stream<({String name, dynamic data})> get events => _events.stream;
   io.Socket? _socket;
@@ -86,12 +103,16 @@ class RealtimeConnection with WidgetsBindingObserver {
         refresh();
         _emit('connect', null);
       });
+      socket.onDisconnect((_) {
+        if (!_disposed) _emit('disconnect', null);
+      });
       socket.onConnectError((error) async {
         if (_disposed ||
             _refreshing ||
             _authRetried ||
-            !'$error'.contains('xác thực'))
+            !'$error'.contains('xác thực')) {
           return;
+        }
         _refreshing = true;
         _authRetried = true;
         try {
@@ -108,6 +129,8 @@ class RealtimeConnection with WidgetsBindingObserver {
       });
       for (final event in [
         'order:updated',
+        'provider:availability',
+        'payment:status',
         'quotation:updated',
         'assignment:new',
         'direct-request:new',
@@ -144,12 +167,16 @@ class RealtimeConnection with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _active = state == AppLifecycleState.resumed;
+    _active =
+        state == AppLifecycleState.resumed ||
+        (state != AppLifecycleState.detached &&
+            keepAliveInBackground?.call() == true);
     if (state == AppLifecycleState.resumed) {
       refresh();
       unawaited(connect());
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
+    } else if (!_active &&
+        (state == AppLifecycleState.paused ||
+            state == AppLifecycleState.detached)) {
       _socket?.disconnect();
     }
   }

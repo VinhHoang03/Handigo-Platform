@@ -1,5 +1,6 @@
 import '../../../shared/widgets/app_search_field.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/realtime_connection.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/account_overview_widgets.dart';
@@ -55,6 +57,7 @@ final providerCurrentLocationProvider = FutureProvider<void>(
     await ref
         .watch(providerLocationServiceProvider.notifier)
         .synchronize(
+          useCachedPosition: true,
           shouldUpload: () =>
               ref.mounted &&
               ref.read(authControllerProvider).user?.id == userId,
@@ -844,6 +847,29 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
   bool busy = false;
   bool? _optimisticOnline;
   String? _lastAddress;
+  StreamSubscription<dynamic>? _availabilityEvents;
+  bool _connected = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (ref.read(providerUiPreviewProvider) != null) return;
+    ref.listenManual(realtimeConnectionProvider, (_, connection) {
+      unawaited(_availabilityEvents?.cancel());
+      _connected = connection?.connected == true;
+      _availabilityEvents = connection?.events.listen((event) {
+        if (mounted && ['connect', 'disconnect'].contains(event.name)) {
+          setState(() => _connected = event.name == 'connect');
+        }
+      });
+    }, fireImmediately: true);
+  }
+
+  @override
+  void dispose() {
+    unawaited(_availabilityEvents?.cancel());
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant _AvailabilityCard oldWidget) {
@@ -854,7 +880,11 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
   }
 
   Future<void> _changeAvailability(bool value) async {
-    if (busy || ref.read(providerUiPreviewProvider) != null) return;
+    if (busy ||
+        widget.data.availabilityStatus == 'busy' ||
+        ref.read(providerUiPreviewProvider) != null) {
+      return;
+    }
     final userId = ref.read(authControllerProvider).user?.id;
     if (userId == null) return;
     bool isCurrent() =>
@@ -880,6 +910,7 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
     } catch (error) {
       if (mounted && isCurrent()) {
         setState(() => _optimisticOnline = previous);
+        ref.invalidate(providerOverviewProvider);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(_message(error))));
@@ -893,11 +924,15 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
   Widget build(BuildContext context) {
     final online =
         _optimisticOnline ?? widget.data.availabilityStatus == 'online';
-    final location = online ? ref.watch(providerCurrentLocationProvider) : null;
+    final location = online && !busy
+        ? ref.watch(providerCurrentLocationProvider)
+        : null;
     final tracker = online ? ref.watch(providerLocationServiceProvider) : null;
     final trackingError = tracker?.error;
     final hasSyncedPosition = tracker?.synchronizedPosition != null;
-    final address = online ? ref.watch(providerWorkingAddressProvider) : null;
+    final address = online && !busy
+        ? ref.watch(providerWorkingAddressProvider)
+        : null;
     if (hasSyncedPosition ||
         (location?.hasValue == true && location?.hasError != true)) {
       final resolved = address?.asData?.value;
@@ -936,6 +971,8 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
                   ? online
                         ? 'Đang bật nhận việc...'
                         : 'Đang tắt nhận việc...'
+                  : online && !_connected
+                  ? 'Đang kết nối lại…'
                   : _availabilityLabel(
                       _optimisticOnline == null
                           ? widget.data.availabilityStatus
@@ -1019,7 +1056,12 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
               ),
               const SizedBox(width: 8),
             ],
-            Switch(value: online, onChanged: busy ? null : _changeAvailability),
+            Switch(
+              value: online,
+              onChanged: busy || widget.data.availabilityStatus == 'busy'
+                  ? null
+                  : _changeAvailability,
+            ),
           ],
         ),
       ),

@@ -2,12 +2,24 @@ import { Request, Response } from "express";
 import { requireRequestUser } from "../middlewares/authContext";
 import * as walletService from "../services/wallet.service";
 import { sendControllerError } from "../utils/controllerError";
+import { getPayosWalletDepositQr } from "../services/payosQr.service";
 import {
   adminWalletListQuerySchema,
   providerIdParamSchema,
   walletDepositOrderCodeParamSchema,
   walletTransactionQuerySchema,
 } from "../validations/wallet.validator";
+
+export const getMyWalletDepositQr = async (req: Request, res: Response) => {
+  try {
+    const { orderCode } = walletDepositOrderCodeParamSchema.parse(req.params);
+    const image = await getPayosWalletDepositQr(orderCode, requireRequestUser(req));
+    res.setHeader("Cache-Control", "no-store");
+    return res.type("png").send(image);
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
 
 export const getMyWallet = async (req: Request, res: Response) => {
   try {

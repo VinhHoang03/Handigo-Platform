@@ -91,6 +91,12 @@ class _BookingPolicyConsentState extends State<BookingPolicyConsent> {
   @override
   Widget build(BuildContext context) => Row(
     children: [
+      Icon(
+        Icons.policy_outlined,
+        size: 20,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+      const SizedBox(width: 8),
       Expanded(
         child: Text.rich(
           TextSpan(

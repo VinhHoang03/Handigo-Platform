@@ -14,6 +14,7 @@ export const removeVoucherSchema = z.object({
 });
 
 export const availableVoucherQuerySchema = z.object({
+  source: z.enum(["all", "public"]).optional(),
   orderId: objectIdSchema.optional(),
 });
 

@@ -8,6 +8,7 @@ import { WalletTransaction } from "../models/walletTransaction.model";
 import { WithdrawRequest } from "../models/withdrawRequest.model";
 import { AppError } from "../utils/appError";
 import type { DashboardQuery } from "../validations/dashboard.validator";
+import { emitToUser } from "../sockets/socketServer";
 
 const dateMatch = (query: DashboardQuery, field = "createdAt") => {
   const range: Record<string, Date> = {};
@@ -572,11 +573,20 @@ export const updateProviderAvailability = async (
   availabilityStatus: "online" | "offline" | "busy",
 ) => {
   const provider = await getProviderForUser(user.id);
-  provider.availabilityStatus = availabilityStatus;
-  await provider.save();
+  if (provider.availabilityStatus === "busy" && availabilityStatus !== "busy") {
+    throw new AppError("Bạn đang có công việc cần xử lý. Chưa thể đổi trạng thái nhận việc.", 409);
+  }
+  const updated = await Provider.findOneAndUpdate(
+    { _id: provider._id, isDeleted: false, availabilityStatus: provider.availabilityStatus === "offline"
+      ? { $in: ["offline", null] } : provider.availabilityStatus },
+    { $set: { availabilityStatus } },
+    { new: true, runValidators: true },
+  ).lean();
+  if (!updated) throw new AppError("Trạng thái nhận việc vừa thay đổi. Vui lòng kiểm tra lại.", 409);
+  emitToUser(user.id, "provider:availability", { availabilityStatus: updated.availabilityStatus });
 
   return {
-    availabilityStatus: provider.availabilityStatus,
+    availabilityStatus: updated.availabilityStatus,
   };
 };
 

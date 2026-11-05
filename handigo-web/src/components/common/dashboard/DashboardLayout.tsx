@@ -31,6 +31,9 @@ interface DashboardLayoutProps {
   userAvatar?: string | null;
   showStatusToggle?: boolean;
   isOnline?: boolean;
+  statusUpdating?: boolean;
+  statusConnected?: boolean;
+  statusBusy?: boolean;
   onStatusToggle?: () => void;
   hideSidebar?: boolean;
 }
@@ -45,6 +48,9 @@ export function DashboardLayout({
   userAvatar,
   showStatusToggle,
   isOnline,
+  statusUpdating,
+  statusConnected,
+  statusBusy,
   onStatusToggle,
   hideSidebar = false,
 }: DashboardLayoutProps) {
@@ -68,6 +74,9 @@ export function DashboardLayout({
       {isProvider && <AnimatedBackground />}
       {isProvider ? (
         <ProviderTopbar
+          statusUpdating={statusUpdating}
+          statusConnected={statusConnected}
+          statusBusy={statusBusy}
           userAvatar={userAvatar}
           isOnline={isOnline}
           onStatusToggle={onStatusToggle}

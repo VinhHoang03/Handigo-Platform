@@ -1,10 +1,38 @@
 import '../../../core/network/api_client.dart';
+import 'dart:typed_data';
 import '../../../core/network/paged_result.dart';
 import '../domain/account_models.dart';
 
 class AccountRepository {
   const AccountRepository(this._api);
   final ApiClient _api;
+
+  Future<List<VoucherItem>> publicVouchers() async {
+    final response = await _api.request('/vouchers/available',
+      query: {'source': 'public'}, authenticated: true);
+    return (response['data'] as List).map((item) => VoucherItem.fromJson(item as Map<String, dynamic>)).toList();
+  }
+
+  Future<PagedResult<VoucherItem>> ownedVouchers({int page = 1}) async {
+    final response = await _api.request('/rewards/vouchers', query: {'page': page}, authenticated: true);
+    final data = response['data'] as Map<String, dynamic>;
+    return PagedResult.fromJson({'items': data['items'], 'pagination': data}, VoucherItem.fromJson);
+  }
+
+  Future<PagedResult<VoucherUsageItem>> voucherUsageHistory({int page = 1}) async {
+    final response = await _api.request('/vouchers/history', query: {'page': page}, authenticated: true);
+    return PagedResult.fromJson(response['data'] as Map<String, dynamic>, VoucherUsageItem.fromJson);
+  }
+
+  Future<Uint8List> depositQr(String orderCode) => _api.walletDepositQr(orderCode);
+
+  Future<Map<String, dynamic>> syncDeposit(String orderCode) async =>
+      (await _api.request('/wallets/me/deposit/$orderCode/sync',
+        method: 'PATCH', authenticated: true))['data'] as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> cancelDeposit(String orderCode) async =>
+      (await _api.request('/wallets/me/deposit/$orderCode/cancel',
+        method: 'PATCH', authenticated: true))['data'] as Map<String, dynamic>;
 
   Future<List<Map<String, dynamic>>> bankAccounts() async {
     final data = (await _api.request(

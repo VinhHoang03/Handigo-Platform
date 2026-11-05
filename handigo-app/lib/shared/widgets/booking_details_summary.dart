@@ -12,6 +12,7 @@ class BookingDetailsSummary extends StatelessWidget {
     this.providerName,
     this.options = const [],
     this.quantity,
+    this.serviceName,
     super.key,
   });
 
@@ -21,6 +22,7 @@ class BookingDetailsSummary extends StatelessWidget {
   final bool isPreview, compact;
   final List<({String name, int quantity})> options;
   final int? quantity;
+  final String? serviceName;
 
   @override
   Widget build(BuildContext context) {
@@ -32,8 +34,18 @@ class BookingDetailsSummary extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: theme.colorScheme.primary, size: 20),
-          const SizedBox(width: 8),
+          if (isPreview)
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+            )
+          else
+            Icon(icon, color: theme.colorScheme.primary, size: 20),
+          SizedBox(width: isPreview ? 12 : 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,7 +57,12 @@ class BookingDetailsSummary extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(value, style: theme.textTheme.bodyMedium),
+                Text(
+                  value,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: isPreview ? FontWeight.w600 : null,
+                  ),
+                ),
               ],
             ),
           ),
@@ -86,6 +103,20 @@ class BookingDetailsSummary extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (isPreview) ...[
+          if (serviceName != null)
+            field(Icons.home_repair_service_outlined, 'Dịch vụ', serviceName!),
+          if (quantity != null)
+            field(Icons.numbers_rounded, 'Số lượng', '$quantity'),
+          if (scheduledAt != null)
+            timeField(Icons.calendar_month_outlined, 'Thời gian', scheduledAt!),
+          if (placedAt != null)
+            timeField(
+              Icons.access_time_rounded,
+              'Thời gian đặt dự kiến',
+              placedAt!,
+            ),
+        ],
         if (compact)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -110,15 +141,23 @@ class BookingDetailsSummary extends StatelessWidget {
             'Địa chỉ thực hiện',
             [if (contact?.isNotEmpty == true) contact!, address].join('\n'),
           ),
-        if (scheduledAt != null)
+        if (!isPreview && scheduledAt != null)
           timeField(Icons.calendar_month_outlined, 'Lịch hẹn', scheduledAt!),
-        if (placedAt != null)
+        if (!isPreview && placedAt != null)
           timeField(
             Icons.access_time_rounded,
             isPreview ? 'Thời gian đặt dự kiến' : 'Thời gian đặt',
             placedAt!,
           ),
-        if (providerName?.isNotEmpty == true)
+        if (isPreview)
+          field(
+            Icons.person_search_outlined,
+            'Điều phối chuyên gia',
+            providerName?.isNotEmpty == true
+                ? 'Yêu cầu trực tiếp $providerName'
+                : 'Hệ thống tự động tìm chuyên gia phù hợp',
+          )
+        else if (providerName?.isNotEmpty == true)
           field(
             Icons.person_outline_rounded,
             isPreview ? 'Thợ đã chọn' : 'Thợ thực hiện',
@@ -143,7 +182,7 @@ class BookingDetailsSummary extends StatelessWidget {
               ),
             ),
         ],
-        if (quantity != null)
+        if (!isPreview && quantity != null)
           field(Icons.numbers_rounded, 'Số lượng', '$quantity'),
       ],
     );
