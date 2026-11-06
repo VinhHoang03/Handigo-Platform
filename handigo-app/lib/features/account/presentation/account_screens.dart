@@ -85,9 +85,7 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
     final addresses = ref.watch(accountAddressesProvider).asData?.value;
     final wallet = ref.watch(accountWalletProvider).asData?.value;
     final vouchers = ref.watch(accountVouchersProvider).asData?.value;
-    final isApprovedProvider =
-        user?.role.name == 'provider' ||
-        user?.providerOnboardingStatus == 'APPROVED';
+    final isApprovedProvider = user?.canAccessProvider == true;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,

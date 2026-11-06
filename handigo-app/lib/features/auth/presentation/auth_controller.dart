@@ -55,6 +55,22 @@ class AuthController extends ChangeNotifier {
     status = AuthStatus.authenticated;
   });
 
+  Future<bool> refreshUser() async {
+    final previous = user;
+    if (!isAuthenticated || previous == null) return false;
+    var applied = false;
+    final success = await _run(() async {
+      final updated = await _repository.currentUser();
+      if (isAuthenticated &&
+          identical(user, previous) &&
+          updated.id == previous.id) {
+        user = updated;
+        applied = true;
+      }
+    });
+    return success && applied;
+  }
+
   Future<bool> verifyRegisterOtp(String email, String otp) async =>
       _run(() async {
         final verifiedUser = await _repository.verifyRegisterOtp(email, otp);

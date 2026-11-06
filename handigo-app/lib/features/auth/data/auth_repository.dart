@@ -9,6 +9,10 @@ class AuthRepository {
   Future<AppUser?> restore() async {
     if (!await _api.hasSession()) return null;
     await _api.refresh();
+    return currentUser();
+  }
+
+  Future<AppUser> currentUser() async {
     final json = await _api.request('/auth/me', authenticated: true);
     return _mobileUser(json['user'] as Map<String, dynamic>);
   }
