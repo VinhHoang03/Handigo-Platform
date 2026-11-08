@@ -32,6 +32,7 @@ import adminRoutes from "./routes/admin.routes";
 import chatRoutes from "./routes/chat.routes";
 import chatbotRoutes from "./routes/chatbot.routes";
 import aiRoutes from "./ai/ai.routes";
+import adminAIRoutes from "./ai/admin/admin-ai.routes";
 import locationRoutes from "./routes/location.routes";
 import orderRoutes from "./routes/order.routes";
 import adminAssetRoutes from "./routes/adminAsset.routes";
@@ -153,6 +154,7 @@ app.use("/vietnam-addresses", vietnamAddressRoutes);
 app.use("/orders", orderRoutes);
 app.use("/chat", chatRoutes);
 app.use("/chatbot", chatbotRoutes);
+app.use("/ai/admin", adminAIRoutes);
 app.use("/ai", aiRoutes);
 app.use("/locations", locationRoutes);
 

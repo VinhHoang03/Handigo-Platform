@@ -167,6 +167,7 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
               </article>
             ) : (
               <FeedbackReplyForm
+                feedbackId={feedback._id}
                 content={content}
                 onContentChange={setContent}
                 maxContentLength={MAX_REPLY_LENGTH}

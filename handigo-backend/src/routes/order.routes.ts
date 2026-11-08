@@ -73,7 +73,6 @@ import {
   createRepairQuotation,
   updateRepairQuotation,
   getRepairQuotation,
-  confirmRepairQuotation,
   rejectRepairQuotation,
   selectAppointmentProvider,
   respondToReassignment,
@@ -339,14 +338,6 @@ router.get(
   roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(orderIdParamSchema, "params"),
   getRepairQuotation,
-);
-
-// POST   /orders/quotations/:quotationId/confirm → Customer: tương thích client cũ
-router.post(
-  "/quotations/:quotationId/confirm",
-  roleMiddleware("CUSTOMER"),
-  validate(quotationIdParamSchema, "params"),
-  confirmRepairQuotation,
 );
 
 // POST   /orders/quotations/:quotationId/reject  → Customer: reject quotation

@@ -93,7 +93,7 @@ function worker(t, attempts, sendError = false) {
     assert.deepEqual(filter.status.$in, ['pending', 'processing']);
     assert.equal(filter.attempts.$lt, 5);
     assert.ok(filter.nextAttemptAt.$lte instanceof Date);
-    assert.equal(options.new, true);
+    assert.equal(options.returnDocument, 'after');
     assert.equal(options.runValidators, true);
     assert.equal(update.$inc.attempts, 1);
     if (claimed) return null;

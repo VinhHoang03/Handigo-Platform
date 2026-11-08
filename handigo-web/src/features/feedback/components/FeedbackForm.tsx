@@ -84,7 +84,7 @@ export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Prop
         maxLength={1000}
         rows={5}
         onValueChange={setComment}
-        hint={`${comment.length}/1000 ký tự`}
+        hint={`${comment.length}/1000 ký tự. Bạn có thể phản ánh chất lượng kém; vui lòng tránh chửi tục, miệt thị và đe dọa.`}
       />
 
       <div>
@@ -143,7 +143,7 @@ export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Prop
         </div>
       </div>
 
-      {message && <p className="rounded-2xl bg-primary/10 p-3 text-primary">{message}</p>}
+      {message && <p role="alert" className="rounded-2xl bg-primary/10 p-3 text-primary">{message}</p>}
       <div className={feedback && onCancel ? 'grid grid-cols-2 gap-2' : ''}>
         {feedback && onCancel && (
           <button type="button" disabled={saving} onClick={onCancel} className="btn-secondary min-w-0 px-3 text-sm">

@@ -1,5 +1,5 @@
 import type { AppNotification } from "@/features/notification/types/notification.types";
-import { dateTime, getNotificationUnavailableReason, typeIcons } from "./notificationBell.utils";
+import { dateTime, getNotificationContent, getNotificationUnavailableReason, typeIcons } from "./notificationBell.utils";
 
 interface NotificationItemProps {
   item: AppNotification;
@@ -39,7 +39,7 @@ export function NotificationItem({ item, onOpen }: NotificationItemProps) {
           )}
         </span>
         <span className="mt-1 line-clamp-2 text-sm leading-5 text-on-surface-variant">
-          {item.content}
+          {getNotificationContent(item)}
         </span>
         {unavailableReason && (
           <span className="mt-2 block text-xs text-on-surface-variant">

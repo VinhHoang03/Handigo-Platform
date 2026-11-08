@@ -1,4 +1,5 @@
 import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
+import { AutomaticReviewControl } from "../ai/AutomaticReviewControl";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
@@ -16,7 +17,10 @@ export default function AdminProviderApplicationsPage() {
       <div className="space-y-4">
         <header className="admin-page-header">
           <AdminPageTitle title="Duyệt hồ sơ thợ" />
-          <AdminRefreshButton onRefresh={() => void applications.load()} loading={applications.loading} />
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <AutomaticReviewControl feature="provider_application" onClose={() => void applications.load()} />
+            <AdminRefreshButton onRefresh={() => void applications.load()} loading={applications.loading} />
+          </div>
         </header>
 
         <ApplicationSummary query={applications.query} {...applications.summary} onChange={applications.setQuery} />

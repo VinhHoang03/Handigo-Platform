@@ -30,7 +30,7 @@ export class KnowledgeRepository {
     return Jobs.findOneAndUpdate({ generation, attempts: { $lt: 5 }, nextAttemptAt: { $lte: new Date() },
       $or: [{ status: "pending" }, { status: "running", leaseUntil: { $lte: new Date() } }] },
     { $set: { status: "running", leaseId: randomUUID(), leaseUntil: new Date(Date.now() + leaseMs), errorCode: null }, $inc: { attempts: 1 } },
-    { new: true, runValidators: true }).sort({ nextAttemptAt: 1, _id: 1 }).lean();
+    { returnDocument: "after", runValidators: true }).sort({ nextAttemptAt: 1, _id: 1 }).lean();
   }
   private lease(job: KnowledgeJob) { return { _id: job._id, status: "running" as const, leaseId: job.leaseId, leaseUntil: { $gt: new Date() } }; }
   async renew(job: KnowledgeJob) {
@@ -45,7 +45,7 @@ export class KnowledgeRepository {
   async publish(job: KnowledgeJob) {
     await mongoose.connection.transaction(async (session) => {
       const locked = await Jobs.findOneAndUpdate(this.lease(job), { $set: { leaseUntil: new Date(Date.now() + leaseMs) } },
-        { new: true, runValidators: true, session });
+        { returnDocument: "after", runValidators: true, session });
       if (!locked) throw new AppError("Công việc kiến thức đã mất quyền công bố.", 409);
       const result = await Documents.updateOne({ _id: job.documentId, status: "active", [`requests.${job.generation}`]: job.versionId },
         { $set: { [`publications.${job.generation}`]: job.versionId } }, { runValidators: true, session });

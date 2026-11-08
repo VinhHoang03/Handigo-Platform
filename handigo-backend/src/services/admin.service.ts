@@ -105,7 +105,7 @@ export const updateUserStatus = async (
   await mongoose.connection.transaction(async (session) => {
     // Ghi cùng tài khoản để các quyết định đồng thời xung đột và được kiểm tra lại.
     const user = await User.findOneAndUpdate({ _id: userId, isDeleted: false },
-      { $inc: { __v: 1 } }, { new: true, runValidators: true, session });
+      { $inc: { __v: 1 } }, { returnDocument: "after", runValidators: true, session });
     if (!user) throw new AppError("Không tìm thấy người dùng", 404);
     if (user.role === "ADMIN" && status === "locked") {
       throw new AppError("Không thể khóa tài khoản quản trị trong phiên bản này", 400);

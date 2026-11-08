@@ -338,7 +338,7 @@ const prepareArrivalCancellationSettlement = async (order: IOrder, session: Clie
   if (!provider) throw new AppError("Không tìm thấy thợ để cộng tiền hỗ trợ.", 409);
   const wallet = await Wallet.findOneAndUpdate({ userId: provider.userId, isDeleted: false }, {
     $inc: { balance: platformSupport }, $setOnInsert: { pendingBalance: 0, currency: "VND" },
-  }, { new: true, session, upsert: true, runValidators: true });
+  }, { returnDocument: "after", session, upsert: true, runValidators: true });
   if (!wallet) throw new AppError("Không thể cộng tiền hỗ trợ vào ví thợ.", 500);
   await WalletTransaction.create([{
     walletId: wallet._id, userId: provider.userId, relatedOrderId: order._id,
@@ -414,7 +414,7 @@ const refundWalletPayments = async (
           metadata: mergePaymentMetadata(payment, { refund: refundMetadata }),
         },
       },
-      { new: true, session, runValidators: true },
+      { returnDocument: "after", session, runValidators: true },
     );
 
     if (!claimedPayment) {
@@ -428,7 +428,7 @@ const refundWalletPayments = async (
     const wallet = await Wallet.findOneAndUpdate(
       { userId: payment.customerId, isDeleted: false },
       { $inc: { balance: refundAmount } },
-      { new: true, session, runValidators: true, upsert: payment.method === "payos" },
+      { returnDocument: "after", session, runValidators: true, upsert: payment.method === "payos" },
     );
 
     if (!wallet) {
@@ -525,7 +525,7 @@ const compensateProviderPayments = async (
           }),
         },
       },
-      { new: true, session, runValidators: true },
+      { returnDocument: "after", session, runValidators: true },
     );
     if (!claimedPayment) continue;
 
@@ -679,7 +679,7 @@ const ensurePayosRefundRecord = async (
           nextRetryAt: new Date(),
         },
       },
-      { new: true, upsert: true, runValidators: true },
+      { returnDocument: "after", upsert: true, runValidators: true },
     );
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
@@ -738,7 +738,7 @@ const claimRefund = async (refundId: Types.ObjectId) => {
         lastError: null,
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
 };
 
@@ -786,7 +786,7 @@ const recordRefundFailure = async (refund: IRefund, error: unknown) => {
         leaseExpiresAt: null,
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!failedRefund) return;
 
@@ -804,7 +804,7 @@ const recordRefundFailure = async (refund: IRefund, error: unknown) => {
           decision.status === "manual_review" ? new Date() : null,
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!updatedRefund) return;
 
@@ -902,7 +902,7 @@ const finalizePayosRefund = async (
         refundReason: reason,
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
 
   if (!refundedPayment) {
@@ -1067,7 +1067,7 @@ const refundPayosPaymentToWallet = async (
             },
           },
         },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
       if (!claimedPayment) {
         throw new AppError("Giao dịch đã thay đổi. Chưa cộng tiền vào ví; vui lòng đối soát lại.", 409);
@@ -1239,7 +1239,7 @@ const settlePendingPayosPayment = async (
           },
         },
       },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
 
     if (paidPayment) {
@@ -1890,7 +1890,7 @@ export const retryPayosRefundByPaymentId = async (paymentId: string) => {
         adminAlertedAt: null,
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!refund) {
     throw new AppError(

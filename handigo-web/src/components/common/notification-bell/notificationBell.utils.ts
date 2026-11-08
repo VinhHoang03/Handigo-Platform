@@ -43,6 +43,13 @@ const getDataString = (item: AppNotification, key: string) => {
   return typeof value === "string" && value.trim() ? value : undefined;
 };
 
+const isApprovedProviderApplication = (item: AppNotification) => item.type === "SYSTEM"
+  && Boolean(getDataString(item, "providerApplicationId")) && item.data?.status === "approved";
+
+export const getNotificationContent = (item: AppNotification) => isApprovedProviderApplication(item)
+  ? item.content.split(/Vui lòng đăng nhập lại/iu)[0].trim()
+  : item.content;
+
 const isInternalPath = (value: string) =>
   value.startsWith("/") && !value.startsWith("//");
 
@@ -51,6 +58,7 @@ export const getNotificationTarget = (
   role?: AppRole,
 ) => {
   if (getNotificationUnavailableReason(item)) return null;
+  if (role === "PROVIDER" && isApprovedProviderApplication(item)) return "/provider/profile#application-history";
   const actionUrl = getDataString(item, "actionUrl");
   const orderId = getDataString(item, "orderId");
   const isWithdrawal = item.type === "WITHDRAWAL" || Boolean(getDataString(item, "withdrawalId"));

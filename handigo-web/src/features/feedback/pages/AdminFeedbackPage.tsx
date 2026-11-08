@@ -2,7 +2,8 @@ import {
   AdminPageTitle,
   AdminRefreshButton,
 } from "@/features/admin/components/shared/AdminPageHeader";
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
+import { BarChart3 } from 'lucide-react';
 import { AsyncState } from "@/components/common/AsyncState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useToast } from '@/components/common/Toast';
@@ -13,32 +14,28 @@ import { AdminFeedbackFilters } from "@/features/admin/components/feedback/Admin
 import { AdminFeedbackList } from "@/features/admin/components/feedback/AdminFeedbackList";
 import { AdminFeedbackStats } from "@/features/admin/components/feedback/AdminFeedbackStats";
 import { AdminFeedbackDetailModal } from "@/features/admin/components/feedback/AdminFeedbackDetailModal";
+import { AdminFeedbackModerationReport } from '@/features/admin/components/feedback/AdminFeedbackModerationReport';
 import { useFeedbackList } from "../hooks/useFeedback";
 import { feedbackService } from "../services/feedback.service";
-import type { Feedback, FeedbackList, FeedbackQuery } from "../types/feedback.types";
+import type { Feedback, FeedbackQuery } from "../types/feedback.types";
 
 export default function AdminFeedbackPage() {
   const { addToast } = useToast();
-  const [query, setQuery] = useState<FeedbackQuery>({ page: 1, limit: 30, ratingBelow: 4 });
-  const autoFilter = useRef(true);
-  const handleLoaded = useCallback((value: FeedbackList) => {
-    if (autoFilter.current && query.ratingBelow === 4 && value.pagination.total === 0) {
-      setQuery((current) => ({ ...current, ratingBelow: undefined, page: 1 }));
-    }
-    autoFilter.current = false;
-  }, [query.ratingBelow]);
-  const changeQuery = (value: FeedbackQuery) => { autoFilter.current = false; setQuery(value); };
-  const { result, loading, error, load } = useFeedbackList("admin", query, handleLoaded);
-  const [target, setTarget] = useState<Feedback | null>(null);
-  const [detail, setDetail] = useState<Feedback | null>(null);
+  const [query, setQuery] = useState<FeedbackQuery>({ page: 1, limit: 30 });
+  const { result, loading, error, load } = useFeedbackList("admin", query);
+  const [target, setTarget] = useState<Pick<Feedback, '_id' | 'isVisible' | 'updatedAt'> | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportRevision, setReportRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const confirm = async () => {
     if (!target) return;
     try {
       setBusy(true);
-      await feedbackService.setVisibility(target._id, !target.isVisible);
+      await feedbackService.setVisibility(target._id, !target.isVisible, target.updatedAt);
       addToast(target.isVisible ? 'Đã ẩn đánh giá.' : 'Đã hiển thị đánh giá.', 'success');
       setTarget(null);
+      setReportRevision(value => value + 1);
       await load();
     } catch (cause) {
       addToast(getErrorMessage(cause, 'Không thể cập nhật đánh giá.'), 'error');
@@ -51,10 +48,15 @@ export default function AdminFeedbackPage() {
     <DashboardShell role="ADMIN">
       <header className="admin-page-header">
         <AdminPageTitle title="Kiểm duyệt đánh giá" />
-        <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button type="button" className="btn-secondary inline-flex items-center gap-2" onClick={() => setReportOpen(true)}>
+            <BarChart3 size={18} aria-hidden="true" /> Báo cáo
+          </button>
+          <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
+        </div>
       </header>
-      <AdminFeedbackStats stats={result?.moderationStats} query={query} onChange={changeQuery} />
-      <AdminFeedbackFilters query={query} onChange={changeQuery} stats={result?.moderationStats} />
+      <AdminFeedbackStats stats={result?.moderationStats} query={query} onChange={setQuery} />
+      <AdminFeedbackFilters query={query} onChange={setQuery} stats={result?.moderationStats} />
 
       <AsyncState
         loading={loading}
@@ -63,7 +65,7 @@ export default function AdminFeedbackPage() {
         emptyMessage="Chưa có đánh giá phù hợp với bộ lọc."
         onRetry={load}
       >
-        <AdminFeedbackList items={result?.items || []} onToggle={setTarget} onOpen={setDetail} />
+        <AdminFeedbackList items={result?.items || []} onToggle={setTarget} onOpen={feedback => setDetailId(feedback._id)} />
       </AsyncState>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant/40 bg-surface px-4 py-2">
       <p className="text-xs text-on-surface-variant" aria-live="polite">Hiển thị {result?.items.length || 0} / {result?.pagination.total || 0} đánh giá</p>
@@ -73,7 +75,10 @@ export default function AdminFeedbackPage() {
         onChange={(page) => setQuery({ ...query, page })}
       />
       </div>
-      {detail && <AdminFeedbackDetailModal key={detail._id} feedbackId={detail._id} onClose={() => setDetail(null)} />}
+      {reportOpen && <AdminFeedbackModerationReport onClose={() => setReportOpen(false)} revision={reportRevision}
+        onOpenFeedback={setDetailId} onShowFeedback={(id, updatedAt) => setTarget({ _id: id, isVisible: false, updatedAt })}
+        onViewHidden={() => { setQuery({ page: 1, limit: 30, isVisible: false }); setReportOpen(false); }} />}
+      {detailId && <AdminFeedbackDetailModal key={detailId} feedbackId={detailId} onClose={() => setDetailId(null)} />}
       <ConfirmDialog
         open={Boolean(target)}
         title={target?.isVisible ? "Ẩn đánh giá" : "Hiện đánh giá"}

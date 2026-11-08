@@ -10,7 +10,7 @@ import {
   conversationIdParamSchema,
   sendMessageSchema,
 } from "../validations/chat.validator";
-import { currentLocationSchema } from "../validations/location.validator";
+import { trackingLocationSchema } from "../validations/location.validator";
 import { orderIdParamSchema } from "../validations/order.validator";
 import { markProviderOffline, restoreProviderAfterReconnect } from "../services/providerPresence.service";
 import { createLogger } from "../utils/logger";
@@ -252,9 +252,11 @@ export const initSocket = (server: HttpServer) => {
     socket.on("order:location:update", async (payload, callback) => {
       try {
         const { orderId } = orderIdParamSchema.parse(payload);
-        const coordinates = currentLocationSchema.parse({
+        const coordinates = trackingLocationSchema.parse({
           latitude: Number(payload?.latitude),
           longitude: Number(payload?.longitude),
+          accuracy: payload?.accuracy,
+          capturedAt: payload?.capturedAt,
         });
         const location = await orderTrackingService.updateOrderTrackingLocation(
           orderId,

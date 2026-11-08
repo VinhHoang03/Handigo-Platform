@@ -10,6 +10,7 @@ export interface IFeedback extends Document, IBaseDocument {
   comment?: string | null;
   images: string[];
   isVisible: boolean;
+  moderationId?: Types.ObjectId | null;
   providerReply?: {
     content: string;
     images: string[];
@@ -40,6 +41,7 @@ const FeedbackSchema = new Schema<IFeedback>(
     comment: { type: String, default: null },
     images: { type: [String], default: [] },
     isVisible: { type: Boolean, default: true },
+    moderationId: { type: Schema.Types.ObjectId, ref: "FeedbackModeration", default: null },
     providerReply: { type: ProviderReplySchema, default: null },
     ...baseFields,
   },

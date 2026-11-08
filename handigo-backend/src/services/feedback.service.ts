@@ -9,6 +9,8 @@ import { OrderStatus } from "../models/orderStatus.model";
 import { Service } from "../models/service.model";
 import User from "../models/user.model";
 import { getAdminOrderDetail } from "./adminOrderDetail.service";
+import { assertFeedbackContentAllowed } from "./feedbackModeration.service";
+import { FeedbackModeration } from "../models/feedbackModeration.model";
 
 interface FeedbackPayload {
   orderId: string;
@@ -63,7 +65,7 @@ export const recalculateProviderRating = async (providerId: Types.ObjectId | str
   // Cùng ghi hồ sơ thợ trong giao dịch để lượt thống kê cũ không ghi đè lượt mới.
   const provider = await Provider.findOneAndUpdate(
     { _id: providerId, isDeleted: false }, { $inc: { __v: 1 } },
-    { session, new: true, runValidators: true },
+    { session, returnDocument: "after", runValidators: true },
   );
   if (!provider) throw new AppError("Không tìm thấy hồ sơ thợ", 404);
   const providerObjectId =
@@ -100,6 +102,18 @@ export const recalculateProviderRating = async (providerId: Types.ObjectId | str
 };
 
 export const createFeedback = async (userId: string, payload: FeedbackPayload, resourceId?: Types.ObjectId) => {
+  // Kiểm duyệt ngoài giao dịch để không giữ khóa database trong lúc chờ AI.
+  assertObjectId(userId, "người dùng");
+  assertObjectId(payload.orderId, "đơn hàng");
+  const eligibleOrder = await Order.findOne({ _id: payload.orderId, isDeleted: false });
+  if (!eligibleOrder) throw new AppError("Không tìm thấy đơn dịch vụ", 404);
+  if (eligibleOrder.customerId.toString() !== userId) throw new AppError("Bạn chỉ có thể đánh giá đơn dịch vụ của mình", 403);
+  if (eligibleOrder.status !== "completed") throw new AppError("Chỉ có thể đánh giá đơn dịch vụ đã hoàn thành", 400);
+  if (!eligibleOrder.providerId) throw new AppError("Đơn dịch vụ chưa có thợ thực hiện", 400);
+  if (await Feedback.exists({ orderId: eligibleOrder._id, isDeleted: false })) {
+    throw new AppError("Đơn dịch vụ này đã được đánh giá", 400);
+  }
+  const moderation = await assertFeedbackContentAllowed(userId, payload.orderId, "comment", payload.comment);
   return withRatingTransaction(async (session) => {
     assertObjectId(userId, "người dùng");
     assertObjectId(payload.orderId, "đơn hàng");
@@ -143,7 +157,12 @@ export const createFeedback = async (userId: string, payload: FeedbackPayload, r
       rating: payload.rating,
       comment: payload.comment ?? null,
       images: payload.images ?? [],
+      isVisible: moderation.decision !== "review",
+      moderationId: moderation.moderationId ?? null,
     }], { session });
+
+    if (moderation.moderationId) await FeedbackModeration.updateOne({ _id: moderation.moderationId },
+      { $set: { feedbackId: feedback._id } }, { session, runValidators: true });
 
     await recalculateProviderRating(order.providerId, session);
 
@@ -158,6 +177,14 @@ export const updateMyFeedback = async (
   payload: UpdateFeedbackPayload,
   expectedVersion?: string,
 ) => {
+  assertObjectId(userId, "người dùng");
+  assertObjectId(feedbackId, "đánh giá");
+  let moderation: Awaited<ReturnType<typeof assertFeedbackContentAllowed>> | undefined;
+  if (payload.comment !== undefined) {
+    const ownedFeedback = await Feedback.findOne({ _id: feedbackId, customerId: userId, isDeleted: false });
+    if (!ownedFeedback) throw new AppError("Không tìm thấy đánh giá", 404);
+    moderation = await assertFeedbackContentAllowed(userId, ownedFeedback.orderId.toString(), "comment", payload.comment);
+  }
   return withRatingTransaction(async (session) => {
     assertObjectId(userId, "người dùng");
     assertObjectId(feedbackId, "đánh giá");
@@ -166,9 +193,15 @@ export const updateMyFeedback = async (
       const version = new Date(expectedVersion);
       if (!Number.isFinite(version.getTime())) throw new AppError("Phiên bản đánh giá không hợp lệ.", 400);
       const changes = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+      if (moderation) {
+        changes.moderationId = moderation.moderationId ?? null;
+        if (moderation.decision === "review") changes.isVisible = false;
+      }
       const updated = await Feedback.findOneAndUpdate({ _id: feedbackId, customerId: userId,
-        isDeleted: false, updatedAt: version }, { $set: changes }, { new: true, runValidators: true, session });
+        isDeleted: false, updatedAt: version }, { $set: changes }, { returnDocument: "after", runValidators: true, session });
       if (!updated) throw new AppError("Đánh giá đã thay đổi. Vui lòng kiểm tra và xác nhận lại.", 409);
+      if (moderation?.moderationId) await FeedbackModeration.updateOne({ _id: moderation.moderationId },
+        { $set: { feedbackId: updated._id } }, { session, runValidators: true });
       await recalculateProviderRating(updated.providerId, session);
       return updated;
     }
@@ -189,6 +222,8 @@ export const updateMyFeedback = async (
 
     if (payload.comment !== undefined) {
       feedback.comment = payload.comment;
+      feedback.moderationId = moderation?.moderationId ?? null;
+      if (moderation?.decision === "review") feedback.isVisible = false;
     }
 
     if (payload.images !== undefined) {
@@ -196,6 +231,8 @@ export const updateMyFeedback = async (
     }
 
     await feedback.save({ session });
+    if (moderation?.moderationId) await FeedbackModeration.updateOne({ _id: moderation.moderationId },
+      { $set: { feedbackId: feedback._id } }, { session, runValidators: true });
     await recalculateProviderRating(feedback.providerId, session);
 
     return feedback;
@@ -282,6 +319,7 @@ export const getProviderFeedbackByOrder = async (userId: string, orderId: string
 
   return Feedback.findOne({
     orderId,
+    isVisible: true,
     isDeleted: false,
   })
     .populate("customerId", "fullName avatar")
@@ -548,22 +586,34 @@ export const getMyProviderFeedbacks = async (
 export const setFeedbackVisibility = async (
   feedbackId: string,
   isVisible: boolean,
+  adminId: string,
+  expectedVersion?: string,
 ) => {
   return withRatingTransaction(async (session) => {
     assertObjectId(feedbackId, "đánh giá");
+
+    const version = expectedVersion !== undefined ? new Date(expectedVersion) : undefined;
+    if (version && !Number.isFinite(version.getTime())) throw new AppError("Phiên bản đánh giá không hợp lệ.", 400);
 
     const feedback = await Feedback.findOneAndUpdate(
       {
         _id: feedbackId,
         isDeleted: false,
+        ...(version ? { updatedAt: version } : {}),
       },
       { isVisible },
-      { new: true, runValidators: true, session },
+      { returnDocument: "after", runValidators: true, session },
     );
 
     if (!feedback) {
+      if (version) throw new AppError("Đánh giá đã thay đổi. Vui lòng tải lại và kiểm tra nội dung trước khi duyệt.", 409);
       throw new AppError("Không tìm thấy đánh giá", 404);
     }
+
+    if (isVisible && feedback.moderationId) await FeedbackModeration.updateOne(
+      { _id: feedback.moderationId, status: "pending" },
+      { $set: { status: "approved", reviewedBy: adminId, reviewedAt: new Date() } }, { session, runValidators: true },
+    );
 
     await recalculateProviderRating(feedback.providerId, session);
 
@@ -588,6 +638,7 @@ export const upsertProviderReply = async (
 
   const feedback = await Feedback.findOne({
     _id: feedbackId,
+    isVisible: true,
     isDeleted: false,
   });
   if (!feedback) {
@@ -603,6 +654,7 @@ export const upsertProviderReply = async (
     throw new AppError("Bạn không có quyền phản hồi đánh giá này", 403);
   }
 
+  await assertFeedbackContentAllowed(userId, feedbackId, "reply", content);
   const now = new Date();
   feedback.providerReply = {
     content,

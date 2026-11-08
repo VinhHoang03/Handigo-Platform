@@ -24,7 +24,7 @@ export const enqueueViolationEmail = async (
     violationId: violation._id,
     userId: violation.userId,
     to: user.email.trim(),
-    ...buildViolationEmail(violation, user.fullName || "", String(violation._id)),
+    ...buildViolationEmail(violation, user.fullName || ""),
   }], { session });
 };
 
@@ -39,7 +39,7 @@ export const processViolationEmails = async () => {
       status: { $in: ["pending", "processing"] }, attempts: { $lt: MAX_ATTEMPTS },
       nextAttemptAt: { $lte: new Date() },
     }, { $set: { status: "processing", leaseId, nextAttemptAt: new Date(Date.now() + LEASE_MS) },
-      $inc: { attempts: 1 } }, { new: true, sort: { nextAttemptAt: 1 }, runValidators: true });
+      $inc: { attempts: 1 } }, { returnDocument: "after", sort: { nextAttemptAt: 1 }, runValidators: true });
     if (!job) return;
     const ownership = { _id: job._id, status: "processing" as const, leaseId };
     try {

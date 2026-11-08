@@ -327,7 +327,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
           balance: { $gte: chargedAmount },
         },
         { $inc: { balance: -chargedAmount } },
-        { new: true, session },
+        { returnDocument: "after", session },
       );
 
       if (!wallet && !waivedDeposit) {
@@ -342,7 +342,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       const createdPayment = switchingCash ? await Payment.findOneAndUpdate({
         _id: duplicatePayment!._id, method: "cash", status: "pending", isDeleted: false,
       }, { $set: { ...paymentData, "metadata.previousMethod": "cash", "metadata.methodChangedAt": new Date() } },
-      { new: true, session, runValidators: true }) : (await Payment.create(
+      { returnDocument: "after", session, runValidators: true }) : (await Payment.create(
         [
           {
             orderId: transactionalOrder._id,
@@ -500,7 +500,7 @@ const reserveExternalPayment = async (
       }, { $set: { method: "payos", transactionCode, gatewayOrderCode,
         gatewayResponse: { orderCode: Number(gatewayOrderCode), provider: "payos" },
         "metadata.previousMethod": "cash", "metadata.methodChangedAt": new Date() } },
-      { new: true, session, runValidators: true }) : (await Payment.create(
+      { returnDocument: "after", session, runValidators: true }) : (await Payment.create(
         [
           {
             orderId: order._id,
@@ -1027,7 +1027,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   const wallet = await Wallet.findOneAndUpdate(
     { userId: provider.userId, balance: { $gte: platformFee } },
     { $inc: { balance: -platformFee } },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!wallet) {
@@ -1139,7 +1139,7 @@ type PayosPaymentLink = {
 const refundUnappliedPayosPayment = async (payment: InstanceType<typeof Payment>, session: ClientSession) => {
   const order = await Order.findOneAndUpdate(
     { _id: payment.orderId, customerId: payment.customerId },
-    { $inc: { __v: 1 } }, { new: true, session, runValidators: true },
+    { $inc: { __v: 1 } }, { returnDocument: "after", session, runValidators: true },
   );
   if (!order) throw new AppError("Không tìm thấy đơn hàng của giao dịch PayOS.", 404);
   const replacement = await Payment.findOne({
@@ -1162,7 +1162,7 @@ const refundUnappliedPayosPayment = async (payment: InstanceType<typeof Payment>
   const wallet = await Wallet.findOneAndUpdate(
     { userId: payment.customerId, isDeleted: false },
     { $inc: { balance: payment.amount }, $setOnInsert: { pendingBalance: 0, currency: "VND" } },
-    { new: true, upsert: true, session, runValidators: true },
+    { returnDocument: "after", upsert: true, session, runValidators: true },
   );
   if (!wallet) throw new AppError("Không thể hoàn khoản thanh toán đến muộn vào ví.", 409);
   payment.status = "refunded";
@@ -1727,7 +1727,7 @@ export const compensateProviderFromInspectionDeposit = async (
       $setOnInsert: { userId: provider.userId, pendingBalance: 0, currency: "VND" },
       $inc: { balance: payment.amount },
     },
-    { new: true, upsert: true },
+    { returnDocument: "after", upsert: true },
   );
 
   const transaction = await WalletTransaction.create({

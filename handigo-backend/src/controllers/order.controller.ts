@@ -473,22 +473,6 @@ export const getRepairQuotation = async (
   }
 };
 
-export const confirmRepairQuotation = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const quotation = await AssignmentService.confirmRepairQuotation(
-      param(req, "quotationId"),
-      uid(req),
-    );
-    return ok(res, quotation);
-  } catch (error) {
-    return next(error);
-  }
-};
-
 export const rejectRepairQuotation = async (
   req: Request,
   res: Response,

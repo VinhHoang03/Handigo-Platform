@@ -7,6 +7,7 @@ import { ProviderApplication } from "../models/providerApplication.model";
 import { Session } from "../models/session.model";
 import { Service } from "../models/service.model";
 import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
+import type { AutomatedReviewContext } from "../ai/admin/admin-ai.review-context";
 
 const notifyInitialApplicationSubmitted = async (
   userId: string,
@@ -261,7 +262,7 @@ const buildDraftCertificates = (
 
 const approveIdentityDocument = (
   identity: IIdentityDocument | undefined,
-  adminId: string,
+  adminId: string | null,
 ): IIdentityDocument | undefined => {
   if (!identity) return undefined;
 
@@ -289,7 +290,7 @@ const approveIdentityDocument = (
     consentAcceptedAt: identity.consentAcceptedAt,
     submittedAt: identity.submittedAt,
     verifiedAt: new Date(),
-    reviewedBy: new Types.ObjectId(adminId),
+    reviewedBy: adminId ? new Types.ObjectId(adminId) : null,
     reviewedAt: new Date(),
     rejectionReason: null,
   };
@@ -297,7 +298,7 @@ const approveIdentityDocument = (
 
 const approveCertificates = (
   certificates: IProviderCertificate[] = [],
-  adminId: string,
+  adminId: string | null,
 ): IProviderCertificate[] =>
   certificates.map((certificate) => ({
     title: certificate.title,
@@ -309,7 +310,7 @@ const approveCertificates = (
     description: certificate.description,
     isPublic: false,
     status: "approved",
-    reviewedBy: new Types.ObjectId(adminId),
+    reviewedBy: adminId ? new Types.ObjectId(adminId) : null,
     reviewedAt: new Date(),
     rejectionReason: null,
   }));
@@ -522,7 +523,7 @@ export const saveDraftApplication = async (
       isDeleted: false,
       deletedAt: null,
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true, runValidators: true },
   );
 
   if (user.providerOnboardingStatus || user.role === "PROVIDER") {
@@ -802,6 +803,7 @@ export const reviewApplication = async (
   adminId: string,
   applicationId: string,
   payload: ReviewProviderApplicationPayload,
+  automation?: AutomatedReviewContext,
 ) => {
   assertObjectId(adminId, "quản trị viên");
   assertObjectId(applicationId, "hồ sơ đăng ký");
@@ -820,13 +822,16 @@ export const reviewApplication = async (
         throw new AppError("Không tìm thấy hồ sơ đăng ký nhà cung cấp", 404);
       }
 
+      if (automation) await automation.beforeWrite(session);
       if (!["pending", "resubmitted"].includes(application.status)) {
         throw new AppError("Chỉ hồ sơ đang chờ duyệt mới có thể xét duyệt", 400);
       }
 
       const reviewedAt = new Date();
       application.status = payload.status;
-      application.reviewedBy = new Types.ObjectId(adminId);
+      application.reviewedBy = automation ? null : new Types.ObjectId(adminId);
+      application.reviewSource = automation ? "ai" : "manual";
+      application.aiAssessmentId = automation ? new Types.ObjectId(automation.assessmentId) : null;
       application.reviewedAt = reviewedAt;
 
       const isServiceAddition = application.applicationType === "service_addition";
@@ -838,15 +843,14 @@ export const reviewApplication = async (
         content: approved
           ? isServiceAddition
             ? "Đơn bổ sung dịch vụ đã được phê duyệt. Dịch vụ và chứng chỉ mới đã được thêm vào hồ sơ của bạn."
-            : "Hồ sơ của bạn đã được phê duyệt. Vui lòng đăng nhập lại để cập nhật quyền Provider và bắt đầu nhận việc."
+            : "Hồ sơ của bạn đã được phê duyệt."
           : `Hồ sơ bị từ chối: ${payload.rejectionReason}. ${payload.rejectionNotes} Vui lòng chỉnh sửa và gửi lại.`,
         data: {
           providerApplicationId: application._id,
           applicationType: application.applicationType || "initial",
           status: payload.status,
-          actionUrl: isServiceAddition
-            ? "/provider/profile"
-            : approved ? "/login" : `/register-provider?applicationId=${applicationId}`,
+          actionUrl: approved ? "/provider/profile#application-history"
+            : isServiceAddition ? "/provider/profile" : `/register-provider?applicationId=${applicationId}`,
         },
       }, { session, deferRealtime: true });
 
@@ -856,7 +860,8 @@ export const reviewApplication = async (
         application.reviewHistory.push({
           action: "rejected",
           status: "rejected",
-          actorId: new Types.ObjectId(adminId),
+          actorId: automation ? null : new Types.ObjectId(adminId),
+          actorType: automation ? "system" : "user",
           actorRole: "ADMIN",
           occurredAt: reviewedAt,
           rejectionReason: payload.rejectionReason || null,
@@ -883,16 +888,17 @@ export const reviewApplication = async (
       application.reviewHistory.push({
         action: "approved",
         status: "approved",
-        actorId: new Types.ObjectId(adminId),
+        actorId: automation ? null : new Types.ObjectId(adminId),
+        actorType: automation ? "system" : "user",
         actorRole: "ADMIN",
         occurredAt: reviewedAt,
       });
 
       const identityDocument = approveIdentityDocument(
         application.identityDocument,
-        adminId,
+        automation ? null : adminId,
       );
-      const certificates = approveCertificates(application.certificates, adminId);
+      const certificates = approveCertificates(application.certificates, automation ? null : adminId);
 
       await application.save({ session });
 
@@ -937,7 +943,7 @@ export const reviewApplication = async (
         },
         {
           upsert: true,
-          new: true,
+          returnDocument: "after",
           runValidators: true,
           setDefaultsOnInsert: true,
           session,
@@ -953,7 +959,7 @@ export const reviewApplication = async (
             providerOnboardingStep: null,
           },
         },
-        { new: true, runValidators: true, session },
+        { returnDocument: "after", runValidators: true, session },
       );
       if (!updatedUser) {
         throw new AppError("Không tìm thấy người dùng của hồ sơ provider", 404);

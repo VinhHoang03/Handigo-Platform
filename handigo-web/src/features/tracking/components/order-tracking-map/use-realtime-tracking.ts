@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 import { mapText } from "./constants";
@@ -26,6 +26,19 @@ export function useRealtimeTracking({
 }: UseRealtimeTrackingParams) {
   const socketRef = useRef<Socket | null>(null);
   const lastSentAtRef = useRef(0);
+  const latestPositionRef = useRef<GeolocationPosition | null>(null);
+  const sendPosition = useCallback((position: GeolocationPosition) => {
+    const now = Date.now();
+    if (!socketRef.current?.connected || now - position.timestamp > 30_000 ||
+      now - lastSentAtRef.current < 10_000) return;
+    lastSentAtRef.current = now;
+    socketRef.current.emit("order:location:update", {
+      orderId, latitude: position.coords.latitude, longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy, capturedAt: position.timestamp,
+    }, (res: { success: boolean; message?: string } | undefined) => {
+      if (res && !res.success) console.warn("[Socket-Client] Cập nhật vị trí đơn hàng thất bại:", res.message);
+    });
+  }, [orderId]);
 
   const [tracking, setTracking] = useState<TrackingState>({
     customer: savedCustomerCoordinate,
@@ -65,6 +78,9 @@ export function useRealtimeTracking({
             }));
             setLocationMessage(mapText.connected);
             lastSentAtRef.current = 0;
+            if (viewerRole === "PROVIDER" && liveTrackingEnabled && latestPositionRef.current) {
+              sendPosition(latestPositionRef.current);
+            }
           } else {
             setLocationMessage(response.message || mapText.joinFailed);
           }
@@ -98,7 +114,7 @@ export function useRealtimeTracking({
       dispose();
       socketRef.current = null;
     };
-  }, [orderId, trackingEnabled, viewerRole]);
+  }, [liveTrackingEnabled, orderId, sendPosition, trackingEnabled, viewerRole]);
 
   // GPS watchPosition — chỉ dành cho PROVIDER.
   // Customer không cần GPS: toạ độ của customer luôn là địa chỉ tĩnh từ đơn hàng.
@@ -108,7 +124,7 @@ export function useRealtimeTracking({
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        const now = Date.now();
+        latestPositionRef.current = position;
         const nextCoordinate = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -119,19 +135,7 @@ export function useRealtimeTracking({
         setTracking((cur) => ({ ...cur, provider: nextCoordinate }));
 
         // Gửi lên server mỗi 10 giây để giảm tần suất chia sẻ GPS.
-        if (now - lastSentAtRef.current < 10_000) return;
-        lastSentAtRef.current = now;
-        socketRef.current?.emit(
-          "order:location:update",
-          { orderId, ...nextCoordinate },
-          (res: { success: boolean; message?: string } | undefined) => {
-            if (res && !res.success) {
-              console.warn("[Socket-Client] Cập nhật vị trí đơn hàng thất bại:", res.message);
-            } else {
-              console.log("[Socket-Client] Phản hồi xác nhận cập nhật vị trí đơn hàng:", res);
-            }
-          },
-        );
+        sendPosition(position);
       },
       (err) => {
         console.error("[Socket-Client] Lỗi theo dõi vị trí GPS:", err.message);
@@ -140,8 +144,11 @@ export function useRealtimeTracking({
       { enableHighAccuracy: true, maximumAge: 10_000, timeout: 15_000 },
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [liveTrackingEnabled, orderId, viewerRole]);
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      latestPositionRef.current = null;
+    };
+  }, [liveTrackingEnabled, orderId, sendPosition, viewerRole]);
 
   return { tracking, locationMessage };
 }

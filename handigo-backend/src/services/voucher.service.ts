@@ -154,14 +154,14 @@ export const markOrderVoucherAsUsed = async (
       "voucherSnapshot.voucherId": voucherId,
     },
     { $set: { voucherUsedAt: usedAt } },
-    { new: true, session, runValidators: true },
+    { returnDocument: "after", session, runValidators: true },
   );
   if (!claimedOrder) return false;
 
   const voucher = await findStoredVoucher({ _id: voucherId }, session);
   if (!voucher) throw new AppError("Không tìm thấy mã giảm giá của đơn.", 409);
   const reservation = await VoucherUsage.findOneAndUpdate({ voucherId, orderId: order._id, status: "reserved", isDeleted: false },
-    { $set: { status: "used", usedAt, discountAmount: order.pricing.voucherDiscountAmount } }, { new: true, session, runValidators: true });
+    { $set: { status: "used", usedAt, discountAmount: order.pricing.voucherDiscountAmount } }, { returnDocument: "after", session, runValidators: true });
   if (reservation) {
     const updated = await updateStoredVoucher(voucherId, { reservedCount: { $gt: 0 } }, { $inc: { reservedCount: -1, usedCount: 1 } }, session);
     if (!updated?.modifiedCount) throw new AppError("Lượt giữ mã giảm giá không còn hợp lệ.", 409);
@@ -205,7 +205,7 @@ export const reservePersonalVoucher = async (
   const restored = await VoucherUsage.findOneAndUpdate(
     { voucherId, orderId, userId: customerId, status: "restored", isDeleted: false },
     { $set: { status: "reserved", discountAmount: 0, usedAt: new Date(), restoredAt: null } },
-    { new: true, session, runValidators: true },
+    { returnDocument: "after", session, runValidators: true },
   );
   if (restored) return;
   try {
@@ -218,7 +218,7 @@ export const reservePersonalVoucher = async (
 
 export const releaseVoucherReservation = async (orderId: Types.ObjectId, session: ClientSession) => {
   const usage = await VoucherUsage.findOneAndUpdate({ orderId, status: "reserved", isDeleted: false },
-    { $set: { status: "restored", restoredAt: new Date() } }, { new: true, session, runValidators: true });
+    { $set: { status: "restored", restoredAt: new Date() } }, { returnDocument: "after", session, runValidators: true });
   if (!usage) return;
   await updateStoredVoucher(usage.voucherId, { reservedCount: { $gt: 0 } }, { $inc: { reservedCount: -1 } }, session);
   await updateStoredVoucher(usage.voucherId, { reservedOrderId: orderId }, { $set: { reservedOrderId: null } }, session);
@@ -459,7 +459,7 @@ export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) 
             ...settlementFields(order, finalAmount),
           },
         },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
 
       if (!updatedOrder) {
@@ -522,7 +522,7 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
             ...settlementFields(order, Math.max(originalAmount - (order.pricing.promotionDiscountAmount || 0), 0)),
           },
         },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
 
       if (!updatedOrder) {

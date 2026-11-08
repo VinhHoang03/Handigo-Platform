@@ -3,7 +3,8 @@ import { z } from "zod";
 import { AgentPaymentService } from "../../services/agentPayment.service";
 import type { ToolContext } from "../tools/tool.interface";
 
-export const PAYMENT_WRITE_TOOLS = ["create_payment", "cancel_payment", "reject_booking_quotation"] as const;
+export const PAYMENT_WRITE_TOOLS = ["create_payment", "cancel_payment", "reject_booking_quotation",
+  "create_wallet_deposit", "cancel_wallet_deposit", "redeem_reward"] as const;
 
 // Chỉ ghi nhận trạng thái đã được backend xác minh; không tạo/hủy giao dịch trong bước đối soát.
 export async function reconcileGraphPayment(context: ToolContext, input: unknown) {

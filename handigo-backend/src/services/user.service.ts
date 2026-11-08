@@ -97,7 +97,7 @@ export const updateProfileService = async (
       { _id: userId, isDeleted: false },
       updateData,
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       },
     ).select(SAFE_USER_PROJECTION);
@@ -157,7 +157,7 @@ export const deleteUserService = async (userId: string, adminId: string) => {
         deletedAt: new Date(),
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   ).select(SAFE_USER_PROJECTION);
 
   if (!user) {

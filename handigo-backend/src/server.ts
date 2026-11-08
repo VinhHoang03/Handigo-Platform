@@ -43,6 +43,8 @@ const startServer = async () => {
     ]);
 
     await connectDB();
+    const { startAdminAIWorker, stopAdminAIWorker } = await import("./ai/admin/admin-ai.worker");
+    await startAdminAIWorker();
     await startViolationEmailMonitor();
 
     const server = http.createServer(app);
@@ -86,6 +88,7 @@ const startServer = async () => {
 
       try {
         await stopViolationEmailMonitor();
+        await stopAdminAIWorker();
         await stopAgentOrderProgressMonitor();
         server.closeIdleConnections();
         await new Promise<void>((resolve, reject) => {

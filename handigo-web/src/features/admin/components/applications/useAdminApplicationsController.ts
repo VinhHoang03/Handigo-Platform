@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useToast } from "@/components/common/Toast";
 import type { Category } from "@/features/provider-application/types/providerApplication.types";
 import { adminApi } from "../../api/admin.api";
@@ -11,6 +12,8 @@ import { applicationSummaryFilters } from './application-summary.utils';
  * `AdminProviderApplicationsPage` để trang chính chỉ còn lo bố cục.
  */
 export function useAdminApplicationsController() {
+  const [params, setParams] = useSearchParams();
+  const applicationId = params.get("applicationId");
   const [query, setQuery] = useState<AdminQuery>({ page: 1, limit: 20 });
   const { result, loading, error, load: loadList } = useAdminList("applications", query);
   const [summaryRevision, setSummaryRevision] = useState(0);
@@ -49,7 +52,23 @@ export function useAdminApplicationsController() {
     adminApi.categories().then(setCategories).catch(() => setCategories([]));
   }, []);
 
-  const closeModal = () => setSelected(null);
+  useEffect(() => {
+    if (!applicationId) return;
+    let active = true;
+    void adminApi.application(applicationId).then(application => {
+      if (!active) return;
+      if (!application.userId) throw new Error("Tài khoản người gửi hồ sơ không còn tồn tại.");
+      setSelected(application);
+    }).catch(() => {
+      if (active) addToast("Không thể tải hồ sơ gốc. Vui lòng thử lại từ danh sách hồ sơ.", "error");
+    });
+    return () => { active = false; };
+  }, [applicationId, addToast]);
+
+  const closeModal = () => {
+    setSelected(null);
+    if (applicationId) setParams(current => { current.delete("applicationId"); return current; }, { replace: true });
+  };
 
   const handleSelectApplication = (item: AdminApplication) => {
     if (!item.userId) {

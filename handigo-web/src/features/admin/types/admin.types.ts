@@ -77,7 +77,8 @@ export interface AdminApplication {
   reviewHistory?: Array<{
     action: 'submitted' | 'rejected' | 'resubmitted' | 'approved';
     status: 'pending' | 'resubmitted' | 'approved' | 'rejected';
-    actorId: ApplicationUser | string;
+    actorId: ApplicationUser | string | null;
+    actorType?: 'user' | 'system';
     actorRole: 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
     occurredAt: string;
     rejectionReason?: string | null;

@@ -83,6 +83,14 @@ export interface IOrderReassignment {
 }
 
 export interface IOrder extends Document, IBaseDocument {
+  movementTracking?: {
+    providerId: Types.ObjectId;
+    latitude: number;
+    longitude: number;
+    lastSampleAt: Date;
+    confirmationStartedAt?: Date | null;
+    notifiedAt?: Date | null;
+  } | null;
   arrival?: { providerId: Types.ObjectId; arrivedAt: Date; latitude: number; longitude: number } | null;
   customerNoShow?: {
     reportId: Types.ObjectId; status: "pending" | "approved" | "rejected";
@@ -212,6 +220,14 @@ const DiscountSnapshotSchema = new Schema<IDiscountSnapshot>(
 
 const OrderSchema = new Schema<IOrder>(
   {
+    movementTracking: { type: new Schema({
+      providerId: { type: Schema.Types.ObjectId, ref: "Provider", required: true },
+      latitude: { type: Number, required: true, min: -90, max: 90 },
+      longitude: { type: Number, required: true, min: -180, max: 180 },
+      lastSampleAt: { type: Date, required: true },
+      confirmationStartedAt: { type: Date, default: null },
+      notifiedAt: { type: Date, default: null },
+    }, { _id: false }), default: null, select: false },
     arrival: { type: new Schema({
       providerId: { type: Schema.Types.ObjectId, ref: "Provider", required: true },
       arrivedAt: { type: Date, required: true },

@@ -17,7 +17,11 @@ const importSchema = createNewsArticleSchema.extend({
 });
 
 export function readNewsImport() {
-  const rows = z.array(importSchema).min(1).parse(JSON.parse(readFileSync(path.join(directory, "articles.json"), "utf8")));
+  return prepareNewsImport(JSON.parse(readFileSync(path.join(directory, "articles.json"), "utf8")));
+}
+
+export function prepareNewsImport(input: unknown) {
+  const rows = z.array(importSchema).min(1).parse(input);
   if (new Set(rows.map(row => row.slug)).size !== rows.length) throw new Error("Dữ liệu nhập có đường dẫn bài viết trùng nhau.");
   return rows.map(row => {
     const content = [...row.content];

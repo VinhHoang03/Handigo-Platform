@@ -469,7 +469,7 @@ export const assignSupportTicket = async (
       assignedAdminId: new Types.ObjectId(targetAdminId),
       status: existingTicket.status === "open" ? "in_progress" : existingTicket.status,
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   ).populate(populateTicket());
 
   if (!ticket) throw new AppError("Yêu cầu hỗ trợ đã thay đổi. Vui lòng tải lại và thử lại.", 409);

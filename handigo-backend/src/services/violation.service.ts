@@ -62,7 +62,7 @@ const resolveSource = async (payload: CreateViolationPayload, session: ClientSes
   if (payload.sourceType === "REPORT") {
     const report = await Report.findOneAndUpdate(
       { _id: payload.sourceId, isDeleted: false }, { $inc: { __v: 1 } },
-      { session, new: true, runValidators: true },
+      { session, returnDocument: "after", runValidators: true },
     );
     if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
     if (["cancelled", "rejected"].includes(report.status)) throw new AppError("Báo cáo đã hủy hoặc từ chối, không thể tạo vi phạm", 400);
@@ -106,7 +106,7 @@ export const applyPenalty = async (userId: string, penaltyType: PenaltyType, vio
     penaltyType === "provider_suspended"
   ) {
     const user = await User.findOneAndUpdate({ _id: userId, isDeleted: false },
-      { $inc: { __v: 1 } }, { session, new: true, runValidators: true }).select("+temporaryLockId");
+      { $inc: { __v: 1 } }, { session, returnDocument: "after", runValidators: true }).select("+temporaryLockId");
     if (!user) throw new AppError("Không tìm thấy người dùng vi phạm", 404);
     if (penaltyType === "TEMPORARY_SUSPEND") {
       if (user.status === "active" || user.temporaryLockId) user.temporaryLockId = violationId;

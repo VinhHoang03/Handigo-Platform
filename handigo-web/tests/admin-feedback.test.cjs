@@ -143,25 +143,14 @@ function loadPageQuery() {
   };
 }
 
-test('Mặc định tải 30 đánh giá dưới 4 sao; không có kết quả thì chuyển sang tất cả', () => {
-  const renderPage = loadPageQuery();
-  let request = renderPage();
-  assert.equal(request.query.limit, 30);
-  assert.equal(request.query.ratingBelow, 4);
-  request.onLoaded({ items: [], pagination: { total: 0 } });
-  request = renderPage();
-  assert.equal(request.query.ratingBelow, undefined);
-  assert.equal(request.query.page, 1);
-  assert.equal(request.query.limit, 30);
-  request.onLoaded({ items: [], pagination: { total: 0 } });
-  assert.equal(renderPage().query, request.query);
-});
-
-test('Giữ bộ lọc dưới 4 sao khi tổng kết quả lớn hơn 0 kể cả trang hiện tại rỗng', () => {
+test('Mặc định tải tất cả đánh giá, 30 đánh giá mỗi trang', () => {
   const renderPage = loadPageQuery();
   const request = renderPage();
-  request.onLoaded({ items: [], pagination: { total: 31 } });
-  assert.equal(renderPage().query, request.query);
+  assert.equal(request.query.limit, 30);
+  assert.equal(request.query.ratingBelow, undefined);
+  assert.equal(request.query.rating, undefined);
+  assert.equal(request.query.page, 1);
+  assert.equal(request.onLoaded, undefined);
 });
 
 test('Không tự bỏ bộ lọc dưới 4 sao do người dùng chọn khi không có kết quả', () => {
@@ -169,7 +158,7 @@ test('Không tự bỏ bộ lọc dưới 4 sao do người dùng chọn khi kh�
   const request = renderPage();
   request.changeQuery({ page: 1, limit: 30, ratingBelow: 4, keyword: 'không có' });
   const filtered = renderPage();
-  filtered.onLoaded({ items: [], pagination: { total: 0 } });
+  filtered.onLoaded?.({ items: [], pagination: { total: 0 } });
   assert.equal(renderPage().query.ratingBelow, 4);
 });
 

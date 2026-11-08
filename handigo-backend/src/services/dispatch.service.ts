@@ -228,7 +228,7 @@ async function sendAssignmentBatch(
         { orderId: data.orderId, providerId: data.providerId,
           status: { $in: ["cancelled", "rejected", "timeout"] }, isDeleted: false },
         { $set: { ...data, respondedAt: null, rejectReason: null } },
-        { new: true, runValidators: true },
+        { returnDocument: "after", runValidators: true },
       );
       if (existing) return existing;
     }
@@ -330,7 +330,7 @@ async function sendDirectProviderRequest(
     { orderId: data.orderId, providerId: data.providerId,
       status: { $in: ["cancelled", "rejected", "timeout"] }, isDeleted: false },
     { $set: { ...data, respondedAt: null, rejectReason: null } },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   ) ?? await OrderAssignment.create(data);
 
   const realtimeAssignment = await getAssignmentRealtimePayload(

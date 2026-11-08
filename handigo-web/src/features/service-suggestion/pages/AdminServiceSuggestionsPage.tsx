@@ -1,7 +1,9 @@
 import { useToastFeedback } from "@/components/common/Toast";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
+import { Pagination } from "@/components/common/Pagination";
 import { DataTable } from "@/components/common/dashboard/DataTable";
 import type { DataTableColumn } from "@/components/common/dashboard/DataTable";
 import { TableSkeleton } from "@/components/common/dashboard/TableSkeleton";
@@ -22,10 +24,14 @@ import type {
 } from "../types/serviceSuggestion.types";
 
 export default function AdminServiceSuggestionsPage() {
+  const [params, setParams] = useSearchParams();
+  const suggestionId = params.get("suggestionId");
   const [suggestions, setSuggestions] = useState<ServiceSuggestion[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [status, setStatus] = useState<SuggestionStatus | "">("pending");
+  const [status, setStatus] = useState<SuggestionStatus | "">("");
   const [suggestionType, setSuggestionType] = useState<SuggestionType | "">("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [selectedSuggestion, setSelectedSuggestion] = useState<ServiceSuggestion | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -34,33 +40,44 @@ export default function AdminServiceSuggestionsPage() {
   const [serviceFormOpen, setServiceFormOpen] = useState(false);
   const [serviceForm, setServiceForm] = useState<ServiceForm>({ ...emptyServiceForm, isActive: false });
   const savingRef = useRef(false);
+  const loadVersion = useRef(0);
   const [, setNotice] = useToastFeedback<string>("", "success");
   const [, setError] = useToastFeedback<string>("", "error");
 
   const loadData = async () => {
+    const version = ++loadVersion.current;
     setIsLoading(true);
     setError("");
     try {
       const [suggestionResult, categoryResult] = await Promise.all([
-        serviceSuggestionApi.list({ page: 1, limit: 100, status, suggestionType }),
+        serviceSuggestionApi.list({ page, limit: 5, status, suggestionType }),
         categoryServiceApi.listCategories({ page: 1, limit: 200 }),
       ]);
+      if (version !== loadVersion.current) return;
+      setTotal(suggestionResult.total);
+      const lastPage = Math.max(1, Math.ceil(suggestionResult.total / 5));
+      if (page > lastPage) {
+        setSuggestions([]);
+        setPage(lastPage);
+        return;
+      }
       setSuggestions(suggestionResult.items);
       setCategories(categoryResult.items);
     } catch (loadError) {
-      setError(getSuggestionErrorMessage(loadError));
+      if (version === loadVersion.current) setError(getSuggestionErrorMessage(loadError));
     } finally {
-      setIsLoading(false);
+      if (version === loadVersion.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadData(), 0);
-    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Ref đếm phiên tải để bỏ phản hồi cũ, không phải ref phần tử DOM.
+    return () => { window.clearTimeout(timer); loadVersion.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, suggestionType]);
+  }, [status, suggestionType, page]);
 
-  const openReviewModal = (suggestion: ServiceSuggestion) => {
+  const openReviewModal = useCallback((suggestion: ServiceSuggestion) => {
     setServiceFormOpen(false);
     setSelectedSuggestion(suggestion);
     setAdminNote("");
@@ -71,13 +88,23 @@ export default function AdminServiceSuggestionsPage() {
           ? suggestion.categoryId
           : "";
     setCategoryId(linkedCategory);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!suggestionId) return;
+    let active = true;
+    void serviceSuggestionApi.detail(suggestionId).then(suggestion => {
+      if (active) openReviewModal(suggestion);
+    }).catch(error => { if (active) setError(getSuggestionErrorMessage(error)); });
+    return () => { active = false; };
+  }, [suggestionId, openReviewModal, setError]);
 
   const closeReviewModal = () => {
     setServiceFormOpen(false);
     setSelectedSuggestion(null);
     setAdminNote("");
     setCategoryId("");
+    if (suggestionId) setParams(current => { current.delete("suggestionId"); return current; }, { replace: true });
   };
 
   const updateSuggestion = async (nextStatus?: SuggestionStatus) => {
@@ -169,7 +196,7 @@ export default function AdminServiceSuggestionsPage() {
         ),
       },
     ],
-    [],
+    [openReviewModal],
   );
 
   return (
@@ -177,10 +204,10 @@ export default function AdminServiceSuggestionsPage() {
       <div className="space-y-5">
         <SuggestionListHeader
           status={status}
-          onStatusChange={setStatus}
+          onStatusChange={value => { setStatus(value); setPage(1); }}
           suggestionType={suggestionType}
-          onSuggestionTypeChange={setSuggestionType}
-          count={suggestions.length}
+          onSuggestionTypeChange={value => { setSuggestionType(value); setPage(1); }}
+          count={total}
           onRefresh={() => void loadData()}
           loading={isLoading}
         />
@@ -190,7 +217,7 @@ export default function AdminServiceSuggestionsPage() {
           loading={isLoading}
           empty={!suggestions.length}
           emptyMessage="Chưa có đề xuất phù hợp."
-          skeleton={<TableSkeleton columns={columns.length} rowCount={6} />}
+          skeleton={<TableSkeleton columns={columns.length} rowCount={5} />}
         >
           <DataTable
             columns={columns}
@@ -199,6 +226,7 @@ export default function AdminServiceSuggestionsPage() {
             minWidthClassName="min-w-[700px]"
           />
         </AsyncState>
+        {!isLoading && <Pagination page={page} totalPages={Math.ceil(total / 5)} onChange={setPage} />}
       </div>
 
       <ServiceSuggestionReviewModal

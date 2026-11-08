@@ -42,7 +42,7 @@ export const earnOrderRewards = async (order: IOrder, session: ClientSession) =>
   const account = await RewardAccount.findOneAndUpdate(
     { _id: order.customerId },
     { $inc: { balance: points, totalEarned: points }, $setOnInsert: { totalRedeemed: 0 } },
-    { session, upsert: true, new: true, runValidators: true },
+    { session, upsert: true, returnDocument: "after", runValidators: true },
   );
   await RewardTransaction.create([{
     _id: key, userId: order.customerId, kind: "EARN", points, balanceAfter: account.balance,
@@ -122,7 +122,7 @@ export const redeemReward = async (userId: string, offerId: string, requestId: s
     const account = await RewardAccount.findOneAndUpdate(
       { _id: userId, balance: { $gte: offer.points } },
       { $inc: { balance: -offer.points, totalRedeemed: offer.points } },
-      { session, new: true, runValidators: true },
+      { session, returnDocument: "after", runValidators: true },
     );
     if (!account) throw new AppError("Bạn chưa đủ điểm để đổi ưu đãi này.", 409);
     const now = new Date();

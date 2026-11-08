@@ -62,7 +62,7 @@ const expirePendingRequests = async (orderId?: Types.ObjectId) => {
     const claimed = await OrderRescheduleRequest.findOneAndUpdate(
       { _id: item._id, status: "pending", expiresAt: { $lte: now } },
       { $set: { status: "expired", respondedAt: now } },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     if (!claimed) continue;
     const order = await Order.findOne({ _id: item.orderId, isDeleted: false });
@@ -262,7 +262,7 @@ export const previewOrderReschedule = async (orderId: string, actor: RequestUser
   };
 };
 
-export const createOrderRescheduleRequest = async (orderId: string, actor: RequestUser, payload: ReschedulePayload) => {
+export const createOrderRescheduleRequest = async (orderId: string, actor: RequestUser, payload: ReschedulePayload, requestId?: Types.ObjectId) => {
   const proposedScheduledAt = new Date(payload.scheduledAt);
   const preview = await previewOrderReschedule(orderId, actor, proposedScheduledAt);
   if (preview.warningRequired && payload.warningAcknowledged !== true) {
@@ -277,6 +277,7 @@ export const createOrderRescheduleRequest = async (orderId: string, actor: Reque
   }
   const requestedAt = new Date();
   const requestData = {
+    ...(requestId ? { _id: requestId } : {}),
     orderId: order._id,
     initiatorId: context.userId,
     initiatorRole: context.role,

@@ -22,22 +22,19 @@ const formatDate = (value: Date) => new Intl.DateTimeFormat("vi-VN", {
   hour: "2-digit", minute: "2-digit", hour12: false,
 }).format(value) + " (giờ Việt Nam)";
 
-type EmailViolation = Pick<IViolation, "violationType" | "severity" | "penaltyType" | "reason" | "adminDecision" | "penalty" | "startAt" | "endAt">;
+type EmailViolation = Pick<IViolation, "violationType" | "severity" | "penaltyType" | "reason" | "penalty" | "endAt">;
 
-export const buildViolationEmail = (violation: EmailViolation, fullName: string, violationId: string) => {
+export const buildViolationEmail = (violation: EmailViolation, fullName: string) => {
   const type = violation.penaltyType;
   const penalty = penaltyLabels[type];
   const rows: [string, string][] = [
-    ["Mã quyết định", violationId], ["Nội dung vi phạm", violation.violationType],
+    ["Nội dung vi phạm", violation.violationType],
     ["Lý do xử lý", violation.reason || "Không có thông tin bổ sung"],
     ["Mức độ vi phạm", severityLabels[violation.severity]], ["Hình thức xử lý", penalty],
-    ["Quyết định của quản trị viên", violation.adminDecision || penalty],
   ];
-  if (violation.startAt) rows.push(["Thời điểm áp dụng", formatDate(violation.startAt)]);
   if (type === "TEMPORARY_SUSPEND") {
     const duration = violation.penalty?.duration ?? violation.penalty?.durationDays;
     rows.push(["Thời hạn", `${duration} ${violation.penalty?.durationUnit === "hours" ? "giờ" : "ngày"}`]);
-    if (violation.endAt) rows.push(["Thời điểm hết hạn", formatDate(violation.endAt)]);
   }
   if (type === "RESTRICT_FEATURE" && violation.penalty?.feature) {
     rows.push(["Tính năng bị hạn chế", featureLabels[violation.penalty.feature] || violation.penalty.feature]);
@@ -56,7 +53,7 @@ export const buildViolationEmail = (violation: EmailViolation, fullName: string,
   }
   const greeting = `Xin chào ${fullName || "bạn"},`;
   const intro = "Handigo thông báo quyết định xử lý vi phạm đối với tài khoản của bạn.";
-  const support = "Nếu cần giải đáp hoặc đề nghị xem xét lại, vui lòng phản hồi email này và cung cấp mã quyết định cùng thông tin liên quan.";
+  const support = "Nếu cần giải đáp hoặc đề nghị xem xét lại, vui lòng phản hồi email này và cung cấp thông tin liên quan.";
   return {
     subject: `[Handigo] ${penalty} do vi phạm`,
     text: [greeting, intro, ...rows.map(([label, value]) => `${label}: ${value}`), impact, support, "Đội ngũ Handigo"].join("\n\n"),

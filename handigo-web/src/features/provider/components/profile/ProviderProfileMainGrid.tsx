@@ -155,7 +155,7 @@ export function ProviderProfileMainGrid({
           canChangePassword={canChangePassword}
         />
 
-        <ProfileSection title="Lịch sử đơn/hồ sơ">
+        <div id="application-history" className="scroll-mt-24"><ProfileSection title="Lịch sử đơn/hồ sơ">
           <ProviderApplicationHistory
             key={applicationHistoryKey}
             canEditRejected
@@ -170,7 +170,7 @@ export function ProviderProfileMainGrid({
               }
             }}
           />
-        </ProfileSection>
+        </ProfileSection></div>
       </div>
     </div>
   );

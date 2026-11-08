@@ -51,13 +51,13 @@ export const settleCustomerNoShow = async (
     reviewedByType: review.automated ? "system" : "admin",
     reviewNote: review.reviewNote?.trim() || null,
     resolutionNote: review.resolutionNote?.trim() || "Chấp thuận báo cáo khách vắng mặt. Handigo hỗ trợ thợ 5.000đ, không thu thêm của khách.",
-  } }, { session, new: true, runValidators: true });
+  } }, { session, returnDocument: "after", runValidators: true });
   if (!report) throw new AppError("Báo cáo đã được xử lý hoặc không thuộc thợ hiện tại.", 409);
 
   const wallet = await Wallet.findOneAndUpdate({ userId: provider.userId, isDeleted: false }, {
     $inc: { balance: CUSTOMER_NO_SHOW_COMPENSATION },
     $setOnInsert: { pendingBalance: 0, currency: "VND" },
-  }, { session, new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true });
+  }, { session, returnDocument: "after", upsert: true, runValidators: true, setDefaultsOnInsert: true });
   if (!wallet) throw new AppError("Không thể cập nhật ví hỗ trợ của thợ.", 500);
   await WalletTransaction.create([{
     walletId: wallet._id, userId: provider.userId, relatedOrderId: order._id,
