@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/features/home/domain/customer_home_data.dart';
 import 'package:handigo_app/features/home/presentation/customer_shell.dart';
+import 'package:handigo_app/features/home/presentation/customer_home_provider.dart';
 
 void main() {
   test('Model Trang chủ đọc được voucher và bài viết từ API', () {
@@ -51,7 +51,12 @@ void main() {
         content: [HomeNewsBlock(type: 'heading', text: 'Chuẩn bị dụng cụ')],
       );
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
+          overrides: [
+            customerHomeRewardsProvider.overrideWith(
+              (ref) async => const HomeRewards(balance: 12, offers: []),
+            ),
+          ],
           child: MaterialApp(
             home: Scaffold(
               body: CustomerHomeContent(
@@ -78,6 +83,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.text('Tin tức'),
+        200,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
+      );
       final labels = tester
           .widgetList<Text>(find.byType(Text))
           .map((widget) => widget.data)
@@ -99,7 +115,8 @@ void main() {
       await tester.tap(find.text('Mẹo vệ sinh điều hòa').hitTestable());
       await tester.pumpAndSettle();
       expect(
-        find.text('Giữ thiết bị sạch và hoạt động ổn định.'),
+        find.descendant(of: find.byType(BottomSheet),
+          matching: find.text('Giữ thiết bị sạch và hoạt động ổn định.')),
         findsOneWidget,
       );
       expect(find.text('Chuẩn bị dụng cụ'), findsOneWidget);

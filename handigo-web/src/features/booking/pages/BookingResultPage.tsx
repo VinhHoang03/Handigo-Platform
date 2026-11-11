@@ -117,7 +117,7 @@ const BookingResultPage = () => {
             </div>
             {(result === 'pending' || result === 'error' || verificationError || quotationError) && <button type="button" onClick={() => void check()} className="mt-3 rounded-xl border border-outline-variant px-4 py-2 text-sm text-primary hover:bg-surface-container-low">Kiểm tra lại kết quả</button>}
             <BookingSuccessActions orderId={order._id} retryPayment={order.status !== 'cancelled' && ['pending', 'cancelled', 'failed', 'error'].includes(result)} />
-            {successful && order.status === 'created' && !order.providerId && <BookingSuccessLocationPreview />}
+            {successful && order.status === 'created' && !order.providerId && !order.preferredProviderId && <BookingSuccessLocationPreview />}
             <BookingSuccessFooter />
           </>}
         </AsyncState>

@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_states.dart';
-import '../../../shared/widgets/provider_avatar.dart';
 import '../../../shared/widgets/customer_page_header.dart';
 import '../../../shared/utils/media_url.dart';
 import '../data/order_repository.dart';
@@ -91,22 +90,12 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     return Scaffold(
       appBar: CustomerPageHeader(
         toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        showBottomBorder: true,
         title: 'Lịch sử đơn hàng',
         centerTitle: false,
-        leading: Center(
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryFixed,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.receipt_long_outlined,
-              color: Theme.of(context).colorScheme.primary,
-              size: 24,
-            ),
-          ),
+        leading: const Center(
+          child: CustomerHeaderIcon(Icons.receipt_long_outlined),
         ),
       ),
       body: Column(
@@ -214,6 +203,12 @@ class OrderSummaryCard extends StatelessWidget {
     final displayedAt = providerView
         ? order.scheduledAt ?? order.createdAt
         : order.scheduledAt;
+    final createdAt = order.createdAt;
+    final placedAtLabel = !providerView && createdAt != null
+        ? DateFormat('dd/MM/yyyy, HH:mm').format(
+            createdAt.toUtc().add(const Duration(hours: 7)),
+          )
+        : null;
     final displayedAmount = providerView
         ? order.providerAmount
         : order.totalAmount;
@@ -230,7 +225,8 @@ class OrderSummaryCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Mã đơn ${order.code}',
+                      'Mã đơn ${order.code}'
+                      '${placedAtLabel == null ? '' : ' | $placedAtLabel'}',
                       style: theme.textTheme.labelMedium,
                     ),
                   ),
@@ -288,7 +284,7 @@ class OrderSummaryCard extends StatelessWidget {
                             ),
                           if (displayedAt != null)
                             Text(
-                              '${providerView ? '' : 'Dự kiến: '}${DateFormat('HH:mm, dd/MM/yyyy').format(displayedAt.toLocal())}',
+                              '${providerView ? '' : 'Dự kiến thực hiện: '}${DateFormat(providerView ? 'HH:mm, dd/MM/yyyy' : 'dd/MM/yyyy, HH:mm').format(displayedAt.toLocal())}',
                               style: theme.textTheme.bodySmall,
                             ),
                           if (providerView && displayedAt == null)
@@ -334,32 +330,6 @@ class OrderSummaryCard extends StatelessWidget {
               if (providerView && providerInfo != null) ...[
                 const SizedBox(height: 10),
                 providerInfo!,
-              ],
-              if (!providerView && order.providerName != null) ...[
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    ProviderAvatar(
-                      url: order.providerAvatar,
-                      gender: order.providerGender,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        order.providerName!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.verified,
-                      size: 16,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ],
-                ),
               ],
               const SizedBox(height: 10),
               Row(

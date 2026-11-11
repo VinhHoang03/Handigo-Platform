@@ -1,5 +1,6 @@
 import '../../../shared/widgets/app_search_field.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/realtime_connection.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/account_overview_widgets.dart';
@@ -24,6 +26,7 @@ import '../data/provider_repository.dart';
 import '../data/provider_location_service.dart';
 import '../domain/provider_models.dart';
 import 'provider_schedule_preview.dart';
+import 'provider_schedule_view.dart';
 import 'provider_history_widgets.dart';
 import 'provider_inbox_visits.dart';
 import 'provider_assignment_customer_info.dart';
@@ -55,6 +58,7 @@ final providerCurrentLocationProvider = FutureProvider<void>(
     await ref
         .watch(providerLocationServiceProvider.notifier)
         .synchronize(
+          useCachedPosition: true,
           shouldUpload: () =>
               ref.mounted &&
               ref.read(authControllerProvider).user?.id == userId,
@@ -844,6 +848,29 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
   bool busy = false;
   bool? _optimisticOnline;
   String? _lastAddress;
+  StreamSubscription<dynamic>? _availabilityEvents;
+  bool _connected = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (ref.read(providerUiPreviewProvider) != null) return;
+    ref.listenManual(realtimeConnectionProvider, (_, connection) {
+      unawaited(_availabilityEvents?.cancel());
+      _connected = connection?.connected == true;
+      _availabilityEvents = connection?.events.listen((event) {
+        if (mounted && ['connect', 'disconnect'].contains(event.name)) {
+          setState(() => _connected = event.name == 'connect');
+        }
+      });
+    }, fireImmediately: true);
+  }
+
+  @override
+  void dispose() {
+    unawaited(_availabilityEvents?.cancel());
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant _AvailabilityCard oldWidget) {
@@ -854,7 +881,11 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
   }
 
   Future<void> _changeAvailability(bool value) async {
-    if (busy || ref.read(providerUiPreviewProvider) != null) return;
+    if (busy ||
+        widget.data.availabilityStatus == 'busy' ||
+        ref.read(providerUiPreviewProvider) != null) {
+      return;
+    }
     final userId = ref.read(authControllerProvider).user?.id;
     if (userId == null) return;
     bool isCurrent() =>
@@ -880,6 +911,7 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
     } catch (error) {
       if (mounted && isCurrent()) {
         setState(() => _optimisticOnline = previous);
+        ref.invalidate(providerOverviewProvider);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(_message(error))));
@@ -893,11 +925,15 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
   Widget build(BuildContext context) {
     final online =
         _optimisticOnline ?? widget.data.availabilityStatus == 'online';
-    final location = online ? ref.watch(providerCurrentLocationProvider) : null;
+    final location = online && !busy
+        ? ref.watch(providerCurrentLocationProvider)
+        : null;
     final tracker = online ? ref.watch(providerLocationServiceProvider) : null;
     final trackingError = tracker?.error;
     final hasSyncedPosition = tracker?.synchronizedPosition != null;
-    final address = online ? ref.watch(providerWorkingAddressProvider) : null;
+    final address = online && !busy
+        ? ref.watch(providerWorkingAddressProvider)
+        : null;
     if (hasSyncedPosition ||
         (location?.hasValue == true && location?.hasError != true)) {
       final resolved = address?.asData?.value;
@@ -936,6 +972,8 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
                   ? online
                         ? 'Đang bật nhận việc...'
                         : 'Đang tắt nhận việc...'
+                  : online && !_connected
+                  ? 'Đang kết nối lại…'
                   : _availabilityLabel(
                       _optimisticOnline == null
                           ? widget.data.availabilityStatus
@@ -1019,7 +1057,12 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
               ),
               const SizedBox(width: 8),
             ],
-            Switch(value: online, onChanged: busy ? null : _changeAvailability),
+            Switch(
+              value: online,
+              onChanged: busy || widget.data.availabilityStatus == 'busy'
+                  ? null
+                  : _changeAvailability,
+            ),
           ],
         ),
       ),
@@ -1695,21 +1738,12 @@ class ProviderScheduleScreen extends ConsumerStatefulWidget {
 
 class _ProviderScheduleScreenState
     extends ConsumerState<ProviderScheduleScreen> {
-  DateTime selected = DateUtils.dateOnly(DateTime.now());
-  DateTime weekStart = DateUtils.dateOnly(DateTime.now());
-  final dayScrollController = ScrollController();
-  final Set<String> viewedOrderIds = {};
   List<OrderSummary>? previewOrders;
 
   void _setPreview(bool enabled) {
     if (!kDebugMode || !mounted) return;
     ref.read(providerUiPreviewProvider.notifier).setEnabled(enabled);
-    setState(() {
-      previewOrders = ref.read(providerUiPreviewProvider);
-      selected = DateUtils.dateOnly(DateTime.now());
-      weekStart = selected;
-      viewedOrderIds.clear();
-    });
+    setState(() => previewOrders = ref.read(providerUiPreviewProvider));
     if (enabled) {
       context.findAncestorStateOfType<_ProviderShellState>()?._showSchedule();
     }
@@ -1742,61 +1776,8 @@ class _ProviderScheduleScreenState
     }
   }
 
-  void _resetToToday() {
-    setState(() {
-      selected = DateUtils.dateOnly(DateTime.now());
-      weekStart = selected;
-    });
-    _scrollToStart();
-  }
-
-  Future<void> _pickDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: selected,
-      firstDate: DateTime(1),
-      lastDate: DateTime(9999, 12, 31),
-      helpText: 'Chọn ngày xem lịch hẹn',
-      cancelText: 'Hủy',
-      confirmText: 'Chọn',
-    );
-    if (date == null || !mounted) return;
-    setState(() {
-      selected = DateUtils.dateOnly(date);
-      weekStart = selected;
-    });
-    _scrollToStart();
-  }
-
-  void _scrollToStart() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && dayScrollController.hasClients) {
-        dayScrollController.jumpTo(0);
-      }
-    });
-  }
-
-  void _changeWeek(int days) {
-    setState(() {
-      weekStart = DateTime(
-        weekStart.year,
-        weekStart.month,
-        weekStart.day + days,
-      );
-      selected = weekStart;
-    });
-    _scrollToStart();
-  }
-
-  @override
-  void didUpdateWidget(covariant ProviderScheduleScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isActive && !oldWidget.isActive) _resetToToday();
-  }
-
   @override
   void dispose() {
-    dayScrollController.dispose();
     if (_setActiveSchedulePreview == _setPreview) {
       _setActiveSchedulePreview = null;
     }
@@ -1806,219 +1787,22 @@ class _ProviderScheduleScreenState
   @override
   Widget build(BuildContext context) {
     previewOrders = ref.watch(providerUiPreviewProvider);
-    final state = previewOrders == null
+    final AsyncValue<PagedResult<OrderSummary>> state = previewOrders == null
         ? ref.watch(providerScheduleOrdersProvider)
         : AsyncData(PagedResult(items: previewOrders!, page: 1, totalPages: 1));
-    final orders = state.asData?.value.items ?? <OrderSummary>[];
-    // Chỉ ghi nhận các đơn đã tải và hiển thị trong ngày đang mở.
-    viewedOrderIds.addAll(
-      _ordersOnDay(orders, selected).map((order) => order.id),
-    );
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryFixed,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.calendar_month_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Lịch làm việc',
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    DateFormat('dd-MM-yyyy').format(DateTime.now()),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return ProviderScheduleView(
+      key: ValueKey(
+        previewOrders == null ? 'schedule-live' : 'schedule-preview',
       ),
-      body: Column(
-        children: [
-          if (previewOrders != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Dữ liệu xem thử • Tự xóa khi mở lại app hoặc hot restart',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Material(
-              color: Colors.white,
-              shape: const StadiumBorder(side: BorderSide(color: Colors.black)),
-              clipBehavior: Clip.antiAlias,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Tuần trước',
-                      onPressed: () => _changeWeek(-7),
-                      icon: const Icon(Icons.chevron_left),
-                    ),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _pickDate,
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          side: BorderSide.none,
-                          shape: const StadiumBorder(),
-                          minimumSize: const Size(48, 48),
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          textStyle: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        child: Text(DateFormat('MM/yyyy').format(selected)),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Tuần sau',
-                      onPressed: () => _changeWeek(7),
-                      icon: const Icon(Icons.chevron_right),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: _WeekStrip(
-              selected: selected,
-              start: weekStart,
-              controller: dayScrollController,
-              orders: orders,
-              viewedOrderIds: viewedOrderIds,
-              onSelected: (value) => setState(() => selected = value),
-            ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                if (previewOrders != null) return;
-                ref.invalidate(providerScheduleOrdersProvider);
-                await ref.read(providerScheduleOrdersProvider.future);
-              },
-              child: state.when(
-                loading: () => const AppLoading(),
-                error: (error, _) => AppMessage(
-                  message: _message(error),
-                  onRetry: () => ref.invalidate(providerScheduleOrdersProvider),
-                ),
-                data: (page) {
-                  final scheduled = _ordersOnDay(page.items, selected);
-                  return ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount:
-                        scheduled.length + 1 + (scheduled.isEmpty ? 1 : 0),
-                    separatorBuilder: (_, index) => const SizedBox(height: 12),
-                    itemBuilder: (_, index) {
-                      if (index == 0) {
-                        return Card(
-                          margin: EdgeInsets.zero,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerLow,
-                          child: ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimary,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.event_note_outlined,
-                                color: Theme.of(context).colorScheme.onPrimary,
-                              ),
-                            ),
-                            title: Text(
-                              '${scheduled.length} lịch hẹn',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: scheduled.isEmpty
-                                ? null
-                                : Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (scheduled.any(
-                                        (order) => order.totalAmount != null,
-                                      ))
-                                        Text(
-                                          'Dự kiến: ${_money(scheduled.fold<double>(0, (total, order) => total + (order.totalAmount ?? 0)))}',
-                                          style: TextStyle(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      if (scheduled.any(
-                                        (order) => order.totalAmount == null,
-                                      ))
-                                        const Text(
-                                          'Một số đơn chưa có giá dự kiến.',
-                                        ),
-                                    ],
-                                  ),
-                          ),
-                        );
-                      }
-                      if (scheduled.isEmpty) {
-                        return const AppMessage(
-                          message: 'Không có lịch hẹn trong ngày này.',
-                          icon: Icons.event_available_outlined,
-                        );
-                      }
-                      return _AppointmentCard(
-                        order: scheduled[index - 1],
-                        isPreview: previewOrders != null,
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
+      state: state,
+      isActive: widget.isActive,
+      isPreview: previewOrders != null,
+      onRetry: () => ref.invalidate(providerScheduleOrdersProvider),
+      onRefresh: () async {
+        if (previewOrders != null) return;
+        ref.invalidate(providerScheduleOrdersProvider);
+        await ref.read(providerScheduleOrdersProvider.future);
+      },
     );
   }
 }
@@ -2049,132 +1833,6 @@ class ProviderStatusBadge extends StatelessWidget {
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
-      ),
-    );
-  }
-}
-
-class _WeekStrip extends StatelessWidget {
-  const _WeekStrip({
-    required this.selected,
-    required this.start,
-    required this.controller,
-    required this.onSelected,
-    required this.orders,
-    required this.viewedOrderIds,
-  });
-  final DateTime selected;
-  final DateTime start;
-  final ScrollController controller;
-  final ValueChanged<DateTime> onSelected;
-  final List<OrderSummary> orders;
-  final Set<String> viewedOrderIds;
-  @override
-  Widget build(BuildContext context) {
-    final today = DateUtils.dateOnly(DateTime.now());
-    final tomorrow = DateTime(today.year, today.month, today.day + 1);
-    const labels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
-    final scheme = Theme.of(context).colorScheme;
-    return SingleChildScrollView(
-      controller: controller,
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (var index = 0; index < 7; index++)
-            Builder(
-              builder: (context) {
-                final day = DateTime(
-                  start.year,
-                  start.month,
-                  start.day + index,
-                );
-                final isSelected = DateUtils.isSameDay(day, selected);
-                final dailyOrders = _ordersOnDay(orders, day);
-                final unread = dailyOrders.any(
-                  (order) => !viewedOrderIds.contains(order.id),
-                );
-                final label = isSelected && DateUtils.isSameDay(day, today)
-                    ? 'Hôm nay'
-                    : isSelected && DateUtils.isSameDay(day, tomorrow)
-                    ? 'Ngày mai'
-                    : null;
-                return Padding(
-                  padding: EdgeInsets.only(right: index == 6 ? 0 : 8),
-                  child: SizedBox(
-                    width: 76,
-                    child: Semantics(
-                      selected: isSelected,
-                      label:
-                          '${labels[day.weekday - 1]}, ${DateFormat('d/M').format(day)}, '
-                          '${dailyOrders.length} lịch hẹn${unread ? ', có đơn chưa xem' : ''}',
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 12,
-                          ),
-                          backgroundColor: isSelected
-                              ? scheme.primaryContainer
-                              : scheme.surfaceContainer,
-                          foregroundColor: isSelected
-                              ? scheme.onPrimary
-                              : scheme.onSurfaceVariant,
-                          shape: const StadiumBorder(),
-                        ),
-                        onPressed: () => onSelected(day),
-                        child: Column(
-                          children: [
-                            Text(
-                              labels[day.weekday - 1],
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              DateFormat('d/M').format(day),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            SizedBox(
-                              height: MediaQuery.textScalerOf(
-                                context,
-                              ).scale(16),
-                              child: Center(
-                                child: label != null
-                                    ? Text(
-                                        label,
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      )
-                                    : Container(
-                                        key: ValueKey(
-                                          'schedule-dot-${DateFormat('yyyy-MM-dd').format(day)}',
-                                        ),
-                                        width: 6,
-                                        height: 6,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: unread
-                                              ? scheme.error
-                                              : scheme.outlineVariant,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-        ],
       ),
     );
   }

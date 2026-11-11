@@ -31,7 +31,7 @@ const getTokenExpiresIn = (
     : fallback;
 };
 
-export const signAccessToken = (user: IUser): string => {
+export const signAccessToken = (user: IUser, sessionId?: string): string => {
   const expiresIn = getTokenExpiresIn(process.env.JWT_EXPIRES_IN, "1d");
 
   return jwt.sign(
@@ -40,6 +40,7 @@ export const signAccessToken = (user: IUser): string => {
       email: user.email,
       role: getEffectiveUserRole(user),
       tokenVersion: user.tokenVersion ?? 0,
+      ...(sessionId ? { sessionId } : {}),
     },
     getAccessSecret(),
     { expiresIn },

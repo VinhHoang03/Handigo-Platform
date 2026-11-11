@@ -25,23 +25,12 @@ class OrderChatButton extends ConsumerStatefulWidget {
 class _OrderChatButtonState extends ConsumerState<OrderChatButton> {
   bool _opening = false;
 
+  bool get _canOpen =>
+      widget.hasProvider &&
+      const ['accepted', 'in_progress', 'completed'].contains(widget.status);
+
   Future<void> _open() async {
-    if (_opening) return;
-    final reason = widget.status == 'cancelled'
-        ? 'Đơn đã hủy nên không thể nhắn tin.'
-        : !widget.hasProvider || widget.status == 'created'
-        ? 'Chưa có thợ nhận đơn nên chưa thể nhắn tin.'
-        : !const [
-            'accepted',
-            'in_progress',
-            'completed',
-          ].contains(widget.status)
-        ? 'Đơn này hiện chưa thể nhắn tin.'
-        : null;
-    if (reason != null) {
-      AppToast.show(context, reason);
-      return;
-    }
+    if (_opening || !_canOpen) return;
     setState(() => _opening = true);
     try {
       final conversation = await ref
@@ -71,6 +60,7 @@ class _OrderChatButtonState extends ConsumerState<OrderChatButton> {
 
   @override
   Widget build(BuildContext context) {
+    final onPressed = _canOpen && !_opening ? _open : null;
     final icon = _opening
         ? const SizedBox(
             width: 17,
@@ -81,11 +71,11 @@ class _OrderChatButtonState extends ConsumerState<OrderChatButton> {
     return widget.iconOnly
         ? IconButton.outlined(
             tooltip: widget.label,
-            onPressed: _open,
+            onPressed: onPressed,
             icon: icon,
           )
         : OutlinedButton.icon(
-            onPressed: _open,
+            onPressed: onPressed,
             icon: icon,
             label: Text(widget.label),
           );

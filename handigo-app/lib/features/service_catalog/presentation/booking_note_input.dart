@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../booking/presentation/booking_provider.dart';
 import 'service_catalog_provider.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../core/network/api_exception.dart';
+import 'dart:typed_data';
 
 class BookingNoteInput extends ConsumerStatefulWidget {
   const BookingNoteInput({
@@ -20,6 +22,10 @@ class BookingNoteInput extends ConsumerStatefulWidget {
 
 class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
   bool _uploading = false;
+  Uint8List? _pendingImage;
+  XFile? _pendingFile;
+  String? _uploadError;
+  double? _uploadProgress;
 
   Future<void> _upload() async {
     if (_uploading || ref.read(bookingDraftProvider).attachments.length >= 4) {
@@ -52,12 +58,60 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
     try {
       final file = await ImagePicker().pickImage(
         source: source,
+        maxWidth: 1280,
+        maxHeight: 1280,
         imageQuality: 80,
       );
       if (file == null || !mounted) return;
+      if (await file.length() > 5 * 1024 * 1024) {
+        throw const ApiException('Ảnh không được vượt quá 5 MB.');
+      }
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _pendingImage = bytes;
+        _pendingFile = file;
+        _uploadError = null;
+        _uploadProgress = null;
+      });
+      await _sendPendingImage();
+    } catch (error) {
+      if (mounted) {
+        AppToast.show(
+          context,
+          error is ApiException
+              ? error.message
+              : 'Không thể chọn hoặc tải ảnh sự cố. Vui lòng thử lại.',
+          type: AppToastType.error,
+        );
+      }
+    } finally {
+      if (mounted && _uploading) {
+        setState(() => _uploading = false);
+        widget.onUploadingChanged?.call(false);
+      }
+    }
+  }
+
+  Future<void> _sendPendingImage() async {
+    final file = _pendingFile;
+    if (file == null) return;
+    if (!_uploading) widget.onUploadingChanged?.call(true);
+    setState(() {
+      _uploading = true;
+      _uploadError = null;
+      _uploadProgress = null;
+    });
+    try {
       final url = await ref
           .read(serviceCatalogRepositoryProvider)
-          .uploadAttachment(file);
+          .uploadAttachment(
+            file,
+            onSendProgress: (sent, total) {
+              if (!mounted || total <= 0) return;
+              setState(() => _uploadProgress = (sent / total).clamp(0, 1));
+            },
+          );
       if (!mounted) return;
       final current = ref.read(bookingDraftProvider).attachments;
       if (current.length < 4) {
@@ -65,14 +119,18 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
           ...current,
           url,
         ]);
-        AppToast.show(context, 'Đã tải ảnh sự cố.', type: AppToastType.success);
       }
-    } catch (_) {
+      setState(() {
+        _pendingImage = null;
+        _pendingFile = null;
+      });
+      AppToast.show(context, 'Đã tải ảnh sự cố.', type: AppToastType.success);
+    } catch (error) {
       if (mounted) {
-        AppToast.show(
-          context,
-          'Không thể tải ảnh sự cố. Vui lòng thử lại.',
-          type: AppToastType.error,
+        setState(
+          () => _uploadError = error is ApiException
+              ? error.message
+              : 'Không thể tải ảnh sự cố. Vui lòng thử lại.',
         );
       }
     } finally {
@@ -151,11 +209,87 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (attachments.isNotEmpty) ...[
+          if (attachments.isNotEmpty || _pendingImage != null) ...[
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (_pendingImage != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      width: 112,
+                      height: 112,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.memory(_pendingImage!, fit: BoxFit.cover),
+                          if (_uploadError != null && !_uploading) ...[
+                            Center(
+                              child: IconButton.filled(
+                                tooltip: 'Thử lại tải ảnh',
+                                onPressed: _sendPendingImage,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.white.withValues(
+                                    alpha: 0.8,
+                                  ),
+                                  foregroundColor: theme.colorScheme.primary,
+                                  shape: const CircleBorder(),
+                                ),
+                                icon: const Icon(Icons.refresh_rounded),
+                              ),
+                            ),
+                            Positioned(
+                              top: 2,
+                              right: 2,
+                              child: IconButton(
+                                tooltip: 'Bỏ ảnh chưa tải',
+                                alignment: Alignment.topRight,
+                                onPressed: () => setState(() {
+                                  _pendingImage = null;
+                                  _pendingFile = null;
+                                  _uploadError = null;
+                                }),
+                                style: IconButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(48, 48),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                icon: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.18,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: Colors.black.withValues(alpha: 0.65),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (_uploading)
+                            ColoredBox(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 for (var index = 0; index < attachments.length; index++)
                   SizedBox(
                     width: 112,
@@ -188,6 +322,7 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
                             height: 48,
                             child: IconButton(
                               tooltip: 'Xóa ảnh sự cố ${index + 1}',
+                              alignment: Alignment.topRight,
                               onPressed: () {
                                 final updated = [
                                   ...ref.read(bookingDraftProvider).attachments,
@@ -196,14 +331,24 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
                                     .read(bookingDraftProvider.notifier)
                                     .setAttachments(updated);
                               },
-                              icon: const Icon(Icons.close, size: 16),
+                              icon: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.black.withValues(alpha: 0.18),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.close,
+                                  size: 14,
+                                  color: Colors.black.withValues(alpha: 0.65),
+                                ),
+                              ),
                               style: IconButton.styleFrom(
                                 padding: EdgeInsets.zero,
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black,
-                                shape: const CircleBorder(
-                                  side: BorderSide(color: Colors.black),
-                                ),
                                 minimumSize: const Size(48, 48),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
@@ -214,6 +359,24 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
                     ),
                   ),
               ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (_pendingImage != null && _uploading) ...[
+            Text(
+              _uploadProgress == 1
+                  ? 'Đang kiểm tra và lưu ảnh…'
+                  : 'Đang tải ảnh${_uploadProgress == null ? '…' : ' ${(_uploadProgress! * 100).round()}%'}',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (_uploadError != null) ...[
+            Text(
+              _uploadError!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
             const SizedBox(height: 8),
           ],

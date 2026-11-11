@@ -1816,6 +1816,11 @@ class _FeedbackQuickToolbar extends StatelessWidget {
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
           hintText: 'Tìm khách hàng, dịch vụ, nội dung...',
+          hintStyle: TextStyle(
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.black
+                : Theme.of(context).colorScheme.onSurface,
+          ),
           prefixIcon: const Icon(Icons.search_rounded),
           suffixIcon: controller.text.isEmpty
               ? null

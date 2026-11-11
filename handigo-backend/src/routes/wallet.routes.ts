@@ -7,6 +7,7 @@ import {
   getAdminWallets,
   getAdminWalletTransactions,
   getMyWallet,
+  getMyWalletDepositQr,
   getMyWalletSummary,
   getMyWalletTransactions,
   syncMyWalletDeposit,
@@ -18,6 +19,13 @@ import { paymentRateLimit } from "../middlewares/rateLimit.middleware";
 import { adminWalletAdjustmentSchema, walletDepositSchema } from "../validations/wallet.validator";
 
 const router = Router();
+
+router.get(
+  "/me/deposit/:orderCode/qr",
+  authMiddleware,
+  roleMiddleware("CUSTOMER", "PROVIDER"),
+  getMyWalletDepositQr,
+);
 
 router.get("/me", authMiddleware, roleMiddleware("CUSTOMER", "PROVIDER"), getMyWallet);
 router.post(

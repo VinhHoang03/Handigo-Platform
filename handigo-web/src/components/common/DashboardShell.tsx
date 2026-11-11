@@ -41,7 +41,7 @@ function StandaloneDashboardShell({
     role === "PROVIDER" &&
     (!user?.providerOnboardingStatus ||
       user.providerOnboardingStatus === "APPROVED");
-  const { isOnline, toggleAvailability } = useProviderAvailability(
+  const { isOnline, isUpdating, isConnected, availabilityStatus, toggleAvailability } = useProviderAvailability(
     canManageProviderAvailability,
   );
   const switchConfig = roleSwitchConfig[role];
@@ -65,6 +65,9 @@ function StandaloneDashboardShell({
       userAvatar={avatar}
       showStatusToggle={canManageProviderAvailability}
       isOnline={isOnline}
+      statusUpdating={isUpdating}
+      statusConnected={isConnected}
+      statusBusy={availabilityStatus === "busy"}
       onStatusToggle={toggleAvailability}
       hideSidebar={hideSidebar}
     >

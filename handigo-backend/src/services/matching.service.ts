@@ -8,6 +8,7 @@ import { createLogger } from "../utils/logger";
 import { getAvailableProviderIds } from "./providerSchedule.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { calculateDuration, ScheduleInterval } from "../utils/bookingPolicy";
+import { getOnlineUserIds } from "../sockets/socketServer";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -94,7 +95,9 @@ export const MatchingService = {
 
     const serviceObjectId = new Types.ObjectId(serviceId);
     const excludeIds = excludeProviderIds.map((id) => id.toString());
-    const eligibleProviderUserIds = await getEligibleProviderUserIds();
+    const walletEligibleUserIds = await getEligibleProviderUserIds();
+    const connectedUserIds = requireOnline ? new Set(await getOnlineUserIds() ?? []) : null;
+    const eligibleProviderUserIds = walletEligibleUserIds.filter((id) => !connectedUserIds || connectedUserIds.has(id.toString()));
     const eligibleProviderUserIdSet = new Set(
       eligibleProviderUserIds.map((userId) => userId.toString()),
     );
@@ -115,6 +118,7 @@ export const MatchingService = {
         ownerType: "provider",
         isActive: true,
         isDeleted: false,
+        ...(requireOnline && { lastUpdatedAt: { $gte: new Date(Date.now() - 120_000) } }),
         userId: { $in: eligibleProviderUserIds },
         coordinates: {
           $nearSphere: {

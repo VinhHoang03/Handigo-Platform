@@ -30,6 +30,7 @@ const VoucherUsageSchema = new Schema<IVoucherUsage>(
 );
 
 VoucherUsageSchema.index({ voucherId: 1, userId: 1, status: 1 });
+VoucherUsageSchema.index({ userId: 1, isDeleted: 1, usedAt: -1, _id: -1 });
 VoucherUsageSchema.index({ voucherId: 1, orderId: 1 }, { unique: true });
 
 export const VoucherUsage = model<IVoucherUsage>("VoucherUsage", VoucherUsageSchema, "voucherusages");

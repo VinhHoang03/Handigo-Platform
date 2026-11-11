@@ -60,14 +60,27 @@ class ProviderLocationService extends ChangeNotifier {
     );
   }
 
-  Future<void> synchronize({required bool Function() shouldUpload}) {
+  Future<void> synchronize({
+    required bool Function() shouldUpload,
+    bool useCachedPosition = false,
+  }) {
     final generation = _generation;
     bool allowed() => !_disposed && generation == _generation && shouldUpload();
     return _run(() async {
       if (!allowed()) return;
       await _checkPermission(request: true);
       if (!allowed()) return;
-      final position = await _readPosition();
+      final recent = _currentPosition;
+      final age = recent == null ? null : _now().difference(recent.timestamp);
+      final position =
+          useCachedPosition &&
+              recent != null &&
+              age != null &&
+              !age.isNegative &&
+              age <= const Duration(seconds: 30) &&
+              recent.accuracy <= 25
+          ? recent
+          : await _readPosition();
       await _accept(position, allowed, force: true, manual: true);
     }, afterRunning: true);
   }

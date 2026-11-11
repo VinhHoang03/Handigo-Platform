@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import multer from "multer";
-import cloudinary from "../configs/cloudinary";
+import cloudinary, { isCloudinaryConfigured } from "../configs/cloudinary";
+import { AppError } from "../utils/appError";
+import { createLogger } from "../utils/logger";
 import { analyzeOrderProblemImage } from "../services/orderAttachmentImageAnalysis.service";
 import {
   ALLOWED_IMAGE_MIME_TYPES,
@@ -8,6 +10,7 @@ import {
 } from "../utils/fileSignature";
 
 const ORDER_PROBLEM_PURPOSE = "order_problem";
+const uploadLogger = createLogger("OrderAttachmentUpload");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -44,6 +47,25 @@ export const uploadOrderAttachmentImage = (
   res: Response,
   next: NextFunction,
 ) => {
+  const startedAt = performance.now();
+  let stage = "receive";
+  let stageStartedAt = startedAt;
+  const durations: Record<string, number> = {};
+  const beginStage = (nextStage: string) => {
+    const now = performance.now();
+    durations[`${stage}Ms`] = Math.round(now - stageStartedAt);
+    stage = nextStage;
+    stageStartedAt = now;
+  };
+  res.once("finish", () => {
+    beginStage("finished");
+    uploadLogger.info("Thời gian xử lý ảnh mô tả.", {
+      ...durations,
+      totalMs: Math.round(performance.now() - startedAt),
+      bytes: req.file?.size,
+      statusCode: res.statusCode,
+    });
+  });
   upload(req, res, async (error) => {
     if (error) {
       return res.status(400).json({ success: false, message: error.message });
@@ -71,8 +93,9 @@ export const uploadOrderAttachmentImage = (
       });
     }
 
-    try {
-      if (shouldAnalyzeOrderProblemImage(req)) {
+    if (shouldAnalyzeOrderProblemImage(req)) {
+      beginStage("analysis");
+      try {
         const analysis = await analyzeOrderProblemImage(
           req.file.buffer,
           req.file.mimetype,
@@ -87,17 +110,41 @@ export const uploadOrderAttachmentImage = (
         }
 
         res.locals.imageAnalysis = analysis;
+      } catch (error) {
+        uploadLogger.error("Không thể kiểm tra ảnh mô tả.", undefined, {
+          stage: "analysis",
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({
+          success: false,
+          message: error instanceof AppError
+            ? error.message
+            : "Dịch vụ kiểm tra ảnh đang gặp sự cố. Vui lòng thử lại sau.",
+        });
       }
+    }
 
+    beginStage("storage");
+    try {
+      if (!isCloudinaryConfigured) {
+        throw new AppError("Hệ thống chưa cấu hình kho lưu ảnh. Vui lòng liên hệ hỗ trợ.", 502);
+      }
       res.locals.imageUrl = await uploadBuffer(req.file.buffer);
       next();
     } catch (uploadError) {
-      const message = uploadError instanceof Error ? uploadError.message : "Không thể phân tích ảnh.";
-      const isGeminiError = message.includes("GEMINI") || message.includes("Gemini");
-
-      return res.status(isGeminiError ? 503 : 502).json({
+      const upstreamStatus = (uploadError as { http_code?: number } | null)?.http_code;
+      uploadLogger.error("Không thể lưu ảnh mô tả lên kho ảnh.", undefined, {
+        stage: "storage",
+        upstreamStatus,
+        errorType: uploadError instanceof Error ? uploadError.name : "UnknownError",
+      });
+      return res.status(502).json({
         success: false,
-        message: "Không thể tải ảnh lên",
+        message: uploadError instanceof AppError
+          ? uploadError.message
+          : upstreamStatus === 401 || upstreamStatus === 403
+            ? "Kho lưu ảnh đang lỗi xác thực hoặc quyền truy cập. Vui lòng liên hệ hỗ trợ."
+            : "Không thể lưu ảnh lên hệ thống. Vui lòng thử lại sau.",
       });
     }
   });

@@ -1,20 +1,29 @@
 import '../../../shared/utils/address_format.dart';
 import '../../booking/presentation/booking_provider.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/account_overview_widgets.dart';
 import '../../../shared/widgets/customer_page_header.dart';
 import '../../home/presentation/device_location_provider.dart';
+import '../../orders/domain/order_summary.dart';
+import '../../orders/presentation/order_screens.dart';
 import '../data/account_repository.dart';
 import '../domain/account_models.dart';
+import '../../home/domain/customer_home_data.dart';
+import '../../home/presentation/customer_home_provider.dart';
+import '../../home/presentation/reward_redemption.dart';
+import 'wallet_deposit_dialog.dart';
 
 const _figmaPrimary = Color(0xFF4F35D5);
 const _figmaPrimarySoft = Color(0xFFEFEBFF);
@@ -58,6 +67,19 @@ final accountPaymentHistoryProvider = FutureProvider.autoDispose
 final accountVouchersProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(accountRepositoryProvider).vouchers(),
 );
+final accountPublicVouchersProvider = FutureProvider.autoDispose(
+  (ref) => ref.watch(accountRepositoryProvider).publicVouchers(),
+);
+final accountOwnedVouchersProvider = FutureProvider.autoDispose
+    .family<PagedResult<VoucherItem>, int>(
+      (ref, page) =>
+          ref.watch(accountRepositoryProvider).ownedVouchers(page: page),
+    );
+final accountVoucherUsageProvider = FutureProvider.autoDispose
+    .family<PagedResult<VoucherUsageItem>, int>(
+      (ref, page) =>
+          ref.watch(accountRepositoryProvider).voucherUsageHistory(page: page),
+    );
 final accountFeedbackProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(accountRepositoryProvider).feedbacks(),
 );
@@ -66,6 +88,9 @@ final accountTicketsProvider = FutureProvider.autoDispose(
 );
 final accountComplaintsProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(accountRepositoryProvider).complaints(),
+);
+final accountReportsProvider = FutureProvider.autoDispose(
+  (ref) => ref.watch(accountRepositoryProvider).reports(),
 );
 
 class AccountOverviewScreen extends ConsumerStatefulWidget {
@@ -1197,237 +1222,481 @@ class _CustomerPaymentHistoryScreenState
 }
 
 Future<void> _deposit(BuildContext context, WidgetRef ref) async {
-  final c = TextEditingController();
-  final amount = await showDialog<double>(
+  await showDialog<void>(
     context: context,
-    builder: (_) => AlertDialog(
-      title: const Text('Nạp tiền vào ví'),
-      content: TextField(
-        controller: c,
-        keyboardType: TextInputType.number,
-        decoration: const InputDecoration(labelText: 'Số tiền (VND)'),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Hủy'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, double.tryParse(c.text)),
-          child: const Text('Tiếp tục'),
-        ),
-      ],
+    barrierDismissible: false,
+    builder: (_) => WalletDepositDialog(
+      repository: ref.read(accountRepositoryProvider),
+      onChanged: () {
+        if (!context.mounted) return;
+        ref.invalidate(accountWalletProvider);
+        ref.invalidate(accountTransactionsProvider);
+        ref.invalidate(accountTransactionPageProvider);
+      },
     ),
   );
-  if (amount == null || amount <= 0 || !context.mounted) return;
-  try {
-    final data = await ref.read(accountRepositoryProvider).deposit(amount);
-    final url = data['checkoutUrl'];
-    if (url is String && url.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Đã tạo liên kết thanh toán. Hãy mở trên trình duyệt để hoàn tất.',
-          ),
-        ),
-      );
-    }
-    ref.invalidate(accountWalletProvider);
-  } catch (_) {
-    if (context.mounted)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể tạo giao dịch nạp ví.')),
-      );
-  }
 }
 
-class VoucherScreen extends ConsumerWidget {
+class VoucherScreen extends ConsumerStatefulWidget {
   const VoucherScreen({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kho Voucher & Ưu đãi'),
-        leading: IconButton(
-          tooltip: 'Quay lại',
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_rounded),
+  ConsumerState<VoucherScreen> createState() => _VoucherScreenState();
+}
+
+class _VoucherScreenState extends ConsumerState<VoucherScreen> {
+  int _tab = 0, _page = 1;
+  final _code = TextEditingController();
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  void _useVoucher(String code) {
+    final normalized = code.trim().toUpperCase();
+    if (normalized.isEmpty) return;
+    ref.read(bookingDraftProvider.notifier).setVoucherCode(normalized);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Đã chọn voucher $normalized. Điều kiện áp dụng sẽ được kiểm tra khi xác nhận đặt dịch vụ.',
         ),
       ),
-      body: ref
-          .watch(accountVouchersProvider)
-          .when(
-            loading: () => const AppLoading(),
-            error: (_, __) => AppMessage(
-              message: 'Không thể tải voucher.',
-              onRetry: () => ref.invalidate(accountVouchersProvider),
-            ),
-            data: (items) {
-              if (items.isEmpty)
-                return const AppMessage(
-                  message: 'Hiện chưa có voucher khả dụng.',
-                );
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                children: [
-                  Row(
+    );
+    if (context.canPop()) context.pop();
+  }
+
+  Future<void> _redeem(HomeRewardOffer offer, int balance) async {
+    if (await confirmRewardRedemption(context, ref, offer, balance)) {
+      ref.invalidate(accountOwnedVouchersProvider);
+      ref.invalidate(accountVouchersProvider);
+      ref.invalidate(accountPublicVouchersProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rewards = ref.watch(customerHomeRewardsProvider);
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Kho Voucher & Ưu đãi'),
+          leading: IconButton(
+            tooltip: 'Quay lại',
+            onPressed: () => context.pop(),
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Card(
+                color: theme.colorScheme.surfaceContainerLowest,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                     children: [
-                      Expanded(
-                        child: TextField(
-                          decoration: const InputDecoration(
-                            hintText: 'Nhập mã khuyến mãi/voucher',
-                            prefixIcon: Icon(Icons.local_offer_outlined),
-                          ),
-                        ),
+                      Icon(
+                        Icons.stars_outlined,
+                        color: theme.colorScheme.primary,
+                        size: 32,
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Mã voucher được áp dụng trong bước đặt dịch vụ.',
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Điểm tích lũy hiện có'),
+                            rewards.when(
+                              loading: () => const LinearProgressIndicator(),
+                              error: (_, _) => TextButton(
+                                onPressed: () =>
+                                    ref.invalidate(customerHomeRewardsProvider),
+                                child: const Text('Tải lại điểm tích lũy'),
+                              ),
+                              data: (data) => Text(
+                                '${NumberFormat.decimalPattern('vi').format(data.balance)} điểm',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        child: const Text('Áp dụng'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppTheme.primaryDark, AppTheme.secondary],
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.auto_awesome, color: Colors.white),
-                        SizedBox(height: 10),
-                        Text(
-                          'Ưu đãi dành riêng cho bạn',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              onTap: (index) => setState(() {
+                _tab = index;
+                _page = 1;
+              }),
+              tabs: const [
+                Tab(text: 'Voucher của tôi'),
+                Tab(text: 'Voucher hiện có'),
+                Tab(text: 'Lịch sử sử dụng'),
+              ],
+            ),
+            Expanded(
+              child: switch (_tab) {
+                0 =>
+                  ref
+                      .watch(accountOwnedVouchersProvider(_page))
+                      .when(
+                        loading: () => const AppLoading(),
+                        error: (_, _) => AppMessage(
+                          message: 'Không thể tải voucher của bạn.',
+                          onRetry: () => ref.invalidate(
+                            accountOwnedVouchersProvider(_page),
                           ),
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Chọn voucher phù hợp để tiết kiệm hơn cho dịch vụ tại nhà.',
-                          style: TextStyle(color: Colors.white70),
+                        data: (data) => _pagedList(
+                          data.items
+                              .map(
+                                (item) => _VoucherCard(
+                                  item: item,
+                                  onUse: () => _useVoucher(item.code),
+                                ),
+                              )
+                              .toList(),
+                          data.totalPages,
+                          'Bạn chưa có voucher riêng. Hãy dùng điểm để đổi voucher ở tab Voucher hiện có.',
                         ),
-                      ],
-                    ),
+                      ),
+                1 => _available(),
+                _ =>
+                  ref
+                      .watch(accountVoucherUsageProvider(_page))
+                      .when(
+                        loading: () => const AppLoading(),
+                        error: (_, _) => AppMessage(
+                          message: 'Không thể tải lịch sử sử dụng voucher.',
+                          onRetry: () => ref.invalidate(
+                            accountVoucherUsageProvider(_page),
+                          ),
+                        ),
+                        data: (data) => _pagedList(
+                          data.items.map(_usageCard).toList(),
+                          data.totalPages,
+                          'Bạn chưa sử dụng voucher nào.',
+                        ),
+                      ),
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pagedList(List<Widget> cards, int totalPages, String emptyMessage) =>
+      ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (cards.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(emptyMessage, textAlign: TextAlign.center),
+            ),
+          ...cards,
+          if (_page > 1 || totalPages > 1)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  tooltip: 'Trang trước',
+                  onPressed: _page > 1 ? () => setState(() => _page--) : null,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Expanded(
+                  child: Text(
+                    'Trang $_page / ${totalPages > 0 ? totalPages : 1}',
+                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Voucher khả dụng',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  ...items.map((item) => _VoucherCard(item: item)),
-                ],
-              );
-            },
+                ),
+                IconButton(
+                  tooltip: 'Trang sau',
+                  onPressed: _page < totalPages
+                      ? () => setState(() => _page++)
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+        ],
+      );
+
+  Widget _available() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _code,
+              decoration: const InputDecoration(
+                hintText: 'Nhập mã voucher',
+                prefixIcon: Icon(Icons.local_offer_outlined),
+              ),
+            ),
           ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: () => _useVoucher(_code.text),
+            child: const Text('Áp dụng'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      Text(
+        'Đổi voucher bằng điểm',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      const SizedBox(height: 10),
+      ref
+          .watch(customerHomeRewardsProvider)
+          .when(
+            loading: () => const AppLoading(),
+            error: (_, _) => AppMessage(
+              message: 'Không thể tải ưu đãi đổi điểm.',
+              onRetry: () => ref.invalidate(customerHomeRewardsProvider),
+            ),
+            data: (data) => Column(
+              children: [
+                if (data.offers.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Hiện chưa có ưu đãi đổi điểm.'),
+                  ),
+                for (final offer in data.offers)
+                  _VoucherCard(
+                    item: VoucherItem(
+                      code: '',
+                      name: rewardOfferName(
+                        offer,
+                        NumberFormat.decimalPattern('vi'),
+                      ),
+                      discountType: offer.discountType,
+                      discountValue: offer.discountValue,
+                      minOrderAmount: offer.minOrderAmount,
+                      maxDiscountAmount: offer.maxDiscountAmount,
+                      applicableOrderType: offer.applicableOrderType,
+                    ),
+                    points: offer.points,
+                    validityDays: data.validityDays,
+                    actionLabel: data.balance >= offer.points
+                        ? 'Đổi voucher'
+                        : 'Chưa đủ điểm',
+                    onUse: data.balance >= offer.points
+                        ? () => _redeem(offer, data.balance)
+                        : null,
+                  ),
+              ],
+            ),
+          ),
+      const SizedBox(height: 12),
+      Text('Voucher công khai', style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 10),
+      ref
+          .watch(accountPublicVouchersProvider)
+          .when(
+            loading: () => const AppLoading(),
+            error: (_, _) => AppMessage(
+              message: 'Không thể tải voucher hiện có.',
+              onRetry: () => ref.invalidate(accountPublicVouchersProvider),
+            ),
+            data: (items) => Column(
+              children: [
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Hiện chưa có voucher công khai khả dụng.'),
+                  ),
+                for (final item in items)
+                  _VoucherCard(
+                    item: item,
+                    publicVoucher: true,
+                    onUse: () => _useVoucher(item.code),
+                  ),
+              ],
+            ),
+          ),
+    ],
+  );
+
+  Widget _usageCard(VoucherUsageItem item) {
+    final usedAt = DateTime.tryParse(item.usedAt ?? '');
+    return Card(
+      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.history_rounded),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item.name,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            if (item.code.isNotEmpty) Text('Mã ${item.code}'),
+            Text('Đã giảm ${_money(item.discountAmount)}'),
+            if (usedAt != null)
+              Text(
+                'Ngày dùng ${DateFormat('HH:mm · dd/MM/yyyy').format(usedAt.toLocal())}',
+              ),
+            Text(
+              item.status == 'cancelled_not_restored'
+                  ? 'Đơn đã hủy · Voucher không được hoàn lại'
+                  : 'Đã sử dụng',
+            ),
+            if (item.orderId != null)
+              TextButton(
+                onPressed: () =>
+                    context.push('/customer/orders/${item.orderId}'),
+                child: Text('Xem đơn ${item.orderCode ?? ''}'),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _VoucherCard extends ConsumerWidget {
-  const _VoucherCard({required this.item});
+class _VoucherCard extends StatelessWidget {
+  const _VoucherCard({
+    required this.item,
+    this.onUse,
+    this.points,
+    this.validityDays,
+    this.publicVoucher = false,
+    this.actionLabel = 'Dùng ngay',
+  });
   final VoucherItem item;
+  final VoidCallback? onUse;
+  final int? points;
+  final int? validityDays;
+  final bool publicVoucher;
+  final String actionLabel;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final discount = item.discountType == 'PERCENT'
         ? '${item.discountValue.toStringAsFixed(0)}%'
         : _money(item.discountValue);
+    final reserved = item.reservedOrderId != null;
+    final condition = switch (item.applicableOrderType) {
+      'fixed_price' => 'Áp dụng cho dịch vụ giá cố định.',
+      'variable_price' => 'Áp dụng cho tiền cọc dịch vụ khảo sát.',
+      _ => 'Áp dụng cho dịch vụ đủ điều kiện.',
+    };
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      color: theme.colorScheme.surfaceContainerLowest,
+      margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                Icons.confirmation_num_outlined,
-                color: theme.colorScheme.primary,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.confirmation_num_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Giảm $discount',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      Text(item.name, style: theme.textTheme.titleSmall),
+                      if (item.code.isNotEmpty)
+                        Text(
+                          'Mã ${item.code}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      if (points != null)
+                        Text(
+                          '${NumberFormat.decimalPattern('vi').format(points)} điểm để đổi',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      if (publicVoucher) const Text('Không cần đổi điểm'),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    discount,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  if (item.description?.isNotEmpty == true)
-                    Text(
-                      item.description!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Mã: ${item.code}',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (item.minOrderAmount > 0)
-                    Text(
-                      'Đơn tối thiểu ${_money(item.minOrderAmount)}',
-                      style: theme.textTheme.labelSmall,
-                    ),
-                ],
+            const SizedBox(height: 12),
+            if (item.description?.isNotEmpty == true) Text(item.description!),
+            Text(condition),
+            if (validityDays != null)
+              Text('Hiệu lực $validityDays ngày kể từ khi đổi'),
+            if (item.minOrderAmount > 0)
+              Text('Đơn tối thiểu ${_money(item.minOrderAmount)}'),
+            if (item.maxDiscountAmount != null && item.maxDiscountAmount! > 0)
+              Text('Giảm tối đa ${_money(item.maxDiscountAmount!)}'),
+            if (!item.neverExpires && item.endAt != null)
+              Text(
+                'Hạn dùng ${DateTime.tryParse(item.endAt!) == null ? item.endAt : DateFormat('dd/MM/yyyy').format(DateTime.parse(item.endAt!).toLocal())}',
               ),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton(
-              onPressed: () {
-                ref
-                    .read(bookingDraftProvider.notifier)
-                    .setVoucherCode(item.code);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Đã chọn voucher ${item.code}. Giá giảm sẽ được kiểm tra khi xác nhận đặt dịch vụ.',
-                    ),
-                  ),
-                );
-                if (context.canPop()) context.pop();
-              },
-              child: const Text('Dùng ngay'),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton(
+                onPressed: reserved
+                    ? () => context.push(
+                        '/customer/orders/${item.reservedOrderId}',
+                      )
+                    : item.usable
+                    ? onUse
+                    : null,
+                child: Text(
+                  reserved
+                      ? 'Xem đơn đang giữ mã'
+                      : item.expired
+                      ? 'Đã hết hạn'
+                      : !item.usable
+                      ? 'Chưa khả dụng'
+                      : actionLabel,
+                ),
+              ),
             ),
           ],
         ),
@@ -1483,7 +1752,7 @@ class SupportScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => _CaseList(
     title: 'Trung tâm hỗ trợ',
     provider: accountTicketsProvider,
-    onCreate: () => _createCase(context, ref, complaint: false),
+    onCreate: () => _showCaseForm(context, ref, report: false),
     empty: 'Bạn chưa có yêu cầu hỗ trợ nào.',
   );
 }
@@ -1492,10 +1761,10 @@ class ComplaintScreen extends ConsumerWidget {
   const ComplaintScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) => _CaseList(
-    title: 'Khiếu nại / sự cố',
-    provider: accountComplaintsProvider,
-    onCreate: () => _createCase(context, ref, complaint: true),
-    empty: 'Bạn chưa có khiếu nại nào.',
+    title: 'Báo cáo sự cố',
+    provider: accountReportsProvider,
+    onCreate: () => _showCaseForm(context, ref, report: true),
+    empty: 'Bạn chưa có báo cáo nào.',
   );
 }
 
@@ -1523,7 +1792,7 @@ class _CaseList extends ConsumerWidget {
         .watch(provider)
         .when(
           loading: () => const AppLoading(),
-          error: (_, __) => AppMessage(
+          error: (_, _) => AppMessage(
             message: 'Không thể tải dữ liệu.',
             onRetry: () => ref.invalidate(provider),
           ),
@@ -1532,83 +1801,712 @@ class _CaseList extends ConsumerWidget {
               : ListView.separated(
                   padding: const EdgeInsets.all(12),
                   itemCount: page.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) => Card(
-                    child: ListTile(
-                      title: Text(page.items[i].title),
-                      subtitle: Text(page.items[i].description),
-                      trailing: Text(page.items[i].status),
-                    ),
-                  ),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final item = page.items[i] as SupportItem;
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.title,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                _CaseStatusBadge(status: item.status),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              item.description,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (item.category?.isNotEmpty == true) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                _caseTypeLabel(item.category!),
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
         ),
   );
 }
 
-Future<void> _createCase(
+Future<void> _showCaseForm(
   BuildContext context,
   WidgetRef ref, {
-  required bool complaint,
+  required bool report,
 }) async {
-  final title = TextEditingController(),
-      description = TextEditingController(),
-      orderId = TextEditingController();
-  final result = await showDialog<List<String>>(
+  final created = await showModalBottomSheet<bool>(
     context: context,
-    builder: (_) => AlertDialog(
-      title: Text(complaint ? 'Tạo khiếu nại' : 'Tạo yêu cầu hỗ trợ'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (complaint) _field(orderId, 'Mã đơn hàng'),
-          _field(title, 'Tiêu đề'),
-          _field(description, 'Mô tả'),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Hủy'),
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => FractionallySizedBox(
+      heightFactor: .96,
+      child: _CaseFormSheet(report: report),
+    ),
+  );
+  if (created == true) {
+    ref.invalidate(report ? accountReportsProvider : accountTicketsProvider);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            report ? 'Đã gửi báo cáo sự cố.' : 'Đã gửi yêu cầu hỗ trợ.',
+          ),
         ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, [
-            orderId.text,
-            title.text,
-            description.text,
-          ]),
-          child: const Text('Gửi'),
+      );
+    }
+  }
+}
+
+class _CaseImage {
+  const _CaseImage(this.file, this.bytes);
+  final XFile file;
+  final Uint8List bytes;
+}
+
+class _CaseFormSheet extends ConsumerStatefulWidget {
+  const _CaseFormSheet({required this.report});
+  final bool report;
+
+  @override
+  ConsumerState<_CaseFormSheet> createState() => _CaseFormSheetState();
+}
+
+class _CaseFormSheetState extends ConsumerState<_CaseFormSheet> {
+  final _form = GlobalKey<FormState>();
+  final _title = TextEditingController();
+  final _description = TextEditingController();
+  final List<_CaseImage> _images = [];
+  String _category = 'ACCOUNT';
+  String _reportType = 'user_behavior';
+  String _target = 'participant';
+  String? _orderId;
+  bool _busy = false;
+  bool _picking = false;
+  String? _error;
+  String? _progress;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    if (_busy || _picking || _images.length >= 5) return;
+    setState(() {
+      _picking = true;
+      _error = null;
+    });
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+      if (file == null || !mounted) return;
+      final extension = file.name.split('.').last.toLowerCase();
+      final mime = file.mimeType?.toLowerCase();
+      if (mime == null
+          ? !['jpg', 'jpeg', 'png', 'webp'].contains(extension)
+          : !['image/jpeg', 'image/png', 'image/webp'].contains(mime)) {
+        throw const ApiException('Vui lòng chọn ảnh JPG, PNG hoặc WebP.');
+      }
+      if (await file.length() > 5 * 1024 * 1024) {
+        throw const ApiException('Mỗi ảnh không được vượt quá 5 MB.');
+      }
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw const ApiException('Ảnh không có dữ liệu.');
+      }
+      if (_images.any((image) => listEquals(image.bytes, bytes))) {
+        throw const ApiException('Ảnh này đã được chọn.');
+      }
+      setState(() => _images.add(_CaseImage(file, bytes)));
+    } catch (error) {
+      if (mounted) setState(() => _error = _caseError(error));
+    } finally {
+      if (mounted) setState(() => _picking = false);
+    }
+  }
+
+  Future<void> _submit(List<OrderSummary> orders) async {
+    if (_busy || _picking || !_form.currentState!.validate()) return;
+    final selected = orders.where((order) => order.id == _orderId).firstOrNull;
+    if (widget.report && selected == null) {
+      setState(() => _error = 'Vui lòng chọn đơn dịch vụ liên quan.');
+      return;
+    }
+    if (widget.report &&
+        _reportType == 'service_quality' &&
+        selected?.status != 'completed') {
+      setState(
+        () => _error = 'Báo cáo chất lượng chỉ áp dụng cho đơn đã hoàn thành.',
+      );
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+      _progress = _images.isEmpty
+          ? 'Đang gửi yêu cầu…'
+          : 'Đang tải ảnh 1/${_images.length}…';
+    });
+    try {
+      final repository = ref.read(accountRepositoryProvider);
+      final attachments = <Map<String, dynamic>>[];
+      for (var index = 0; index < _images.length; index++) {
+        if (!mounted) return;
+        setState(
+          () => _progress = 'Đang tải ảnh ${index + 1}/${_images.length}…',
+        );
+        final image = _images[index];
+        final url = await repository.uploadCaseImage(image.file);
+        attachments.add({
+          'fileType': 'image',
+          'url': url,
+          'mimeType': image.file.mimeType,
+          'fileName': image.file.name,
+        });
+      }
+      if (!mounted) return;
+      setState(() => _progress = 'Đang gửi yêu cầu…');
+      if (widget.report) {
+        final user = ref.read(authControllerProvider).user!;
+        final targetOrder =
+            _reportType == 'service_quality' || _target == 'order';
+        final payload = <String, dynamic>{
+          'targetType': targetOrder
+              ? 'order'
+              : user.role.name == 'provider'
+              ? 'user'
+              : 'provider',
+          'orderId': selected!.id,
+          'reportType': _reportType,
+          'title': _title.text.trim(),
+          'description': _description.text.trim(),
+          'evidenceImages': attachments.map((file) => file['url']).toList(),
+          'evidenceFiles': attachments,
+        };
+        if (!targetOrder) {
+          if (user.role.name == 'provider') {
+            if (selected.customerId == null) {
+              throw const ApiException(
+                'Đơn đã chọn không có thông tin khách hàng để báo cáo.',
+              );
+            }
+            payload['targetUserId'] = selected.customerId;
+          } else {
+            if (selected.providerId == null) {
+              throw const ApiException(
+                'Đơn đã chọn chưa có nhà cung cấp để báo cáo.',
+              );
+            }
+            payload['targetProviderId'] = selected.providerId;
+          }
+        }
+        await repository.createReport(payload);
+      } else {
+        await repository.createTicket({
+          'category': _category,
+          'subject': _title.text.trim(),
+          'description': _description.text.trim(),
+          if (_category == 'PAYMENT' && _orderId != null) 'orderId': _orderId,
+          if (attachments.isNotEmpty) 'attachments': attachments,
+        });
+      }
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) setState(() => _error = _caseError(error));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _progress = null;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ordersState = ref.watch(orderListProvider);
+    final orders = ordersState.asData?.value.items ?? const <OrderSummary>[];
+    final availableOrders = widget.report && _reportType == 'service_quality'
+        ? orders.where((order) => order.status == 'completed').toList()
+        : orders;
+    final showOrders = widget.report || _category == 'PAYMENT';
+    final user = ref.watch(authControllerProvider).user;
+    return PopScope(
+      canPop: !_busy && !_picking,
+      child: Scaffold(
+        backgroundColor: _accountBackground,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: Text(
+            widget.report ? 'Gửi báo cáo sự cố' : 'Tạo yêu cầu hỗ trợ',
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'Đóng',
+              onPressed: _busy ? null : () => Navigator.pop(context),
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
+        body: Form(
+          key: _form,
+          child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+            children: [
+              _CaseIntro(report: widget.report),
+              const SizedBox(height: 16),
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!widget.report)
+                        DropdownButtonFormField<String>(
+                          initialValue: _category,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Loại hỗ trợ',
+                            prefixIcon: Icon(Icons.help_outline_rounded),
+                          ),
+                          items: _supportCategories.entries
+                              .map(
+                                (entry) => DropdownMenuItem(
+                                  value: entry.key,
+                                  child: Text(
+                                    entry.value,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _busy
+                              ? null
+                              : (value) => setState(() {
+                                  _category = value!;
+                                  if (value != 'PAYMENT') _orderId = null;
+                                }),
+                        ),
+                      if (widget.report) ...[
+                        DropdownButtonFormField<String>(
+                          initialValue: _reportType,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Loại báo cáo',
+                            prefixIcon: Icon(Icons.flag_outlined),
+                          ),
+                          items: _reportTypes.entries
+                              .map(
+                                (entry) => DropdownMenuItem(
+                                  value: entry.key,
+                                  child: Text(
+                                    entry.value,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _busy
+                              ? null
+                              : (value) => setState(() {
+                                  _reportType = value!;
+                                  _orderId = null;
+                                  if (value == 'service_quality') {
+                                    _target = 'order';
+                                  }
+                                }),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: _reportType == 'service_quality'
+                              ? 'order'
+                              : _target,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Đối tượng báo cáo',
+                            prefixIcon: Icon(Icons.person_search_outlined),
+                          ),
+                          items: [
+                            DropdownMenuItem(
+                              value: 'participant',
+                              child: Text(
+                                user?.role.name == 'provider'
+                                    ? 'Khách hàng của đơn'
+                                    : 'Nhà cung cấp của đơn',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const DropdownMenuItem(
+                              value: 'order',
+                              child: Text(
+                                'Đơn dịch vụ',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                          onChanged: _busy || _reportType == 'service_quality'
+                              ? null
+                              : (value) => setState(() => _target = value!),
+                        ),
+                      ],
+                      if (showOrders) ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: _orderId,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: widget.report
+                                ? 'Đơn dịch vụ'
+                                : 'Đơn thanh toán liên quan',
+                            prefixIcon: const Icon(Icons.receipt_long_outlined),
+                          ),
+                          items: availableOrders
+                              .map(
+                                (order) => DropdownMenuItem(
+                                  value: order.id,
+                                  child: Text(
+                                    '${order.code} · ${order.serviceName}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _busy || ordersState.isLoading
+                              ? null
+                              : (value) => setState(() => _orderId = value),
+                          validator: widget.report
+                              ? (value) => value == null
+                                    ? 'Vui lòng chọn đơn dịch vụ.'
+                                    : null
+                              : null,
+                        ),
+                        if (ordersState.isLoading) ...[
+                          const SizedBox(height: 8),
+                          const LinearProgressIndicator(),
+                        ],
+                        if (ordersState.hasError) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Không thể tải danh sách đơn.',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                        if (!ordersState.isLoading && availableOrders.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              _reportType == 'service_quality'
+                                  ? 'Không có đơn đã hoàn thành phù hợp.'
+                                  : 'Bạn chưa có đơn dịch vụ.',
+                            ),
+                          ),
+                      ],
+                      if (widget.report &&
+                          _reportType == 'service_quality') ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          'Chỉ áp dụng cho đơn đã hoàn thành trong thời hạn hệ thống cho phép.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _title,
+                        enabled: !_busy,
+                        maxLength: 200,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Tiêu đề',
+                          prefixIcon: Icon(Icons.title_rounded),
+                        ),
+                        validator: (value) => (value?.trim().length ?? 0) < 5
+                            ? 'Tiêu đề cần có ít nhất 5 ký tự.'
+                            : null,
+                      ),
+                      const SizedBox(height: 4),
+                      TextFormField(
+                        controller: _description,
+                        enabled: !_busy,
+                        minLines: 5,
+                        maxLines: 8,
+                        maxLength: 3000,
+                        decoration: InputDecoration(
+                          labelText: widget.report
+                              ? 'Nội dung chi tiết'
+                              : 'Mô tả cần hỗ trợ',
+                          alignLabelWithHint: true,
+                        ),
+                        validator: (value) => (value?.trim().length ?? 0) < 10
+                            ? 'Nội dung cần có ít nhất 10 ký tự.'
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _CaseImagePicker(
+                images: _images,
+                busy: _busy || _picking,
+                onAdd: _pickImage,
+                onRemove: (index) => setState(() => _images.removeAt(index)),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Container(
+            color: _accountSurface,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_busy) ...[
+                  const LinearProgressIndicator(),
+                  const SizedBox(height: 6),
+                  Text(_progress ?? 'Đang xử lý…'),
+                  const SizedBox(height: 8),
+                ],
+                FilledButton.icon(
+                  onPressed: _busy || ordersState.isLoading
+                      ? null
+                      : () => _submit(orders),
+                  icon: const Icon(Icons.send_rounded),
+                  label: Text(
+                    _busy
+                        ? 'Đang gửi…'
+                        : widget.report
+                        ? 'Gửi báo cáo'
+                        : 'Gửi yêu cầu hỗ trợ',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CaseIntro extends StatelessWidget {
+  const _CaseIntro({required this.report});
+  final bool report;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: _figmaPrimarySoft,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          report ? Icons.shield_outlined : Icons.support_agent_rounded,
+          color: _figmaPrimary,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            report
+                ? 'Chọn đúng đơn và mô tả rõ sự cố để Handigo có đủ thông tin xem xét.'
+                : 'Đội ngũ Handigo sẽ phản hồi yêu cầu của bạn ngay trong trung tâm hỗ trợ.',
+          ),
         ),
       ],
     ),
   );
-  if (result == null ||
-      result[1].trim().length < 5 ||
-      result[2].trim().length < 10)
-    return;
-  try {
-    if (complaint) {
-      if (result[0].trim().isEmpty) return;
-      await ref.read(accountRepositoryProvider).createComplaint({
-        'orderId': result[0].trim(),
-        'title': result[1],
-        'description': result[2],
-      });
-      ref.invalidate(accountComplaintsProvider);
-    } else {
-      await ref.read(accountRepositoryProvider).createTicket({
-        'category': 'OTHER',
-        'subject': result[1],
-        'description': result[2],
-      });
-      ref.invalidate(accountTicketsProvider);
-    }
-  } catch (_) {
-    if (context.mounted)
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Không thể gửi yêu cầu.')));
+}
+
+class _CaseImagePicker extends StatelessWidget {
+  const _CaseImagePicker({
+    required this.images,
+    required this.busy,
+    required this.onAdd,
+    required this.onRemove,
+  });
+  final List<_CaseImage> images;
+  final bool busy;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onRemove;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Ảnh bằng chứng',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Không bắt buộc · Tối đa 5 ảnh, mỗi ảnh 5 MB.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          for (var index = 0; index < images.length; index++) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _accountBackground,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      images[index].bytes,
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.cover,
+                      cacheWidth: 156,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      images[index].file.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Xóa ảnh ${index + 1}',
+                    onPressed: busy ? null : () => onRemove(index),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: busy || images.length >= 5 ? null : onAdd,
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: Text('Thêm ảnh (${images.length}/5)'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _CaseStatusBadge extends StatelessWidget {
+  const _CaseStatusBadge({required this.status});
+  final String status;
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (status) {
+      'resolved' || 'closed' || 'confirmed' => const Color(0xFF198754),
+      'cancelled' || 'rejected' => Theme.of(context).colorScheme.error,
+      'in_progress' || 'under_review' => const Color(0xFFB05A00),
+      _ => Theme.of(context).colorScheme.primary,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        _caseStatusLabel(status),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }
+
+const _supportCategories = <String, String>{
+  'ACCOUNT': 'Tài khoản',
+  'PAYMENT': 'Thanh toán',
+  'TECHNICAL': 'Lỗi kỹ thuật',
+  'APPEAL': 'Yêu cầu xem xét',
+  'GUIDANCE': 'Hướng dẫn sử dụng',
+};
+
+const _reportTypes = <String, String>{
+  'service_quality': 'Chất lượng dịch vụ',
+  'harassment': 'Quấy rối',
+  'insulting_language': 'Ngôn từ xúc phạm',
+  'fraud': 'Gian lận',
+  'impersonation': 'Mạo danh',
+  'spam_booking': 'Đặt đơn rác',
+  'payment_fraud': 'Gian lận thanh toán',
+  'user_behavior': 'Hành vi người dùng',
+  'other': 'Khác',
+};
+
+String _caseError(Object error) => error is ApiException
+    ? error.message
+    : 'Không thể gửi yêu cầu. Nội dung đã nhập vẫn được giữ lại.';
+
+String _caseStatusLabel(String value) => switch (value) {
+  'open' || 'pending' => 'Đã tiếp nhận',
+  'in_progress' || 'under_review' => 'Đang xử lý',
+  'waiting_user' || 'evidence_requested' => 'Cần bổ sung',
+  'resolved' || 'closed' || 'confirmed' => 'Đã xử lý',
+  'cancelled' => 'Đã hủy',
+  'rejected' => 'Đã từ chối',
+  _ => value,
+};
+
+String _caseTypeLabel(String value) =>
+    _supportCategories[value] ?? _reportTypes[value] ?? value;
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

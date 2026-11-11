@@ -43,7 +43,7 @@ class Conversation {
 
 class ChatMessage {
   const ChatMessage({required this.id, required this.content, required this.isMine,
-    required this.messageType, this.createdAt});
+    required this.messageType, this.createdAt, this.senderAvatar});
   factory ChatMessage.fromJson(Map<String, dynamic> json, String currentUserId) {
     final sender = json['senderId'];
     final senderId = sender is Map<String, dynamic> ? sender['_id'] ?? sender['id'] : sender;
@@ -51,11 +51,13 @@ class ChatMessage {
       id: (json['_id'] ?? json['id']) as String,
       content: (json['content'] ?? json['imageUrl'] ?? '') as String,
       isMine: senderId?.toString() == currentUserId,
+      senderAvatar: sender is Map<String, dynamic> ? sender['avatar'] as String? : null,
       messageType: json['messageType'] as String? ?? 'text',
       createdAt: json['createdAt'] is String ? DateTime.tryParse(json['createdAt'] as String) : null,
     );
   }
   final String id, content, messageType;
+  final String? senderAvatar;
   final bool isMine;
   final DateTime? createdAt;
 }
