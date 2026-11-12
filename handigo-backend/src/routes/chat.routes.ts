@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as chatController from "../controllers/chat.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
+import { uploadOrderAttachmentImage } from "../middlewares/orderAttachmentUpload.middleware";
 import { reportConversationSchema, sendMessageSchema, updateMessageSchema } from "../validations/chat.validator";
 
 const router = Router();
@@ -10,7 +11,14 @@ router.use(authMiddleware);
 
 router.get("/conversations", chatController.getMyConversations);
 router.get("/orders/:orderId/conversation", chatController.getOrCreateConversationByOrder);
+router.get("/conversations/:conversationId/availability", chatController.getConversationAvailability);
 router.get("/conversations/:conversationId/messages", chatController.getMessages);
+router.post(
+  "/conversations/:conversationId/attachments",
+  chatController.authorizeChatImageUpload,
+  uploadOrderAttachmentImage,
+  chatController.uploadChatImage,
+);
 router.post(
   "/conversations/:conversationId/messages",
   validate(sendMessageSchema),

@@ -14,7 +14,7 @@ interface MessageRowProps {
   busy: boolean;
   menuOpen: boolean;
   onToggleMenu: () => void;
-  onStartEdit: () => void;
+  onStartEdit?: () => void;
   onRequestDelete: () => void;
   onPreviewImage: (url: string) => void;
 }
@@ -111,7 +111,7 @@ export function MessageRow({
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-9 w-40 overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest py-1 text-on-surface shadow-xl">
-                {message.messageType === "text" && (
+                {onStartEdit && message.messageType === "text" && (
                   <button
                     type="button"
                     onClick={onStartEdit}

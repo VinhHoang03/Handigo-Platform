@@ -213,7 +213,9 @@ class AppBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surface,
+    color:
+        Theme.of(context).bottomSheetTheme.modalBackgroundColor ??
+        Theme.of(context).colorScheme.surface,
     borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
     child: Padding(
       padding: padding ?? const EdgeInsets.fromLTRB(20, 12, 20, 24),

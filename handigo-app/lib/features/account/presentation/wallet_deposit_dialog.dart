@@ -76,9 +76,7 @@ class _WalletDepositDialogState extends State<WalletDepositDialog>
       final orderCode = transaction is Map
           ? transaction['gatewayOrderCode']?.toString()
           : null;
-      if (orderCode == null ||
-          orderCode.isEmpty ||
-          data['amount'] != amount) {
+      if (orderCode == null || orderCode.isEmpty || data['amount'] != amount) {
         throw const ApiException(
           'Thông tin nạp ví chưa hợp lệ. Vui lòng kiểm tra lịch sử trước khi tạo giao dịch mới.',
         );
@@ -146,9 +144,9 @@ class _WalletDepositDialogState extends State<WalletDepositDialog>
   Widget build(BuildContext context) => PopScope(
     canPop: !_busy,
     child: AlertDialog(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
-      title: const Text('Nạp tiền vào ví'),
+      title: const Text('Nạp ví'),
       content: SizedBox(
         width: 320,
         child: SingleChildScrollView(

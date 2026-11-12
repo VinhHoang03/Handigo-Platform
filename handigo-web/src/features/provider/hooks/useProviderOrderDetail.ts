@@ -9,6 +9,7 @@ import { useToast } from '@/components/common/Toast';
 import { getCurrentCoordinates } from './useProviderAvailability';
 import { providerDashboardApi } from '../api/providerDashboard.api';
 import { getProviderCancellationReasons } from '../utils/providerOrder.utils';
+import { createAuthenticatedSocket } from '@/realtime/authenticatedSocket';
 
 /** State, tải dữ liệu và các thao tác của trang chi tiết đơn dịch vụ (thợ). */
 export function useProviderOrderDetail(orderId: string | undefined, navigate: NavigateFunction) {
@@ -90,6 +91,20 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
       if (scope.current === context) scope.current = null;
     };
   }, [loadData, renderScope]);
+
+  useEffect(() => {
+    if (!orderId) return;
+    const { socket, dispose } = createAuthenticatedSocket();
+    const refresh = () => { void loadData(false).catch(() => {}); };
+    const onUpdate = (payload: { orderId: string }) => { if (payload.orderId === orderId) refresh(); };
+    socket.on('order:updated', onUpdate);
+    socket.on('connect', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      dispose();
+    };
+  }, [loadData, orderId]);
 
   // Cập nhật thanh toán trong lúc thợ chờ khách trả tiền, giữ nguyên ảnh và ghi chú đang nhập.
   useEffect(() => {
@@ -294,6 +309,8 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
   };
 
   return {
+    handleConfirmWorking: () => runAction(() => providerOrderApi.confirmWorking(currentOrder!._id),
+      'Không thể xác nhận đang làm việc.', true, 'Đã xác nhận vẫn đang làm việc.'),
     order: currentOrder,
     assignment,
     quotation,

@@ -1,4 +1,5 @@
 import '../../../shared/widgets/app_search_field.dart';
+import '../../../shared/widgets/handigo_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -579,7 +580,13 @@ class _ProviderOnboardingScreenState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
           children: const [
-            Text('HANDIGO · ĐỐI TÁC', style: _T.overline),
+            Row(
+              children: [
+                HandigoLogo(height: 30),
+                SizedBox(width: 8),
+                Text('ĐỐI TÁC', style: _T.overline),
+              ],
+            ),
             SizedBox(height: 9),
             Text('Chủ động công việc,\ntăng thêm thu nhập', style: _T.hero),
             SizedBox(height: 14),
@@ -1742,6 +1749,7 @@ class _ProviderOnboardingScreenState
                       onTap: () => showAboutDialog(
                         context: context,
                         applicationName: 'Handigo Đối tác',
+                        applicationIcon: const HandigoLogo(height: 24),
                         applicationVersion: 'Hồ sơ đăng ký',
                       ),
                       child: const Column(

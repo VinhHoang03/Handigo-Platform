@@ -19,6 +19,7 @@ import { assertProviderWalletEligible } from "./providerWalletEligibility.servic
 import type { UserRole } from "../models/user.model";
 import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
 import { requestDirectProviderReassignment } from "./orderReassignment.service";
+import { scheduleOrderDeadline } from "./orderDeadline.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
 import { calculateDuration } from "../utils/bookingPolicy";
@@ -417,6 +418,7 @@ export const AssignmentService = {
     } catch (error) {
       assignmentLogger.error("Đã lưu lời chào nhưng chưa phát được tin nhắn trực tiếp.", error, { assignmentId });
     }
+    scheduleOrderDeadline(result.order);
     emitToUser(result.order.customerId.toString(), "order:updated", {
       orderId: result.order._id.toString(),
     });

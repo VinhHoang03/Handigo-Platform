@@ -29,14 +29,31 @@ class _NotificationCenterScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(notificationListProvider);
     return Scaffold(
-      appBar: AppBar(title: Text('Thông báo', style: Theme.of(context).textTheme.headlineLarge)),
+      appBar: AppBar(title: const Text('Thông báo')),
       body: state.when(
         loading: () => const AppLoading(),
-        error: (_, __) => AppMessage(
+        error: (_, _) => AppMessage(
           message: 'Không thể tải thông báo.',
           onRetry: () => ref.invalidate(notificationListProvider),
         ),
         data: (page) {
+          if (page.items.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: () => ref.refresh(notificationListProvider.future),
+              child: const CustomScrollView(
+                physics: AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: AppMessage(
+                      icon: Icons.notifications_none_rounded,
+                      message: 'Bạn chưa có thông báo nào.',
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
           final items = _selectedType == 'ALL'
               ? page.items
               : page.items.where((item) => item.type == _selectedType).toList();
@@ -53,14 +70,13 @@ class _NotificationCenterScreenState
                 .where((item) => item.type == 'PROMOTION')
                 .length,
           };
-          if (page.items.isEmpty)
-            return const AppMessage(message: 'Bạn chưa có thông báo nào.');
           return RefreshIndicator(
             onRefresh: () => ref.refresh(notificationListProvider.future),
             child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               itemCount: items.isEmpty ? 2 : items.length + 1,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, index) {
                 if (index == 0) {
                   return _NotificationFilters(
@@ -69,13 +85,16 @@ class _NotificationCenterScreenState
                     onSelected: (type) => setState(() => _selectedType = type),
                   );
                 }
-                if (items.isEmpty)
-                  return const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(
-                      child: Text('Chưa có thông báo thuộc nhóm này.'),
+                if (items.isEmpty) {
+                  return AppMessage(
+                    icon: Icons.notifications_none_rounded,
+                    message: 'Chưa có thông báo thuộc nhóm này.',
+                    action: OutlinedButton(
+                      onPressed: () => setState(() => _selectedType = 'ALL'),
+                      child: const Text('Xem tất cả thông báo'),
                     ),
                   );
+                }
                 return _NotificationTile(item: items[index - 1]);
               },
             ),
@@ -208,8 +227,9 @@ class _NotificationTile extends ConsumerWidget {
       child: InkWell(
         onTap: () async {
           try {
-            if (!item.isRead)
+            if (!item.isRead) {
               await ref.read(notificationRepositoryProvider).markRead(item.id);
+            }
             ref.invalidate(notificationListProvider);
           } catch (_) {
             /* Vẫn mở đơn nếu đánh dấu đã đọc chưa thành công. */

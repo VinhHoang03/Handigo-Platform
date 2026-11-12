@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
+import '../../../shared/widgets/handigo_logo.dart';
 import '../../auth/domain/app_user.dart';
 
 class RoleHomeScreen extends ConsumerWidget {
@@ -10,7 +11,7 @@ class RoleHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(role == UserRole.provider ? 'Handigo Provider' : 'Handigo')),
+      appBar: AppBar(title: const HandigoLogo()),
       body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
         Text('Xin chào, ${auth.user?.fullName ?? ''}', textAlign: TextAlign.center),
         const SizedBox(height: 8), Text(role.label), const SizedBox(height: 24),

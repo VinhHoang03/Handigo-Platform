@@ -27,7 +27,7 @@ const startServer = async () => {
         startRefundReconciliationMonitor,
         stopRefundReconciliationMonitor,
       },
-      { startReassignmentMonitor, stopReassignmentMonitor },
+      { stopReassignmentMonitor },
       { startAgentOrderProgressMonitor, stopAgentOrderProgressMonitor },
       { startOrderRescheduleMonitor, stopOrderRescheduleMonitor },
     ] = await Promise.all([
@@ -50,9 +50,7 @@ const startServer = async () => {
     server.setTimeout(REQUEST_TIMEOUT_MS);
 
     const io = initSocket(server);
-    DispatchService.startTimeoutMonitor();
     startRefundReconciliationMonitor();
-    startReassignmentMonitor();
     startAgentOrderProgressMonitor();
     startOrderRescheduleMonitor();
     startTemporaryLockMonitor();

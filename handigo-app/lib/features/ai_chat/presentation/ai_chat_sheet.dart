@@ -238,10 +238,7 @@ class _AiChatSheetState extends ConsumerState<AiChatSheet> {
         : null;
     return Material(
       color: scheme.surfaceContainerLowest,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .5)),
-      ),
+      borderRadius: BorderRadius.circular(24),
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
