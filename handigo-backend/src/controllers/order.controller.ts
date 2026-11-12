@@ -4,6 +4,7 @@ import type { UserRole } from "../models/user.model";
 import { AssignmentService } from "../services/assignment.service";
 import { DispatchService } from "../services/dispatch.service";
 import { OrderService } from "../services/order.service";
+import { confirmOrderWork } from "../services/orderDeadline.service";
 import { AppError } from "../utils/appError";
 import { previewServiceBooking } from "../services/servicePricing.service";
 import { updateExpectedEnd } from "../services/providerSchedule.service";
@@ -46,6 +47,11 @@ export const createCustomerNoShowEvidence = async (req: Request, res: Response, 
 
 export const getBookingPolicies = async (_req: Request, res: Response, next: NextFunction) => {
   try { return ok(res, await getCustomerBookingPolicies()); }
+  catch (error) { return next(error); }
+};
+
+export const confirmWorking = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await confirmOrderWork(String(req.params.orderId), uid(req))); }
   catch (error) { return next(error); }
 };
 
@@ -295,7 +301,7 @@ export const startOrder = async (
   next: NextFunction,
 ) => {
   try {
-    const order = await OrderService.startOrder(param(req, "orderId"), uid(req));
+    const order = await OrderService.startOrder(param(req, "orderId"), uid(req), req.body?.workConfirmationEnabled === true);
     return ok(res, order);
   } catch (error) {
     return next(error);

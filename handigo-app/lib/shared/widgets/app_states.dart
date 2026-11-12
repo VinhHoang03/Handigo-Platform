@@ -16,12 +16,14 @@ class AppMessage extends StatelessWidget {
     required this.message,
     this.icon = Icons.info_outline,
     this.onRetry,
+    this.action,
     super.key,
   });
 
   final String message;
   final IconData icon;
   final VoidCallback? onRetry;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => Center(
@@ -33,13 +35,14 @@ class AppMessage extends StatelessWidget {
           Icon(icon, size: 40, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 16),
           Text(message, textAlign: TextAlign.center),
-          if (onRetry != null) ...[
+          if (action != null || onRetry != null) ...[
             const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Thử lại'),
-            ),
+            action ??
+                OutlinedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Thử lại'),
+                ),
           ],
         ],
       ),

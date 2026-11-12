@@ -83,7 +83,7 @@ void main() {
 
       await tester.tap(find.text('Đổi'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Thêm địa chỉ'));
+      await tester.tap(find.text('Thêm địa chỉ'));
       await tester.pumpAndSettle();
       expect(additions, 1);
       expect(find.byType(AlertDialog), findsNothing);

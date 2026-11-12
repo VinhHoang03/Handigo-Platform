@@ -1,4 +1,5 @@
 import '../../../shared/widgets/app_search_field.dart';
+import '../../../shared/widgets/handigo_logo.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'dart:developer' as developer;
@@ -226,7 +227,9 @@ class _ProviderShellState extends State<ProviderShell> {
           ],
         );
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset:
+          widget.navigationShell != null &&
+          GoRouterState.of(context).uri.path.startsWith('/provider/chat'),
       backgroundColor: Colors.transparent,
       body: _ProviderShellBackground(
         child: Theme(
@@ -469,29 +472,10 @@ class ProviderDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(providerOverviewProvider);
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/brand/handigo-logo.png',
-              width: 32,
-              height: 32,
-              semanticLabel: 'Logo Handigo',
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Handigo',
-              style: TextStyle(
-                color: scheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+        title: const HandigoLogo(),
         actions: [
           IconButton(
             tooltip: 'Tin nhắn',

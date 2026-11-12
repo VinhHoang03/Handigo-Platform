@@ -63,6 +63,7 @@ Future<void> showCatalog(
   bool serviceError = false,
   bool voucherError = false,
   List<Service> items = services,
+  List<ServiceCategory> categoryItems = categories,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -87,7 +88,7 @@ Future<void> showCatalog(
     ProviderScope(
       overrides: [
         serviceCatalogCategoriesProvider.overrideWith(
-          (ref) async => categories,
+          (ref) async => categoryItems,
         ),
         serviceCatalogServicesProvider.overrideWith((ref, id) async {
           if (serviceError) throw StateError('Không có kết nối');
@@ -222,6 +223,42 @@ void main() {
     await tester.tap(find.byTooltip('Xóa tìm kiếm'));
     await tester.pumpAndSettle();
     expect(find.text('3 dịch vụ khả dụng'), findsOneWidget);
+  });
+
+  testWidgets('Kéo ngang bằng chuột để chọn danh mục ngoài khung', (
+    tester,
+  ) async {
+    await showCatalog(
+      tester,
+      categoryItems: const [
+        ServiceCategory(
+          id: 'furniture',
+          name: 'Nội thất và đồ gỗ',
+          slug: 'noi-that',
+        ),
+        ServiceCategory(
+          id: 'appliances',
+          name: 'Thiết bị gia dụng',
+          slug: 'gia-dung',
+        ),
+        ...categories,
+      ],
+    );
+    final lastCategory = find.widgetWithText(ChoiceChip, 'Điện nước');
+    expect(lastCategory.hitTestable(), findsNothing);
+
+    await tester.drag(
+      find.widgetWithText(ChoiceChip, 'Tất cả'),
+      const Offset(-450, 0),
+      kind: ui.PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+
+    expect(lastCategory.hitTestable(), findsOneWidget);
+    expect(find.text('3 dịch vụ khả dụng'), findsOneWidget);
+    await tester.tap(lastCategory);
+    await tester.pumpAndSettle();
+    expect(find.text('1 dịch vụ khả dụng'), findsOneWidget);
   });
 
   testWidgets('Nút lọc áp dụng danh mục đã chọn', (tester) async {

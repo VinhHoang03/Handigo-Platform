@@ -92,6 +92,7 @@ export interface IOrder extends Document, IBaseDocument {
   promotionUsedAt?: Date | null;
   promotionReleasedAt?: Date | null;
   statusVersion: number;
+  workConfirmation?: { nextAt: Date; expiresAt?: Date | null } | null;
   addressSnapshot?: {
     recipientName?: string; recipientPhone?: string; fullAddress: string;
     province: string; ward: string; note?: string | null;
@@ -229,6 +230,10 @@ const OrderSchema = new Schema<IOrder>(
       customerRepliedAt: { type: Date, default: null },
     }, { _id: false }), default: null },
     statusVersion: { type: Number, default: 0, min: 0 },
+    workConfirmation: { type: new Schema({
+      nextAt: { type: Date, required: true },
+      expiresAt: { type: Date, default: null },
+    }, { _id: false }), default: null },
     overdueReview: { type: new Schema({ escalatedAt: { type: Date, default: null } }, { _id: false }), default: null },
     schedule: { type: new Schema({
       durationMinutes: { type: Number, required: true, min: 1 },

@@ -10,10 +10,12 @@ import 'package:handigo_app/app/routing/app_router.dart';
 import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/core/network/api_client.dart';
 import 'package:handigo_app/core/network/api_exception.dart';
+import 'package:handigo_app/core/network/paged_result.dart';
 import 'package:handigo_app/core/network/realtime_connection.dart';
 import 'package:handigo_app/features/auth/data/auth_repository.dart';
 import 'package:handigo_app/features/auth/domain/app_user.dart';
 import 'package:handigo_app/features/auth/presentation/auth_controller.dart';
+import 'package:handigo_app/features/chat/presentation/chat_screens.dart';
 import 'package:handigo_app/features/home/presentation/customer_shell.dart';
 import 'package:handigo_app/features/home/presentation/device_location_provider.dart';
 import 'package:handigo_app/features/orders/domain/order_summary.dart';
@@ -44,6 +46,7 @@ Future<GoRouter> _show(
   WidgetTester tester,
   UserRole role, {
   bool withIncome = false,
+  bool withOrderPages = false,
 }) async {
   FlutterSecureStorage.setMockInitialValues({});
   final api = _Api();
@@ -59,6 +62,29 @@ Future<GoRouter> _show(
   final container = ProviderContainer(
     retry: (_, _) => null,
     overrides: [
+      if (withOrderPages)
+        orderPageProvider.overrideWith((ref, query) async {
+          final (page, status, search) = query;
+          if (status != 'all' || search.isNotEmpty) {
+            return const PagedResult<OrderSummary>(
+              items: [],
+              page: 1,
+              totalPages: 0,
+            );
+          }
+          return PagedResult(
+            items: [
+              OrderSummary(
+                id: 'order-$page',
+                code: 'ORD-00$page',
+                serviceName: page == 1 ? 'Vệ sinh điều hòa' : 'Sửa đường ống',
+                status: 'completed',
+              ),
+            ],
+            page: page,
+            totalPages: 2,
+          );
+        }),
       if (withIncome) ...[
         providerWalletProvider.overrideWith(
           (ref) async => const WalletInfo(balance: 500000, pendingBalance: 0),
@@ -131,6 +157,81 @@ Finder _tab(String label) =>
     find.descendant(of: find.byType(SafeArea), matching: find.text(label)).last;
 
 void main() {
+  for (final role in [UserRole.customer, UserRole.provider]) {
+    testWidgets('Ô soạn tin nhắn nằm sát bàn phím của ${role.name}', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetViewInsets);
+      final router = await _show(tester, role);
+      router.go('/${role.name}/chat');
+      await tester.pumpAndSettle();
+      final context = tester.element(find.byType(ConversationListScreen));
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(
+            body: Align(alignment: Alignment.bottomCenter, child: TextField()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+      await tester.pumpAndSettle();
+      expect(tester.getBottomLeft(find.byType(TextField)).dy, 520);
+
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      expect(tester.getBottomLeft(find.byType(TextField)).dy, greaterThan(520));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Lịch sử chuyển trang và xóa bộ lọc khi không có kết quả', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 800);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final router = await _show(tester, UserRole.customer, withOrderPages: true);
+    Finder pageButton(String label) => find.byWidgetPredicate(
+      (widget) => widget is IconButton && widget.tooltip == label,
+    );
+    router.go('/customer/orders');
+    await tester.pumpAndSettle();
+    expect(find.text('Trang 1 / 2'), findsOneWidget);
+    expect(
+      tester.widget<IconButton>(pageButton('Trang trước')).onPressed,
+      isNull,
+    );
+    await tester.tap(find.byTooltip('Trang sau'));
+    await tester.pumpAndSettle();
+    expect(find.text('Trang 2 / 2'), findsOneWidget);
+    expect(find.text('Sửa đường ống'), findsOneWidget);
+    expect(
+      tester.widget<IconButton>(pageButton('Trang sau')).onPressed,
+      isNull,
+    );
+    await tester.tap(find.byTooltip('Trang trước'));
+    await tester.pumpAndSettle();
+    expect(find.text('Vệ sinh điều hòa'), findsOneWidget);
+
+    final searchField = find.byType(TextField);
+    await tester.enterText(searchField, 'Không tìm thấy');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(find.text('Không có đơn hàng phù hợp.'), findsOneWidget);
+    await tester.tap(find.text('Xóa bộ lọc'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(searchField).controller?.text, isEmpty);
+    expect(find.text('Trang 1 / 2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Thu nhập dùng giao diện ví và mở ngân hàng rồi quay lại', (
     tester,
   ) async {
@@ -183,7 +284,7 @@ void main() {
       expect(tester.getSize(homeHeader).height, 64);
       expect(find.text('VỊ TRÍ HIỆN TẠI'), findsOneWidget);
       expect(find.text('An Hải, Đà Nẵng'), findsOneWidget);
-      expect(find.text('Handigo'), findsOneWidget);
+      expect(find.bySemanticsLabel('Handigo'), findsOneWidget);
       expect(find.text('Trang chủ'), findsOneWidget);
       expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsNothing);
       final homeAppBar = tester.widget<AppBar>(find.byType(AppBar).first);

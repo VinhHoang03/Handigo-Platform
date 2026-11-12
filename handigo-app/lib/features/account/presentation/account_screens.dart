@@ -24,6 +24,7 @@ import '../../home/domain/customer_home_data.dart';
 import '../../home/presentation/customer_home_provider.dart';
 import '../../home/presentation/reward_redemption.dart';
 import 'wallet_deposit_dialog.dart';
+import 'customer_withdrawals.dart';
 
 const _figmaPrimary = Color(0xFF4F35D5);
 const _figmaPrimarySoft = Color(0xFFEFEBFF);
@@ -58,6 +59,12 @@ final accountTransactionPageProvider = FutureProvider.autoDispose
     .family<PagedResult<WalletTransactionItem>, int>(
       (ref, page) =>
           ref.watch(accountRepositoryProvider).walletTransactions(page: page),
+    );
+final _accountDepositPageProvider = FutureProvider.autoDispose
+    .family<PagedResult<WalletTransactionItem>, int>(
+      (ref, page) => ref
+          .watch(accountRepositoryProvider)
+          .walletTransactions(page: page, type: 'deposit'),
     );
 final accountPaymentHistoryProvider = FutureProvider.autoDispose
     .family<PagedResult<PaymentHistoryItem>, int>(
@@ -138,124 +145,128 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-              children: [
-                AccountProfileSummaryCard(
-                  name: user?.fullName ?? 'Khách hàng',
-                  contact: _maskedPhone('${profile?['phone'] ?? ''}'),
-                  avatarUrl: user?.avatar,
-                  onEdit: () => context.push('/customer/profile'),
-                ),
-                const SizedBox(height: 24),
-                _ProviderModeCard(
-                  isApproved: isApprovedProvider,
-                  onPressed: () => isApprovedProvider
-                      ? context.go('/provider')
-                      : context.push('/customer/provider-onboarding'),
-                ),
-                const SizedBox(height: 24),
-                _WalletOverviewCard(
-                  balance: wallet?.balance,
-                  onDeposit: () => context.push('/customer/wallet'),
-                  onHistory: () => context.push('/customer/wallet/history'),
-                ),
-                const SizedBox(height: 24),
-                AccountSection(
-                  title: 'Quản lý cá nhân',
-                  items: [
-                    AccountMenuItem(
-                      label: 'Sổ địa chỉ',
-                      subtitle: addresses == null
-                          ? 'Quản lý các địa chỉ đã lưu'
-                          : '${addresses.length} địa chỉ đã lưu',
-                      iconAsset: '$_accountIconPath/pin.svg',
-                      onTap: () => context.push('/customer/addresses'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Phương thức thanh toán',
-                      subtitle: 'Ví & tài khoản ngân hàng đã lưu',
-                      iconAsset: '$_accountIconPath/card.svg',
-                      onTap: () => context.push('/customer/wallet'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Voucher & ưu đãi',
-                      subtitle: vouchers == null
-                          ? 'Xem các ưu đãi đang có'
-                          : '${vouchers.length} ưu đãi sẵn sàng sử dụng',
-                      iconAsset: '$_accountIconPath/gift.svg',
-                      onTap: () => context.push('/customer/vouchers'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                AccountSection(
-                  title: 'Cài đặt ứng dụng',
-                  items: [
-                    AccountMenuItem(
-                      label: 'Thông báo & nhắc lịch',
-                      subtitle: 'Lịch hẹn, tin nhắn & cập nhật dịch vụ',
-                      iconAsset: '$_accountIconPath/bell.svg',
-                      onTap: () => context.push('/customer/notifications'),
-                    ),
-                    const AccountMenuItem(
-                      label: 'Ngôn ngữ & giao diện',
-                      subtitle: 'Tiếng Việt · Sáng / Tối',
-                      iconAsset: '$_accountIconPath/globe.svg',
-                      comingSoon: true,
-                    ),
-                    AccountMenuItem(
-                      label: 'Bảo mật & đăng nhập',
-                      subtitle: 'Mật khẩu, Face ID & vân tay',
-                      iconAsset: '$_accountIconPath/shield.svg',
-                      onTap: () => context.push('/customer/settings'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                AccountSection(
-                  title: 'Hỗ trợ & thông tin',
-                  items: [
-                    AccountMenuItem(
-                      label: 'Trung tâm trợ giúp',
-                      subtitle: 'Chat với Handigo · Hỗ trợ 24/7',
-                      iconAsset: '$_accountIconPath/help.svg',
-                      onTap: () => context.push('/customer/support'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Góp ý & báo cáo sự cố',
-                      subtitle: 'Chúng tôi luôn lắng nghe bạn',
-                      iconAsset: '$_accountIconPath/chat.svg',
-                      onTap: () => context.push('/customer/complaints'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Điều khoản & quyền riêng tư',
-                      subtitle: 'Cách Handigo bảo vệ dữ liệu của bạn',
-                      iconAsset: '$_accountIconPath/file.svg',
-                      onTap: () => context.push('/customer/settings'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Đánh giá Handigo',
-                      subtitle: 'Chia sẻ trải nghiệm của bạn',
-                      iconAsset: '$_accountIconPath/star.svg',
-                      onTap: () => context.push('/customer/feedback'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                AccountLogoutButton(
-                  onPressed: () async {
-                    final confirmed = await showAccountLogoutConfirmation(
-                      context,
-                      userName: user?.fullName ?? 'Khách hàng Handigo',
-                    );
-                    if (confirmed) {
-                      await ref.read(authControllerProvider).logout();
-                    }
-                  },
-                ),
-                const AccountVersionFooter(),
-              ],
+            child: ScrollConfiguration(
+              behavior: ScrollConfiguration.of(
+                context,
+              ).copyWith(scrollbars: false),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                children: [
+                  AccountProfileSummaryCard(
+                    name: user?.fullName ?? 'Khách hàng',
+                    contact: _maskedPhone('${profile?['phone'] ?? ''}'),
+                    avatarUrl: user?.avatar,
+                    onEdit: () => context.push('/customer/profile'),
+                  ),
+                  const SizedBox(height: 24),
+                  _ProviderModeCard(
+                    isApproved: isApprovedProvider,
+                    onPressed: () => isApprovedProvider
+                        ? context.go('/provider')
+                        : context.push('/customer/provider-onboarding'),
+                  ),
+                  const SizedBox(height: 24),
+                  _WalletOverviewCard(
+                    balance: wallet?.balance,
+                    onHistory: () => context.push('/customer/wallet/activity'),
+                  ),
+                  const SizedBox(height: 24),
+                  AccountSection(
+                    title: 'Quản lý cá nhân',
+                    items: [
+                      AccountMenuItem(
+                        label: 'Sổ địa chỉ',
+                        subtitle: addresses == null
+                            ? 'Quản lý các địa chỉ đã lưu'
+                            : '${addresses.length} địa chỉ đã lưu',
+                        iconAsset: '$_accountIconPath/pin.svg',
+                        onTap: () => context.push('/customer/addresses'),
+                      ),
+                      AccountMenuItem(
+                        label: 'Phương thức thanh toán',
+                        subtitle: 'Ví & tài khoản ngân hàng đã lưu',
+                        iconAsset: '$_accountIconPath/card.svg',
+                        onTap: () => context.push('/customer/wallet'),
+                      ),
+                      AccountMenuItem(
+                        label: 'Voucher & ưu đãi',
+                        subtitle: vouchers == null
+                            ? 'Xem các ưu đãi đang có'
+                            : '${vouchers.length} ưu đãi sẵn sàng sử dụng',
+                        iconAsset: '$_accountIconPath/gift.svg',
+                        onTap: () => context.push('/customer/vouchers'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  AccountSection(
+                    title: 'Cài đặt ứng dụng',
+                    items: [
+                      AccountMenuItem(
+                        label: 'Thông báo & nhắc lịch',
+                        subtitle: 'Lịch hẹn, tin nhắn & cập nhật dịch vụ',
+                        iconAsset: '$_accountIconPath/bell.svg',
+                        onTap: () => context.push('/customer/notifications'),
+                      ),
+                      const AccountMenuItem(
+                        label: 'Ngôn ngữ & giao diện',
+                        subtitle: 'Tiếng Việt · Sáng / Tối',
+                        iconAsset: '$_accountIconPath/globe.svg',
+                        comingSoon: true,
+                      ),
+                      AccountMenuItem(
+                        label: 'Bảo mật & đăng nhập',
+                        subtitle: 'Mật khẩu, Face ID & vân tay',
+                        iconAsset: '$_accountIconPath/shield.svg',
+                        onTap: () => context.push('/customer/settings'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  AccountSection(
+                    title: 'Hỗ trợ & thông tin',
+                    items: [
+                      AccountMenuItem(
+                        label: 'Trung tâm trợ giúp',
+                        subtitle: 'Chat với Handigo · Hỗ trợ 24/7',
+                        iconAsset: '$_accountIconPath/help.svg',
+                        onTap: () => context.push('/customer/support'),
+                      ),
+                      AccountMenuItem(
+                        label: 'Góp ý & báo cáo sự cố',
+                        subtitle: 'Chúng tôi luôn lắng nghe bạn',
+                        iconAsset: '$_accountIconPath/chat.svg',
+                        onTap: () => context.push('/customer/complaints'),
+                      ),
+                      AccountMenuItem(
+                        label: 'Điều khoản & quyền riêng tư',
+                        subtitle: 'Cách Handigo bảo vệ dữ liệu của bạn',
+                        iconAsset: '$_accountIconPath/file.svg',
+                        onTap: () => context.push('/customer/settings'),
+                      ),
+                      AccountMenuItem(
+                        label: 'Đánh giá Handigo',
+                        subtitle: 'Chia sẻ trải nghiệm của bạn',
+                        iconAsset: '$_accountIconPath/star.svg',
+                        onTap: () => context.push('/customer/feedback'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  AccountLogoutButton(
+                    onPressed: () async {
+                      final confirmed = await showAccountLogoutConfirmation(
+                        context,
+                        userName: user?.fullName ?? 'Khách hàng Handigo',
+                      );
+                      if (confirmed) {
+                        await ref.read(authControllerProvider).logout();
+                      }
+                    },
+                  ),
+                  const AccountVersionFooter(),
+                ],
+              ),
             ),
           ),
         ),
@@ -676,8 +687,6 @@ class AddressScreen extends ConsumerWidget {
                                 const SizedBox(height: 12),
                               ],
                             ),
-                          const SizedBox(height: 16),
-                          const _AddressPrivacyFooter(),
                         ],
                       ),
                     ),
@@ -777,6 +786,47 @@ Widget _field(TextEditingController c, String label) => Padding(
   ),
 );
 
+Future<void> _withdraw(
+  BuildContext context,
+  WidgetRef ref,
+  double balance,
+) async {
+  if (await showCustomerWithdrawal(context, balance) != true ||
+      !context.mounted)
+    return;
+  ref.invalidate(accountWalletProvider);
+  ref.invalidate(customerWithdrawalsProvider);
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(const SnackBar(content: Text('Đã gửi yêu cầu rút tiền.')));
+}
+
+class _WithdrawalActions extends StatelessWidget {
+  const _WithdrawalActions({required this.onWithdraw});
+  final VoidCallback? onWithdraw;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 10),
+    child: Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        FilledButton.tonalIcon(
+          onPressed: onWithdraw,
+          icon: const Icon(Icons.payments_outlined),
+          label: const Text('Rút tiền'),
+        ),
+        TextButton.icon(
+          onPressed: () => context.push('/customer/wallet/withdrawals'),
+          icon: const Icon(Icons.receipt_long_outlined),
+          label: const Text('Lịch sử rút tiền'),
+        ),
+      ],
+    ),
+  );
+}
+
 class WalletScreen extends ConsumerWidget {
   const WalletScreen({super.key});
 
@@ -847,7 +897,7 @@ class WalletScreen extends ConsumerWidget {
                               child: FilledButton.icon(
                                 onPressed: () => _deposit(context, ref),
                                 icon: const Icon(Icons.add, size: 18),
-                                label: const Text('Nạp tiền'),
+                                label: const Text('Nạp ví'),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -860,6 +910,10 @@ class WalletScreen extends ConsumerWidget {
                               ),
                             ),
                           ],
+                        ),
+                        _WithdrawalActions(
+                          onWithdraw: () =>
+                              _withdraw(context, ref, wallet.balance),
                         ),
                       ],
                     ),
@@ -1059,7 +1113,9 @@ class _AddBankAccountDialogState extends ConsumerState<_AddBankAccountDialog> {
 }
 
 class CustomerPaymentHistoryScreen extends ConsumerStatefulWidget {
-  const CustomerPaymentHistoryScreen({super.key});
+  const CustomerPaymentHistoryScreen({this.walletActivity = false, super.key});
+
+  final bool walletActivity;
 
   @override
   ConsumerState<CustomerPaymentHistoryScreen> createState() =>
@@ -1114,46 +1170,55 @@ class _CustomerPaymentHistoryScreenState
           ],
         );
 
-  Widget _walletHistory() => ref
-      .watch(accountTransactionPageProvider(_page))
-      .when(
-        loading: () => const AppLoading(),
-        error: (_, _) => AppMessage(
-          message: 'Không thể tải giao dịch ví.',
-          onRetry: () => ref.invalidate(accountTransactionPageProvider(_page)),
-        ),
-        data: (page) => page.items.isEmpty
-            ? const AppMessage(message: 'Chưa có giao dịch ví.')
-            : Column(
-                children: [
-                  ...page.items.map(
-                    (item) => Card(
-                      child: ListTile(
-                        leading: Icon(
-                          item.direction == 'in'
-                              ? Icons.arrow_downward
-                              : Icons.arrow_upward,
-                        ),
-                        title: Text(
-                          item.description ?? _transactionLabel(item.type),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(_detail(item.status, item.createdAt)),
-                            Text(
-                              '${item.direction == 'in' ? '+' : '-'}${_money(item.amount)}',
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                          ],
+  Widget _walletHistory() {
+    final provider = widget.walletActivity
+        ? _accountDepositPageProvider(_page)
+        : accountTransactionPageProvider(_page);
+    return ref
+        .watch(provider)
+        .when(
+          loading: () => const AppLoading(),
+          error: (_, _) => AppMessage(
+            message: 'Không thể tải giao dịch ví.',
+            onRetry: () => ref.invalidate(provider),
+          ),
+          data: (page) => page.items.isEmpty
+              ? AppMessage(
+                  message: widget.walletActivity
+                      ? 'Chưa có giao dịch nạp ví.'
+                      : 'Chưa có giao dịch ví.',
+                )
+              : Column(
+                  children: [
+                    ...page.items.map(
+                      (item) => Card(
+                        child: ListTile(
+                          leading: Icon(
+                            item.direction == 'in'
+                                ? Icons.arrow_downward
+                                : Icons.arrow_upward,
+                          ),
+                          title: Text(
+                            item.description ?? _transactionLabel(item.type),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_detail(item.status, item.createdAt)),
+                              Text(
+                                '${item.direction == 'in' ? '+' : '-'}${_money(item.amount)}',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  _pager(page.totalPages),
-                ],
-              ),
-      );
+                    _pager(page.totalPages),
+                  ],
+                ),
+        );
+  }
 
   Widget _paymentHistory() => ref
       .watch(accountPaymentHistoryProvider(_page))
@@ -1190,34 +1255,89 @@ class _CustomerPaymentHistoryScreenState
               ),
       );
 
+  Widget _walletActivity() {
+    final balance = ref.watch(accountWalletProvider).asData?.value.balance;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Row(
+            spacing: 8,
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => _deposit(context, ref),
+                  child: const Text('Nạp ví'),
+                ),
+              ),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: balance == null
+                      ? null
+                      : () => _withdraw(context, ref, balance),
+                  child: const Text('Rút tiền'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        TabBar(
+          onTap: (index) {
+            if (index != _source)
+              setState(() {
+                _source = index;
+                _page = 1;
+              });
+          },
+          tabs: const [
+            Tab(text: 'Lịch sử nạp ví'),
+            Tab(text: 'Lịch sử rút tiền'),
+          ],
+        ),
+        Expanded(
+          child: _source == 0
+              ? ListView(
+                  key: ValueKey(_page),
+                  padding: const EdgeInsets.all(16),
+                  children: [_walletHistory()],
+                )
+              : const CustomerWithdrawalsList(),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Lịch sử giao dịch')),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final entry in const {
-              0: 'Ví Handigo',
-              1: 'Thanh toán đơn',
-            }.entries)
-              ChoiceChip(
-                label: Text(entry.value),
-                selected: _source == entry.key,
-                onSelected: (_) => setState(() {
-                  _source = entry.key;
-                  _page = 1;
-                }),
+    body: widget.walletActivity
+        ? DefaultTabController(length: 2, child: _walletActivity())
+        : ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final entry in const {
+                    0: 'Ví Handigo',
+                    1: 'Thanh toán đơn',
+                  }.entries)
+                    ChoiceChip(
+                      label: Text(entry.value),
+                      selected: _source == entry.key,
+                      onSelected: (_) => setState(() {
+                        _source = entry.key;
+                        _page = 1;
+                      }),
+                    ),
+                ],
               ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (_source == 0) _walletHistory() else _paymentHistory(),
-      ],
-    ),
+              const SizedBox(height: 16),
+              if (_source == 0) _walletHistory() else _paymentHistory(),
+            ],
+          ),
   );
 }
 
@@ -1232,6 +1352,7 @@ Future<void> _deposit(BuildContext context, WidgetRef ref) async {
         ref.invalidate(accountWalletProvider);
         ref.invalidate(accountTransactionsProvider);
         ref.invalidate(accountTransactionPageProvider);
+        ref.invalidate(_accountDepositPageProvider);
       },
     ),
   );
@@ -1887,6 +2008,8 @@ class _CaseImage {
   final Uint8List bytes;
 }
 
+const _maxCaseImages = 10;
+
 class _CaseFormSheet extends ConsumerStatefulWidget {
   const _CaseFormSheet({required this.report});
   final bool report;
@@ -1917,7 +2040,7 @@ class _CaseFormSheetState extends ConsumerState<_CaseFormSheet> {
   }
 
   Future<void> _pickImage() async {
-    if (_busy || _picking || _images.length >= 5) return;
+    if (_busy || _picking || _images.length >= _maxCaseImages) return;
     setState(() {
       _picking = true;
       _error = null;
@@ -1945,6 +2068,7 @@ class _CaseFormSheetState extends ConsumerState<_CaseFormSheet> {
       if (_images.any((image) => listEquals(image.bytes, bytes))) {
         throw const ApiException('Ảnh này đã được chọn.');
       }
+      if (!mounted) return;
       setState(() => _images.add(_CaseImage(file, bytes)));
     } catch (error) {
       if (mounted) setState(() => _error = _caseError(error));
@@ -2053,6 +2177,7 @@ class _CaseFormSheetState extends ConsumerState<_CaseFormSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final ordersState = ref.watch(orderListProvider);
     final orders = ordersState.asData?.value.items ?? const <OrderSummary>[];
     final availableOrders = widget.report && _reportType == 'service_quality'
@@ -2060,11 +2185,15 @@ class _CaseFormSheetState extends ConsumerState<_CaseFormSheet> {
         : orders;
     final showOrders = widget.report || _category == 'PAYMENT';
     final user = ref.watch(authControllerProvider).user;
+    final modalSurface = Theme.of(
+      context,
+    ).bottomSheetTheme.modalBackgroundColor;
     return PopScope(
       canPop: !_busy && !_picking,
       child: Scaffold(
-        backgroundColor: _accountBackground,
+        backgroundColor: modalSurface ?? _accountBackground,
         appBar: AppBar(
+          backgroundColor: modalSurface,
           automaticallyImplyLeading: false,
           title: Text(
             widget.report ? 'Gửi báo cáo sự cố' : 'Tạo yêu cầu hỗ trợ',
@@ -2096,17 +2225,56 @@ class _CaseFormSheetState extends ConsumerState<_CaseFormSheet> {
                         DropdownButtonFormField<String>(
                           initialValue: _category,
                           isExpanded: true,
+                          itemHeight: null,
+                          menuMaxHeight: 320,
+                          borderRadius: BorderRadius.circular(16),
+                          dropdownColor: scheme.surfaceContainerLowest,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded),
                           decoration: const InputDecoration(
                             labelText: 'Loại hỗ trợ',
                             prefixIcon: Icon(Icons.help_outline_rounded),
                           ),
+                          selectedItemBuilder: (_) => [
+                            for (final label in _supportCategories.values)
+                              Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Text(
+                                  label,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
                           items: _supportCategories.entries
                               .map(
                                 (entry) => DropdownMenuItem(
                                   value: entry.key,
-                                  child: Text(
-                                    entry.value,
-                                    overflow: TextOverflow.ellipsis,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minHeight: 52,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            entry.value,
+                                            style: entry.key == _category
+                                                ? TextStyle(
+                                                    color: scheme.primary,
+                                                    fontWeight: FontWeight.w700,
+                                                  )
+                                                : null,
+                                          ),
+                                        ),
+                                        if (entry.key == _category) ...[
+                                          const SizedBox(width: 8),
+                                          Icon(
+                                            Icons.check_rounded,
+                                            size: 20,
+                                            color: scheme.primary,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               )
@@ -2391,7 +2559,7 @@ class _CaseImagePicker extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Không bắt buộc · Tối đa 5 ảnh, mỗi ảnh 5 MB.',
+            'Không bắt buộc · Tối đa $_maxCaseImages ảnh, mỗi ảnh 5 MB.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           for (var index = 0; index < images.length; index++) ...[
@@ -2433,9 +2601,9 @@ class _CaseImagePicker extends StatelessWidget {
           ],
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: busy || images.length >= 5 ? null : onAdd,
+            onPressed: busy || images.length >= _maxCaseImages ? null : onAdd,
             icon: const Icon(Icons.add_photo_alternate_outlined),
-            label: Text('Thêm ảnh (${images.length}/5)'),
+            label: Text('Thêm ảnh (${images.length}/$_maxCaseImages)'),
           ),
         ],
       ),
@@ -2664,101 +2832,48 @@ class _ProviderModeCard extends StatelessWidget {
 }
 
 class _WalletOverviewCard extends StatelessWidget {
-  const _WalletOverviewCard({
-    required this.balance,
-    required this.onDeposit,
-    required this.onHistory,
-  });
+  const _WalletOverviewCard({required this.balance, required this.onHistory});
 
   final double? balance;
-  final VoidCallback onDeposit, onHistory;
+  final VoidCallback onHistory;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _accountSurface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Ví Handigo',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: _accountInk,
-                    fontSize: 16,
-                    height: 1.45,
-                    fontWeight: FontWeight.w600,
+  Widget build(BuildContext context) => Material(
+    color: Theme.of(context).colorScheme.surfaceContainerLowest,
+    borderRadius: BorderRadius.circular(20),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onHistory,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ví Handigo',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                ),
+                  const SizedBox(height: 10),
+                  const Text('Số dư khả dụng'),
+                  Text(
+                    balance == null ? 'Đang tải…' : _accountMoney(balance!),
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Số dư khả dụng',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: _accountMuted,
-              fontSize: 13,
-              height: 1.45,
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            balance == null ? 'Đang tải...' : _accountMoney(balance!),
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: _accountInk,
-              fontSize: 28,
-              height: 1.45,
-              fontWeight: FontWeight.w600,
+            const Tooltip(
+              message: 'Lịch sử giao dịch',
+              child: Icon(Icons.chevron_right),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: onDeposit,
-                  icon: const Icon(Icons.add, size: 17),
-                  label: const Text('Nạp tiền'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                    backgroundColor: _figmaPrimary,
-                    foregroundColor: _accountSurface,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: onHistory,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                    backgroundColor: _figmaPrimarySoft,
-                    foregroundColor: _figmaPrimary,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Lịch sử giao dịch'),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _SectionLabel extends StatelessWidget {
@@ -3496,51 +3611,6 @@ class _EmptyAddress extends StatelessWidget {
   );
 }
 
-class _AddressPrivacyFooter extends StatelessWidget {
-  const _AddressPrivacyFooter();
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SvgPicture.asset(
-          '$_accountIconPath/shield.svg',
-          width: 21,
-          height: 21,
-          colorFilter: const ColorFilter.mode(_figmaPrimary, BlendMode.srcIn),
-        ),
-        const SizedBox(width: 10),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bảo mật thông tin địa chỉ',
-                style: TextStyle(
-                  color: _accountInk,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                'Địa chỉ của bạn chỉ được chia sẻ với kỹ thuật viên sau khi đơn đặt dịch vụ được xác nhận.',
-                style: TextStyle(
-                  color: _accountMuted,
-                  fontSize: 13,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _SecurityStatusCard extends StatelessWidget {
   const _SecurityStatusCard();
   @override
@@ -3668,7 +3738,7 @@ String _money(num value) => '${NumberFormat('#,##0', 'vi_VN').format(value)}đ';
 String _accountMoney(num value) =>
     '${NumberFormat('#,##0', 'vi_VN').format(value)} ₫';
 String _transactionLabel(String type) => switch (type) {
-  'deposit' => 'Nạp tiền',
+  'deposit' => 'Nạp ví',
   'payment' => 'Thanh toán đơn hàng',
   'refund' => 'Hoàn tiền',
   _ => 'Giao dịch ví',

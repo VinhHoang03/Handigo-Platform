@@ -16,7 +16,7 @@ interface MessageThreadProps {
   messages: ChatMessage[];
   conversations?: Conversation[];
   currentUserId: string;
-  onEdit: (messageId: string, content: string) => Promise<void>;
+  onEdit?: (messageId: string, content: string) => Promise<void>;
   onDelete: (messageId: string) => Promise<void>;
   hasMore?: boolean;
   loadingOlder?: boolean;
@@ -60,6 +60,7 @@ export function MessageThread({
   }, [loadingOlder, messages]);
 
   const submitEdit = async () => {
+    if (!onEdit) return;
     const content = editingContent.trim();
     if (!content) {
       setActionError("Tin nhắn không được để trống.");
@@ -108,7 +109,7 @@ export function MessageThread({
         }}>{loadingOlder ? "Đang tải..." : "Tải tin nhắn cũ hơn"}</button>}
         {orderedMessages.map((message, index) => {
           const isMine = getSenderId(message) === currentUserId;
-          const isEditing = editingMessageId === message._id;
+          const isEditing = Boolean(onEdit) && editingMessageId === message._id;
           const conversation = conversations.find((item) => item._id === message.conversationId);
           const showOrder = conversation && orderedMessages[index - 1]?.conversationId !== message.conversationId;
           return (
@@ -133,11 +134,11 @@ export function MessageThread({
                   current === message._id ? "" : message._id,
                 )
               }
-              onStartEdit={() => {
+              onStartEdit={onEdit ? () => {
                 setEditingMessageId(message._id);
                 setEditingContent(message.content || "");
                 setMenuMessageId("");
-              }}
+              } : undefined}
               onRequestDelete={() => {
                 setDeletingMessageId(message._id);
                 setMenuMessageId("");

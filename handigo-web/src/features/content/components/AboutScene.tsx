@@ -1,5 +1,6 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Check, HeartHandshake, House, ShieldCheck, Sparkles, Wrench } from "lucide-react";
+import { BrandLogoArtwork } from "@/components/common/BrandLogo";
 import "./about-scene.css";
 
 interface AboutSceneProps {
@@ -73,7 +74,9 @@ export function AboutScene({ variant }: AboutSceneProps) {
                 <div className="about-house-front"><div className="about-house-window" /><div className="about-house-door"><span /></div></div>
                 <div className="about-house-side"><div className="about-house-window" /></div>
                 <div className="about-house-roof"><House size={36} strokeWidth={1.3} /></div>
-                <div className="about-house-sign"><HeartHandshake size={20} /><span>Handigo</span></div>
+                <div className="about-house-sign">
+                  <BrandLogoArtwork className="h-8 w-28" />
+                </div>
               </div>
               <div className="about-scene-tree"><span /><i /></div>
               <div className="about-scene-tile about-scene-tile--one"><Wrench size={26} /></div>

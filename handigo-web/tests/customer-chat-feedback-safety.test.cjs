@@ -80,27 +80,48 @@ test('KH-21: socket popup chỉ nhận tin mới/sửa của hội thoại hiệ
 
 test('KH-21: đổi popup tạo lại trạng thái; phản hồi lịch sử cũ không đánh dấu đã đọc', async () => {
   const app = hooks(); const oldHistory = deferred(); const seen = [];
+  const sockets = socketFixture();
+  const document = Object.assign(new EventTarget(), { body: {}, visibilityState: 'visible' });
+  const window = Object.assign(new EventTarget(), { setInterval, clearInterval });
+  const conversation = { _id: 'A', orderId: { _id: '1', status: 'in_progress' } };
+  let activeOrder = { _id: '1', orderCode: 'ORD-001' };
   function Thread() {}
+  function Composer() {}
   const toast = { useToast: () => ({ addToast() {} }), useToastFeedback: initial => app.react.useState(initial) };
   const history = load('features/chat/hooks/useChatMessages.ts', {
     react: app.react,
     '../hooks/useChatSocket': { useChatSocket() {} },
-    './useChatSocket': { useChatSocket() {} },
+    './useChatSocket': { useChatSocket(...args) { sockets.handlers.set('order:updated', new Set([args[5]])); } },
     '../api/chat.api': { chatApi: { messages: () => oldHistory.promise, seen: async id => { seen.push(id); } } },
     '../utils/chatHistory': load('features/chat/utils/chatHistory.ts', {}),
   }, { window: { setTimeout, clearTimeout } });
   const { ChatPopup } = load('features/chat/components/ChatPopup.tsx', {
     react: app.react, 'react-dom': { createPortal: node => node },
     '@/features/auth/store/auth.store': auth, '@/components/common/Toast': toast,
+    '@/realtime/authenticatedSocket': sockets,
     '../hooks/useChatMessages': history,
+    '../utils/conversationGroups': load('features/chat/utils/conversationGroups.ts', {}),
     '../store/chatUi.store': { useChatUiStore: selector => selector({ registerOpenPopup() {}, unregisterOpenPopup() {} }) },
     './MessageThread': { MessageThread: Thread },
-    '../api/chat.api': { chatApi: { messages: () => oldHistory.promise, seen: async id => { seen.push(id); } } },
-  }, { document: { body: {}, addEventListener() {}, removeEventListener() {} } });
-  const first = ChatPopup({ conversation: { _id: 'A' }, open: true, onClose() {} });
+    './MessageComposer': { MessageComposer: Composer },
+    '../api/chat.api': { chatApi: {
+      allConversations: async () => [conversation],
+      availability: async () => ({ activeOrder }),
+    } },
+  }, { document, window });
+  const first = ChatPopup({ conversation, relatedConversations: [conversation], open: true, onClose() {} });
   const second = ChatPopup({ conversation: { _id: 'B' }, open: true, onClose() {} });
   assert.notEqual(first.key, second.key);
-  app.render(() => first.type(first.props)); await tick();
+  const render = () => app.render(() => first.type(first.props));
+  assert.equal(find(render(), node => node.type === Composer), null);
+  await tick();
+  assert.ok(find(render(), node => node.type === Composer));
+  activeOrder = null;
+  sockets.fire('order:updated');
+  await tick();
+  const closed = render();
+  assert.equal(find(closed, node => node.type === Composer), null);
+  assert.equal(find(closed, node => node.type === Thread).props.onEdit, undefined);
   app.unmount();
   oldHistory.resolve({ items: [{ _id: 'tin-A', conversationId: 'A', createdAt: new Date().toISOString() }] });
   await tick(); assert.equal(seen.length, 0);
@@ -114,7 +135,8 @@ test('KH-25: danh sách rỗng vẫn nghe tin đầu tiên, kết nối lại v�
     react: app.react, '@/features/auth/store/auth.store': auth,
     '@/components/common/Toast': { useToastFeedback: initial => app.react.useState(initial) },
     '@/realtime/authenticatedSocket': sockets,
-    '../api/chat.api': { chatApi: { conversations: async () => { reads++; return { items: rows }; } } },
+    '../utils/conversationGroups': load('features/chat/utils/conversationGroups.ts', {}),
+    '../api/chat.api': { chatApi: { allConversations: async () => { reads++; return rows; } } },
   }, { window: windowEvents, document: documentEvents });
   const page = MessageCenter(); const render = () => app.render(() => page.type(page.props));
   render(); await tick(); render();

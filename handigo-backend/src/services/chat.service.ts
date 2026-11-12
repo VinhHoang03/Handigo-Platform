@@ -24,7 +24,32 @@ interface SendMessagePayload {
   imageUrl?: string;
 }
 
-const chatEnabledStatuses: IOrder["status"][] = ["accepted", "in_progress", "completed"];
+const chatEnabledStatuses: IOrder["status"][] = ["accepted", "in_progress"];
+const chatClosedMessage = "Chỉ có thể nhắn tin khi có đơn đã được thợ nhận hoặc đang thực hiện.";
+
+const activeChatOrders = ({ customerId, providerId }: {
+  customerId: Types.ObjectId;
+  providerId: Types.ObjectId;
+}) => ({
+  customerId,
+  providerId,
+  status: { $in: chatEnabledStatuses },
+  isDeleted: false,
+});
+
+const assertConversationCanSend = async (
+  conversation: InstanceType<typeof Conversation>,
+  session?: ClientSession,
+) => {
+  const filter = activeChatOrders(conversation);
+  // Khóa đơn trong giao dịch gửi để thay đổi trạng thái đồng thời buộc kiểm tra lại.
+  const order = session
+    ? await Order.findOneAndUpdate(filter, { $inc: { __v: 1 } }, {
+      session, timestamps: false, runValidators: true,
+    }).select("_id")
+    : await Order.exists(filter);
+  if (!order) throw new AppError(chatClosedMessage, 400, "CHAT_ORDER_INACTIVE");
+};
 
 const getOrCreateParticipantConversation = async (
   order: IOrder, providerId: Types.ObjectId, session: ClientSession, updateOrder = false,
@@ -170,7 +195,7 @@ const assertOrderCanChat = async (userId: string, role: UserRole, orderId: strin
     throw new AppError("Đơn hàng chưa có nhà cung cấp", 400);
   }
 
-  if (requireChatEnabled && !chatEnabledStatuses.includes(order.status)) {
+  if (requireChatEnabled && order.status !== "completed" && !chatEnabledStatuses.includes(order.status)) {
     throw new AppError("Đơn hàng chưa sẵn sàng để trò chuyện", 400);
   }
 
@@ -207,6 +232,21 @@ const getConversationForParticipant = async (
   const participant = await resolveParticipant(userId, role, conversation);
 
   return { conversation, participant };
+};
+
+export const getConversationAvailability = async (userId: string, role: UserRole, conversationId: string) => {
+  const { conversation } = await getConversationForParticipant(userId, role, conversationId);
+  const activeOrder = await Order.findOne(activeChatOrders(conversation))
+    .sort({ createdAt: -1, _id: -1 })
+    .select("_id orderCode")
+    .lean();
+  return { activeOrder };
+};
+
+export const authorizeChatImageUpload = async (userId: string, role: UserRole, conversationId: string) => {
+  await assertFeatureAllowed(userId, "chat");
+  const { conversation } = await getConversationForParticipant(userId, role, conversationId);
+  await assertConversationCanSend(conversation);
 };
 
 export const getMyConversations = async (userId: string, role: UserRole, query: Query = {}) => {
@@ -320,12 +360,6 @@ export const sendMessage = async (
     conversationId,
   );
 
-  const activeOrder = await Order.exists({
-    customerId: conversation.customerId, providerId: conversation.providerId,
-    status: { $in: chatEnabledStatuses }, isDeleted: false,
-  });
-  if (!activeOrder) throw new AppError("Đơn hàng chưa sẵn sàng để trò chuyện", 400);
-
   const messageType = payload.messageType || "text";
   const content = messageType === "text" ? payload.content : payload.imageUrl;
 
@@ -334,6 +368,7 @@ export const sendMessage = async (
   }
 
   const messageId = await withConversationWrite(conversationId, async (current, session) => {
+    await assertConversationCanSend(current, session);
     if (participant.senderRole === "customer") {
       // Ghi cùng giao dịch để tự duyệt phát hiện phản hồi đồng thời và thử lại.
       await Order.updateMany({ customerId: conversation.customerId, providerId: conversation.providerId,
@@ -416,6 +451,7 @@ export const updateMessage = async (
   }
 
   await withConversationWrite(conversation._id.toString(), async (current, session) => {
+    await assertConversationCanSend(current, session);
     const latest = await Message.findOne({ _id: messageId, senderId: userId, isDeleted: false }).session(session);
     if (!latest) throw new AppError("Không tìm thấy tin nhắn.", 404);
     latest.content = content.trim();

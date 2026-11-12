@@ -13,6 +13,15 @@ class ChatRepository {
     final response = await _api.request('/chat/orders/$orderId/conversation', authenticated: true);
     return Conversation.fromJson(response['data'] as Map<String, dynamic>);
   }
+  Future<bool> canSend(String id) async {
+    final response = await _api.request(
+      '/chat/conversations/$id/availability',
+      authenticated: true,
+    );
+    final data = response['data'] as Map<String, dynamic>;
+    return data['activeOrder'] is Map<String, dynamic>;
+  }
+
   Future<PagedResult<ChatMessage>> messages(String id, String userId) async {
     final response = await _api.request('/chat/conversations/$id/messages', query: {'page': 1, 'limit': 100}, authenticated: true);
     final data = response['data'] as Map<String, dynamic>;
