@@ -20,6 +20,7 @@ import 'package:handigo_app/features/orders/domain/order_summary.dart';
 import 'package:handigo_app/features/orders/presentation/order_payment_panel.dart';
 import 'package:handigo_app/features/orders/presentation/order_rebook_button.dart';
 import 'package:handigo_app/features/orders/presentation/order_reschedule_panel.dart';
+import 'package:handigo_app/features/orders/presentation/order_reschedule_date_time_picker.dart';
 import 'package:handigo_app/features/service_catalog/domain/service_detail.dart';
 import 'package:handigo_app/features/service_catalog/domain/service_option.dart';
 import 'package:handigo_app/features/service_catalog/presentation/service_catalog_provider.dart';
@@ -30,6 +31,7 @@ class _Api extends ApiClient {
 
   final calls = <(String, String, Map<String, dynamic>?)>[];
   bool failPreview = false;
+  bool warningRequired = false;
 
   @override
   Future<Map<String, dynamic>> request(
@@ -48,7 +50,11 @@ class _Api extends ApiClient {
         throw const ApiException('Không thể kiểm tra lịch lúc này.');
       }
       return {
-        'data': {'approvalRequired': true},
+        'data': {
+          'approvalRequired': true,
+          'warningRequired': warningRequired,
+          'providerMonthlyAppliedCount': warningRequired ? 3 : 0,
+        },
       };
     }
     return {'data': <String, dynamic>{}};
@@ -109,7 +115,12 @@ OrderDetail _scheduledOrder({String? initiatorRole}) {
   });
 }
 
-Future<void> _mount(WidgetTester tester, _Api api, Widget child) async {
+Future<void> _mount(
+  WidgetTester tester,
+  _Api api,
+  Widget child, {
+  double textScale = 1,
+}) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(320, 720);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -132,6 +143,12 @@ Future<void> _mount(WidgetTester tester, _Api api, Widget child) async {
       ],
       child: MaterialApp(
         theme: AppTheme.customerModals(AppTheme.light),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: Scaffold(body: SingleChildScrollView(child: child)),
       ),
     ),
@@ -139,7 +156,81 @@ Future<void> _mount(WidgetTester tester, _Api api, Widget child) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _chooseNextRescheduleHour(WidgetTester tester) async {
+  final wheel = find.byKey(const ValueKey('reschedule-Giờ'));
+  await tester.ensureVisible(wheel);
+  await tester.pumpAndSettle();
+  await tester.drag(wheel, const Offset(0, -44));
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  testWidgets('Bộ chọn dời lịch chuyển sang 21 giờ chỉ giữ phút 00', (
+    tester,
+  ) async {
+    final api = _Api();
+    var selected = DateTime.utc(2026, 11, 15, 13, 30);
+    await _mount(
+      tester,
+      api,
+      StatefulBuilder(
+        builder: (context, setState) => OrderRescheduleDateTimePicker(
+          value: selected,
+          earliest: DateTime.utc(2026, 11, 15, 1),
+          onChanged: (value) => setState(() => selected = value),
+        ),
+      ),
+    );
+    final hours = find.byKey(const ValueKey('reschedule-Giờ'));
+    await tester.ensureVisible(hours);
+    await tester.pumpAndSettle();
+    await tester.drag(hours, const Offset(0, -44));
+    await tester.pumpAndSettle();
+    expect(selected, DateTime.utc(2026, 11, 15, 14));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Form dời lịch cuộn được trên màn hình nhỏ và chữ lớn', (
+    tester,
+  ) async {
+    final api = _Api();
+    await _mount(
+      tester,
+      api,
+      OrderReschedulePanel(order: _scheduledOrder(), providerView: true),
+      textScale: 1.6,
+    );
+    await tester.tap(find.text('Đề nghị dời lịch'));
+    await tester.pumpAndSettle();
+    final reason = find.widgetWithText(TextField, 'Lý do dời lịch');
+    await tester.ensureVisible(reason);
+    await tester.pumpAndSettle();
+    await tester.enterText(reason, 'Tôi cần đổi thời gian làm việc');
+    await tester.pumpAndSettle();
+    expect(find.text('Gửi yêu cầu').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Đóng'));
+    await tester.pumpAndSettle();
+  });
+
+  test('Giờ dời lịch làm tròn theo phút và chặn sau 21 giờ Việt Nam', () {
+    final day = DateTime.utc(2026, 11, 15);
+    expect(
+      firstAvailableRescheduleTime(day, DateTime.utc(2026, 11, 15, 0, 59, 59)),
+      DateTime.utc(2026, 11, 15, 1),
+    );
+    expect(
+      firstAvailableRescheduleTime(day, DateTime.utc(2026, 11, 15, 14, 0, 1)),
+      isNull,
+    );
+    expect(
+      isAllowedRescheduleTime(
+        DateTime.utc(2026, 11, 15, 14, 1),
+        DateTime.utc(2026, 11, 15),
+      ),
+      isFalse,
+    );
+  });
   test('Bản nháp đặt lại quá hạn bị bỏ', () async {
     FlutterSecureStorage.setMockInitialValues({
       'handigo_rebook_customer/order': '{"expiresAt":0}',
@@ -284,22 +375,10 @@ void main() {
         DialogTheme.of(tester.element(dialog)).backgroundColor,
         Colors.white,
       );
-      await tester.tap(find.text('Chọn ngày và giờ mới'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextButton, 'OK'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.keyboard_outlined));
-      await tester.pumpAndSettle();
-      final timeFields = find.descendant(
-        of: find.byType(TimePickerDialog),
-        matching: find.byType(TextField),
-      );
-      await tester.enterText(timeFields.at(0), '10');
-      await tester.enterText(timeFields.at(1), '00');
-      await tester.tap(find.widgetWithText(TextButton, 'OK'));
-      await tester.pumpAndSettle();
+      await _chooseNextRescheduleHour(tester);
       expect(find.text('Không thể kiểm tra lịch lúc này.'), findsOneWidget);
       await tester.ensureVisible(find.text('Kiểm tra lại lịch'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Kiểm tra lại lịch'));
       await tester.pumpAndSettle();
       final reason = find.widgetWithText(TextField, 'Lý do dời lịch');
@@ -375,6 +454,97 @@ void main() {
       '/orders/order/reschedule-requests/request/cancel',
       null,
     ));
+  });
+
+  testWidgets(
+    'Thợ gửi đề nghị sau khi xác nhận cảnh báo dời lịch trong tháng',
+    (tester) async {
+      final api = _Api()..warningRequired = true;
+      final order = _scheduledOrder();
+      await _mount(
+        tester,
+        api,
+        OrderReschedulePanel(order: order, providerView: true),
+      );
+      await tester.tap(find.text('Đề nghị dời lịch'));
+      await tester.pumpAndSettle();
+      await _chooseNextRescheduleHour(tester);
+      expect(
+        find.text(
+          'Lịch phù hợp. Khách hàng cần đồng ý sau khi bạn gửi đề nghị.',
+        ),
+        findsOneWidget,
+      );
+      final reason = find.widgetWithText(TextField, 'Lý do dời lịch');
+      await tester.ensureVisible(reason);
+      await tester.enterText(reason, 'Cần điều chỉnh giờ làm việc');
+      await tester.pumpAndSettle();
+      final send = find.widgetWithText(FilledButton, 'Gửi yêu cầu');
+      expect(tester.widget<FilledButton>(send).onPressed, isNull);
+      await tester.ensureVisible(find.byType(CheckboxListTile));
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pumpAndSettle();
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+      expect(api.calls.last.$2, '/orders/order/reschedule-requests');
+      expect(api.calls.last.$3?['warningAcknowledged'], isTrue);
+      expect(
+        api.calls.last.$3?['expectedOrderUpdatedAt'],
+        '2026-11-01T08:00:00.000Z',
+      );
+      expect(
+        api.calls.last.$3?['scheduledAt'],
+        order.scheduledAt!.add(const Duration(hours: 1)).toIso8601String(),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Thợ chỉ thu hồi đề nghị của mình, phản hồi yêu cầu của khách', (
+    tester,
+  ) async {
+    final api = _Api();
+    await _mount(
+      tester,
+      api,
+      OrderReschedulePanel(
+        order: _scheduledOrder(initiatorRole: 'provider'),
+        providerView: true,
+      ),
+    );
+    expect(find.text('Đang chờ khách hàng phản hồi'), findsOneWidget);
+    expect(find.text('Đồng ý lịch mới'), findsNothing);
+    await tester.tap(find.text('Thu hồi yêu cầu'));
+    await tester.pumpAndSettle();
+    expect(
+      api.calls.last.$2,
+      '/orders/order/reschedule-requests/request/cancel',
+    );
+  });
+
+  testWidgets('Thợ từ chối yêu cầu của khách cần lý do hợp lệ', (tester) async {
+    final api = _Api();
+    await _mount(
+      tester,
+      api,
+      OrderReschedulePanel(
+        order: _scheduledOrder(initiatorRole: 'customer'),
+        providerView: true,
+      ),
+    );
+    expect(find.text('Khách hàng yêu cầu dời lịch'), findsOneWidget);
+    expect(find.text('Thu hồi yêu cầu'), findsNothing);
+    await tester.tap(find.text('Từ chối'));
+    await tester.pumpAndSettle();
+    final submit = find.widgetWithText(FilledButton, 'Xác nhận từ chối');
+    expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+    await tester.enterText(find.byType(TextField), 'Trùng lịch làm việc');
+    await tester.pumpAndSettle();
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(api.calls.last.$3?['decision'], 'reject');
+    expect(api.calls.last.$3?['reason'], 'Trùng lịch làm việc');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Voucher đã lưu áp dụng vào đơn chờ thanh toán qua modal trắng', (

@@ -34,13 +34,10 @@ class AppToast {
         backgroundColor ??
         switch (type) {
           AppToastType.info => scheme.primary,
-          AppToastType.success => AppTheme.successGreen,
-          AppToastType.warning || AppToastType.error => scheme.error,
+          AppToastType.success => const Color(0xFF15803D),
+          AppToastType.warning => const Color(0xFFB45309),
+          AppToastType.error => scheme.error,
         };
-    final foreground =
-        ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-        ? Colors.white
-        : AppTheme.onSurface;
     final toastIcon =
         icon ??
         switch (type) {
@@ -77,7 +74,6 @@ class AppToast {
                 message: message,
                 title: title,
                 color: color,
-                foreground: foreground,
                 icon: toastIcon,
                 action: action,
                 duration: duration,
@@ -99,7 +95,6 @@ class _TopToast extends StatefulWidget {
     required this.message,
     required this.title,
     required this.color,
-    required this.foreground,
     required this.icon,
     required this.action,
     required this.duration,
@@ -107,7 +102,7 @@ class _TopToast extends StatefulWidget {
   });
   final String message;
   final String? title;
-  final Color color, foreground;
+  final Color color;
   final IconData icon;
   final SnackBarAction? action;
   final Duration duration;
@@ -116,73 +111,131 @@ class _TopToast extends StatefulWidget {
   State<_TopToast> createState() => _TopToastState();
 }
 
-class _TopToastState extends State<_TopToast> {
+class _TopToastState extends State<_TopToast>
+    with SingleTickerProviderStateMixin {
   Timer? _timer;
+  late final AnimationController _controller;
+  late final Animation<double> _entrance;
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+    );
+    _entrance = _controller.drive(CurveTween(curve: Curves.easeOutCubic));
     _timer = Timer(widget.duration, widget.onClose);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => Semantics(
     liveRegion: true,
-    child: Material(
-      color: widget.color,
-      elevation: 8,
-      shadowColor: Colors.black26,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 4, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(widget.icon, color: widget.foreground, size: 24),
-            const SizedBox(width: 10),
-            Expanded(
-              child: DefaultTextStyle(
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium!.copyWith(color: widget.foreground),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (widget.title != null) ...[
-                      Text(
-                        widget.title!,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+    child: FadeTransition(
+      opacity: _entrance,
+      child: SlideTransition(
+        position: _entrance.drive(
+          Tween(begin: const Offset(0, -0.18), end: Offset.zero),
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.onSurface.withValues(alpha: 0.10),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Theme.of(context).colorScheme.surfaceContainerLowest,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: widget.color.withValues(alpha: 0.16)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: widget.color.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(widget.icon, color: widget.color, size: 23),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DefaultTextStyle(
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        height: 1.4,
+                        fontWeight: widget.title == null
+                            ? FontWeight.w500
+                            : FontWeight.w400,
                       ),
-                      const SizedBox(height: 2),
-                    ],
-                    Text(widget.message),
-                    if (widget.action != null)
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: widget.foreground,
-                        ),
-                        onPressed: () {
-                          widget.onClose();
-                          widget.action!.onPressed();
-                        },
-                        child: Text(widget.action!.label),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (widget.title != null) ...[
+                            Text(
+                              widget.title!,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                          ],
+                          Text(widget.message),
+                          if (widget.action != null)
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: widget.color,
+                              ),
+                              onPressed: () {
+                                widget.onClose();
+                                widget.action!.onPressed();
+                              },
+                              child: Text(widget.action!.label),
+                            ),
+                        ],
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Đóng thông báo',
+                    onPressed: widget.onClose,
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      size: 18,
+                    ),
+                  ),
+                ],
               ),
             ),
-            IconButton(
-              tooltip: 'Đóng thông báo',
-              onPressed: widget.onClose,
-              icon: Icon(Icons.close, color: widget.foreground, size: 20),
-            ),
-          ],
+          ),
         ),
       ),
     ),

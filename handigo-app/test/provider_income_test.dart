@@ -503,12 +503,16 @@ void main() {
       expect(find.textContaining('đơn hoàn tất theo bộ lọc'), findsNothing);
       await tester.tap(find.text('Theo năm'));
       await tester.pumpAndSettle();
+      final requestsBeforeYearApply = api.calls.length;
       await tester.tap(
         find.descendant(
           of: find.byType(YearPicker),
           matching: find.text('2025'),
         ),
       );
+      await tester.pumpAndSettle();
+      expect(api.calls.length, requestsBeforeYearApply);
+      await tester.tap(find.text('Áp dụng'));
       await tester.pumpAndSettle();
       var query = api.calls
           .where((call) => call.path == '/dashboard/earnings')

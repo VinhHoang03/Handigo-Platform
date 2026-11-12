@@ -23,7 +23,11 @@ class _Api extends ApiClient {
   final events = <String>[];
   bool arrived = false, confirmed = true, rejectArrival = false;
   String status = 'accepted', orderType = 'immediate';
+  String paymentStatus = 'unpaid', paymentMethod = 'cash';
+  bool rejectCash = false;
+  Map<String, dynamic>? cashConfirmation;
   Map<String, dynamic>? cancellation;
+  Map<String, dynamic>? rescheduleRequest;
   @override
   Future<Map<String, dynamic>> request(
     String path, {
@@ -34,6 +38,24 @@ class _Api extends ApiClient {
     Duration? receiveTimeout,
   }) async {
     expect(authenticated, isTrue);
+    if (path == '/feedback/provider/orders/order') return {'data': null};
+    if (path == '/orders/order/cash-payment/confirm' && method == 'POST') {
+      cashConfirmation = data;
+      events.add('cash');
+      if (rejectCash) {
+        throw const ApiException(
+          'Số tiền thanh toán đã thay đổi. Vui lòng tải lại đơn hàng.',
+        );
+      }
+      paymentStatus = 'paid';
+      return {'data': {}};
+    }
+    if (path == '/orders/order/reschedule-requests/request/respond' &&
+        method == 'PATCH') {
+      events.add('reschedule:${data?['decision']}');
+      rescheduleRequest = {...?rescheduleRequest, 'status': 'applied'};
+      return {'data': <String, dynamic>{}};
+    }
     if (method == 'POST' && path == '/orders/order/arrival') {
       events.add('arrival');
       if (rejectArrival) {
@@ -60,9 +82,27 @@ class _Api extends ApiClient {
         'id': 'order',
         'orderCode': 'HD-001',
         'status': status,
-        'paymentStatus': 'unpaid',
-        'paymentMethod': 'cash',
+        'paymentStatus': paymentStatus,
+        'paymentMethod': paymentMethod,
+        'pricing': {
+          'baseAmount': 120000,
+          'bookingAmount': 120000,
+          'voucherDiscountAmount': 12000,
+          'totalPaidAmount': 108000,
+        },
         'orderType': orderType,
+        if (rescheduleRequest != null) ...{
+          'scheduledAt': DateTime.now()
+              .toUtc()
+              .add(const Duration(days: 2))
+              .toIso8601String(),
+          'rescheduleEligibility': {
+            'canRequest': false,
+            'remainingCount': 1,
+            'minAdvanceMinutes': 60,
+          },
+          'latestRescheduleRequest': rescheduleRequest,
+        },
         'bookingStatus': confirmed ? 'confirmed' : 'awaiting_payment',
         'serviceId': {'name': 'Vệ sinh máy lạnh', 'serviceType': 'fixed_price'},
         'providerId': {
@@ -85,7 +125,10 @@ class _Tracker extends ProviderLocationService {
   bool fail = false;
   Completer<void>? pending;
   @override
-  Future<void> synchronize({required bool Function() shouldUpload}) async {
+  Future<void> synchronize({
+    required bool Function() shouldUpload,
+    bool useCachedPosition = false,
+  }) async {
     api.events.add('gps');
     if (fail) throw const ApiException('Vui lòng bật GPS.');
     await pending?.future;
@@ -127,6 +170,119 @@ Future<void> _swipe(WidgetTester tester) => tester.drag(
 );
 
 void main() {
+  for (final method in ['wallet', 'bank']) {
+    testWidgets(
+      'Khách trả $method sau nghiệm thu: cập nhật đơn sẽ ẩn xác nhận tiền mặt',
+      (tester) async {
+        final api = _Api()..status = 'completed';
+        await _show(tester, api, _Tracker(api));
+        expect(find.text('Xác nhận đã nhận tiền mặt'), findsOneWidget);
+        api.paymentMethod = method;
+        api.paymentStatus = 'paid';
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(ProviderOrderDetailScreen)),
+        );
+        container.invalidate(orderDetailProvider('order'));
+        await tester.pumpAndSettle();
+        expect(find.text('Xác nhận đã nhận tiền mặt'), findsNothing);
+        expect(api.cashConfirmation, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'Tiền mặt đơn cố định: quay lại không gửi, xác nhận số tiền sau voucher và cập nhật đã trả',
+    (tester) async {
+      final api = _Api()..status = 'completed';
+      await _show(tester, api, _Tracker(api));
+      final button = find.text('Xác nhận đã nhận tiền mặt');
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.textContaining(RegExp(r'108\.000\s*đ')),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Quay lại'));
+      await tester.pumpAndSettle();
+      expect(api.cashConfirmation, isNull);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Đã nhận đủ'));
+      await tester.pumpAndSettle();
+      expect(api.cashConfirmation, {'expectedAmount': 108000.0});
+      expect(api.events, ['cash']);
+      expect(find.text('Đã xác nhận nhận tiền mặt'), findsOneWidget);
+      expect(button, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Xác nhận tiền mặt lỗi giữ nút để thử lại', (tester) async {
+    final api = _Api()
+      ..status = 'completed'
+      ..rejectCash = true;
+    await _show(tester, api, _Tracker(api));
+    final button = find.text('Xác nhận đã nhận tiền mặt');
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đã nhận đủ'));
+    await tester.pumpAndSettle();
+    expect(api.paymentStatus, 'unpaid');
+    expect(button, findsOneWidget);
+    expect(find.text('Đã xác nhận nhận tiền mặt'), findsNothing);
+    expect(
+      find.text('Số tiền thanh toán đã thay đổi. Vui lòng tải lại đơn hàng.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Đơn trả qua ví không hiển thị xác nhận tiền mặt', (
+    tester,
+  ) async {
+    final api = _Api()
+      ..status = 'completed'
+      ..paymentMethod = 'wallet'
+      ..paymentStatus = 'paid';
+    await _show(tester, api, _Tracker(api));
+    expect(find.text('Xác nhận đã nhận tiền mặt'), findsNothing);
+  });
+
+  testWidgets(
+    'Chi tiết công việc của thợ hiển thị và chấp nhận yêu cầu dời lịch của khách',
+    (tester) async {
+      final api = _Api()
+        ..orderType = 'scheduled'
+        ..rescheduleRequest = {
+          '_id': 'request',
+          'status': 'pending',
+          'initiatorRole': 'customer',
+          'approvalRole': 'provider',
+          'reason': 'Khách muốn đổi giờ hẹn',
+          'proposedScheduledAt': DateTime.now()
+              .toUtc()
+              .add(const Duration(days: 3))
+              .toIso8601String(),
+        };
+      await _show(tester, api, _Tracker(api));
+      final accept = find.text('Đồng ý lịch mới');
+      await tester.scrollUntilVisible(accept.hitTestable(), 120);
+      await tester.pumpAndSettle();
+      expect(find.text('Khách hàng yêu cầu dời lịch'), findsOneWidget);
+      expect(find.text('Thu hồi yêu cầu'), findsNothing);
+      await tester.tap(accept);
+      await tester.pumpAndSettle();
+      expect(api.events, ['reschedule:accept']);
+      expect(find.text('Lịch hẹn đã được cập nhật.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Hoàn tất nghiệm thu chỉ mở khi vuốt đủ sang phải', (
     tester,
   ) async {

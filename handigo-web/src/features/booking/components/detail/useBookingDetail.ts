@@ -76,7 +76,7 @@ export const useBookingDetail = () => {
     && (quotation.quotation.status === "saved" || (quotation.quotation.status === "approved" && quotation.quotation.customerConfirmed))
     && remainingQuotationAmount > 0);
   const canChangePayment = canPayQuotation || Boolean(order && !order.inspectionRequired &&
-    order.status === "in_progress" && order.paymentStatus === "unpaid" &&
+    ["in_progress", "completed"].includes(order.status) && order.paymentStatus === "unpaid" &&
     !payments.some((payment) => payment.paymentType === "full" && payment.status === "paid"));
   const paymentFlow = useBookingPaymentFlow(order, busy, setBusy, canChangePayment, data.updateOrder,
     canPayQuotation && quotation ? { quotation, amount: remainingQuotationAmount } : undefined);

@@ -18,6 +18,7 @@ import 'provider_account_screens.dart';
 import 'provider_screens.dart';
 import 'provider_order_detail_screen.dart';
 import 'provider_income_range_sheet.dart';
+import 'provider_income_year_sheet.dart';
 import 'provider_rewards_tab.dart';
 
 final providerFinanceNowProvider = Provider<DateTime Function()>(
@@ -141,27 +142,10 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
         _period = period;
       });
     } else if (period == ProviderIncomePeriod.year) {
-      final year = await showDialog<int>(
-        context: context,
-        builder: (dialog) => AlertDialog(
-          title: const Text('Chọn năm xem thu nhập'),
-          content: SizedBox(
-            width: 320,
-            height: 300,
-            child: YearPicker(
-              firstDate: DateTime(1),
-              lastDate: DateTime(now.year, 12, 31),
-              selectedDate: DateTime(_selectedYear ?? now.year),
-              onChanged: (value) => Navigator.pop(dialog, value.year),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialog),
-              child: const Text('Hủy'),
-            ),
-          ],
-        ),
+      final year = await showProviderIncomeYearSheet(
+        context,
+        now: now,
+        selectedYear: _selectedYear,
       );
       if (year == null || !mounted) return;
       setState(() {

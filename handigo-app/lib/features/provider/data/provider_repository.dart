@@ -482,6 +482,15 @@ class ProviderRepository {
     );
   }
 
+  Future<void> confirmCashPayment(String orderId, double expectedAmount) async {
+    await _api.request(
+      '/orders/$orderId/cash-payment/confirm',
+      method: 'POST',
+      authenticated: true,
+      data: {'expectedAmount': expectedAmount},
+    );
+  }
+
   Future<void> confirmQuotationPayment(
     String orderId,
     RepairQuotation quotation,

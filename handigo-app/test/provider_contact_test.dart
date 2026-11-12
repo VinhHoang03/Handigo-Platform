@@ -22,6 +22,38 @@ OrderDetail order({bool inspection = false}) => OrderDetail.fromJson({
 });
 
 void main() {
+  testWidgets('Chi tiết đơn thợ chỉ hiển thị voucher và số tiền khách trả', (
+    tester,
+  ) async {
+    final discounted = OrderDetail.fromJson({
+      '_id': 'discounted',
+      'status': 'accepted',
+      'paymentStatus': 'unpaid',
+      'paymentMethod': 'cash',
+      'inspectionRequired': false,
+      'pricing': {
+        'baseAmount': 120000,
+        'bookingAmount': 120000,
+        'voucherDiscountAmount': 12000,
+        'totalPaidAmount': 108000,
+        'platformCommissionAmount': 18000,
+        'providerEarningAmount': 102000,
+      },
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OrderPaymentSummary(order: discounted, providerView: true),
+        ),
+      ),
+    );
+    expect(find.text('Voucher'), findsOneWidget);
+    expect(find.text('108.000đ'), findsOneWidget);
+    expect(find.text('Phí nền tảng'), findsNothing);
+    expect(find.text('Thu nhập sau phí'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Khách hàng dùng icon, nút nhắn tin bên phải và sao chép đúng số điện thoại',
     (tester) async {

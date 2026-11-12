@@ -47,6 +47,21 @@ function fixture(quotationOrder = true) {
   return { order, quotation, requests, toasts, redirects, navigations, render, open, get prepared() { return prepared; } };
 }
 
+test('Đơn cố định sau nghiệm thu tiếp tục trả ví hoặc QR theo số tiền khách cần trả', async () => {
+  for (const method of ['WALLET', 'PAYOS']) {
+    const f = fixture(false);
+    f.order.status = 'completed';
+    const flow = f.open(method);
+    const task = flow.handleInitialPayment();
+    assert.equal(f.requests.length, 1);
+    assert.equal(f.requests[0].payload.paymentType, 'FULL');
+    assert.equal(f.requests[0].payload.expectedAmount, 20000);
+    f.requests[0].resolve({ payment: { status: 'paid', method: method === 'WALLET' ? 'wallet' : 'payos' } });
+    await task;
+    assert.equal(f.navigations.length, 1);
+  }
+});
+
 test('Báo giá dùng luồng chung: đúng phần còn lại, phiên bản và chống bấm nhiều lần', async () => {
   const f = fixture(), flow = f.open('WALLET');
   const first = flow.handleInitialPayment(); await flow.handleInitialPayment();
