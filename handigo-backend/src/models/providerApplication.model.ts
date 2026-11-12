@@ -14,7 +14,8 @@ export type ProviderApplicationType = "initial" | "service_addition";
 export interface IProviderApplicationReviewHistory {
   action: "submitted" | "rejected" | "resubmitted" | "approved";
   status: ProviderApplicationStatus;
-  actorId: Types.ObjectId;
+  actorId: Types.ObjectId | null;
+  actorType?: "user" | "system";
   actorRole: "CUSTOMER" | "PROVIDER" | "ADMIN";
   occurredAt: Date;
   rejectionReason?: string | null;
@@ -38,6 +39,8 @@ export interface IProviderApplication extends Document, IBaseDocument {
   rejectionNotes?: string | null;
   reviewedBy?: Types.ObjectId | null;
   reviewedAt?: Date | null;
+  reviewSource?: "manual" | "ai";
+  aiAssessmentId?: Types.ObjectId | null;
   reviewHistory: IProviderApplicationReviewHistory[];
 }
 
@@ -116,7 +119,8 @@ const ProviderApplicationReviewHistorySchema =
         enum: ["draft", "pending", "resubmitted", "approved", "rejected"],
         required: true,
       },
-      actorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+      actorId: { type: Schema.Types.ObjectId, ref: "User", default: null, required: function () { return this.actorType !== "system"; } },
+      actorType: { type: String, enum: ["user", "system"], default: "user" },
       actorRole: {
         type: String,
         enum: ["CUSTOMER", "PROVIDER", "ADMIN"],
@@ -155,6 +159,8 @@ const ProviderApplicationSchema = new Schema<IProviderApplication>(
     rejectionNotes: { type: String, default: null },
     reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     reviewedAt: { type: Date, default: null },
+    reviewSource: { type: String, enum: ["manual", "ai"], default: "manual" },
+    aiAssessmentId: { type: Schema.Types.ObjectId, ref: "AdminAIAssessment", default: null },
     reviewHistory: { type: [ProviderApplicationReviewHistorySchema], default: [] },
     ...baseFields,
   },
@@ -170,6 +176,7 @@ ProviderApplicationSchema.index(
   },
 );
 ProviderApplicationSchema.index({ userId: 1, applicationType: 1, createdAt: -1 });
+ProviderApplicationSchema.index({ status: 1, updatedAt: 1, _id: 1 });
 
 export const ProviderApplication = model<IProviderApplication>(
   "ProviderApplication",

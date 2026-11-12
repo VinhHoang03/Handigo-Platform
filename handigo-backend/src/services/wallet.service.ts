@@ -341,7 +341,7 @@ export const getWalletTransactionHistory = async (
   };
 };
 
-export const createWalletDeposit = async (user: RequestUser, input: WalletDepositInput) => {
+export const createWalletDeposit = async (user: RequestUser, input: WalletDepositInput, transactionId?: Types.ObjectId) => {
   assertPositiveAmount(input.amount);
   const frontendOrigin = resolvePaymentFrontendOrigin(input.cancelUrl, input.returnUrl,
     process.env.FRONTEND_URL, process.env.PAYOS_WALLET_DEPOSIT_CANCEL_URL,
@@ -354,6 +354,7 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
   const orderCode = buildPayosOrderCode();
 
   const transaction = await WalletTransaction.create({
+    ...(transactionId ? { _id: transactionId } : {}),
     walletId: wallet._id,
     userId: wallet.userId,
     type: "deposit",
@@ -499,7 +500,7 @@ const markWalletDepositSuccess = async (
       const wallet = await Wallet.findOneAndUpdate(
         { _id: freshTransaction.walletId, isDeleted: false },
         { $inc: { balance: freshTransaction.amount } },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
 
       if (!wallet) {
@@ -583,7 +584,7 @@ const reconcileWalletDeposit = async (
           ...(paymentLink.status === "CANCELLED" ? { description: "Giao dịch nạp ví đã hủy" } : {}),
         },
       },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     return (
       syncedTransaction ||
@@ -689,7 +690,7 @@ export const handleWalletDepositPayosWebhook = async (webhookData: any, payload:
           gatewayResponse: gatewayPatch.gatewayResponse,
         },
       },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     return (
       failedTransaction ||
@@ -865,7 +866,7 @@ export const deductPlatformFee = async (
           balance: { $gte: platformFee },
         },
         { $inc: { balance: -platformFee } },
-        { new: true, session },
+        { returnDocument: "after", session },
       );
 
       if (!wallet) {
@@ -1152,7 +1153,7 @@ export const adjustWallet = async (
             };
 
       const wallet = await Wallet.findOneAndUpdate(filter, update, {
-        new: true,
+        returnDocument: "after",
         session,
       });
 

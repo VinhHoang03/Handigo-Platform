@@ -9,11 +9,22 @@ import {
   providerReplySchema,
   updateFeedbackSchema,
   visibilitySchema,
+  moderationListSchema,
+  moderationIdSchema,
+  moderationReviewSchema,
 } from "../validations/feedback.validator";
 import { uploadFeedbackImages } from "../middlewares/feedbackUpload.middleware";
-import { uploadRateLimit } from "../middlewares/rateLimit.middleware";
+import { createRateLimit, uploadRateLimit } from "../middlewares/rateLimit.middleware";
 
 const router = Router();
+const moderationRateLimit = createRateLimit({ windowMs: 60_000, maxRequests: 10,
+  message: "Bạn gửi đánh giá quá nhanh. Vui lòng chờ rồi thử lại.",
+  keyGenerator: req => req.user!.id });
+
+router.get("/moderation", authMiddleware, roleMiddleware("ADMIN", "CUSTOMER", "PROVIDER"),
+  validate(moderationListSchema, "query"), feedbackController.listModeration);
+router.patch("/moderation/:id", authMiddleware, roleMiddleware("ADMIN"),
+  validate(moderationIdSchema, "params"), validate(moderationReviewSchema), feedbackController.reviewModeration);
 
 router.get("/latest", feedbackController.getLatestPublicFeedbacks);
 
@@ -21,6 +32,7 @@ router.post(
   "/",
   authMiddleware,
   roleMiddleware("CUSTOMER"),
+  moderationRateLimit,
   validate(createFeedbackSchema),
   feedbackController.createFeedback,
 );
@@ -29,6 +41,7 @@ router.put(
   "/:id",
   authMiddleware,
   roleMiddleware("CUSTOMER"),
+  moderationRateLimit,
   validate(updateFeedbackSchema),
   feedbackController.updateMyFeedback,
 );
@@ -91,6 +104,7 @@ router.put(
   "/:id/reply",
   authMiddleware,
   roleMiddleware("PROVIDER"),
+  moderationRateLimit,
   validate(providerReplySchema),
   feedbackController.upsertProviderReply,
 );

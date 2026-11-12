@@ -1,4 +1,5 @@
 import { customerKnowledge } from "../customer-knowledge";
+import { repairKnowledgeSources } from "../repair-cases";
 
 // Mã nguồn ổn định, không phụ thuộc vị trí bài trong mảng; đổi tiêu đề phải đối chiếu mã này.
 const keys: Record<string, string> = {
@@ -19,9 +20,9 @@ const keys: Record<string, string> = {
   "Địa chỉ thực hiện, người nhận và sổ địa chỉ": "address",
 };
 export function builtinKnowledgeSources() {
-  return customerKnowledge.map(({ keywords: _keywords, ...source }) => {
+  return [...customerKnowledge.map(({ keywords: _keywords, ...source }) => {
     const key = keys[source.title];
     if (!key) throw new Error("Nguồn nội bộ mới cần được đối chiếu mã định danh trước khi nhập.");
     return { ...source, sourceKey: `handigo/customer/${key}` };
-  });
+  }), ...repairKnowledgeSources()];
 }

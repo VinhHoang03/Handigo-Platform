@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useProviderAvailabilityStore } from "../store/providerAvailability.store";
@@ -17,6 +17,7 @@ import { ProviderProfileMainGrid } from "../components/profile/ProviderProfileMa
 import { ProviderProfileDialogsGroup } from "../components/profile/ProviderProfileDialogsGroup";
 
 function ProviderProfileContent() {
+  const location = useLocation();
   const onboardingStatus = useAuthStore(
     (state) => state.user?.providerOnboardingStatus,
   );
@@ -51,6 +52,14 @@ function ProviderProfileContent() {
     profile: data.profile,
     userProfileSectionRef,
   });
+  const profileLoaded = Boolean(data.profile);
+  useEffect(() => {
+    if (location.hash !== "#application-history" || data.isLoading || !profileLoaded) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("application-history")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.hash, location.key, data.isLoading, profileLoaded]);
 
   if (data.isLoading) {
     return (

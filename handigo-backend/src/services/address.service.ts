@@ -43,7 +43,7 @@ export const ensureAddressCoordinates = async (address: IAddress): Promise<IAddr
     { _id: address._id, userId: address.userId, updatedAt: address.updatedAt },
     { $set: { latitude: coordinates.latitude, longitude: coordinates.longitude,
       ...(coordinates.placeId ? { placeId: coordinates.placeId } : {}) } },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!updated) {
     throw new AppError("Địa chỉ vừa được thay đổi. Vui lòng chọn lại địa chỉ và đặt đơn.", 409);
@@ -214,7 +214,7 @@ export const createAddress = async (userId: string, data: AddressPayload, option
       const restored = await Address.findOneAndUpdate(
         { _id: duplicate._id, userId, isDeleted: true, updatedAt: duplicate.updatedAt },
         { $set: fields, ...(unresolvedLocationFields(payload) ? { $unset: unresolvedLocationFields(payload) } : {}) },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
       if (!restored) throw new AppError("Địa chỉ vừa thay đổi. Vui lòng thử lại.", 409);
       return restored;
@@ -247,7 +247,7 @@ export const updateAddress = async (addressId: string, userId: string, data: Add
         ...(unresolvedLocationFields(payload) ? { $unset: unresolvedLocationFields(payload) }
           : unlocated ? { $unset: { latitude: 1, longitude: 1 } }
           : payload.latitude !== undefined && !payload.placeId ? { $unset: { placeId: 1 } } : {}) },
-      { new: true, session, runValidators: true },
+      { returnDocument: "after", session, runValidators: true },
     );
     if (!address) {
       if (expectedVersion) throw new ActionPreconditionError();
@@ -259,7 +259,7 @@ export const updateAddress = async (addressId: string, userId: string, data: Add
 
 export const deleteAddress = async (addressId: string, userId: string) => changeAddresses(userId, async session => {
   const address = await Address.findOneAndUpdate({ _id: addressId, userId, isDeleted: { $ne: true } },
-    { $set: { isDeleted: true, deletedAt: new Date(), isDefault: false } }, { new: true, session, runValidators: true });
+    { $set: { isDeleted: true, deletedAt: new Date(), isDefault: false } }, { returnDocument: "after", session, runValidators: true });
   if (!address) throw new AppError("Không tìm thấy địa chỉ.", 404);
   return address;
 });
@@ -282,7 +282,7 @@ export const setDefaultAddress = async (userId: string, addressId: string) => ch
   if (!exists) throw new AppError("Không tìm thấy địa chỉ.", 404);
   await Address.updateMany({ userId, _id: { $ne: addressId } }, { $set: { isDefault: false } }, { session, runValidators: true });
   return Address.findOneAndUpdate({ _id: addressId, userId, isDeleted: { $ne: true } },
-    { $set: { isDefault: true } }, { new: true, session, runValidators: true });
+    { $set: { isDefault: true } }, { returnDocument: "after", session, runValidators: true });
 });
 
 export const getServiceHistory = async (_userId: string) => {

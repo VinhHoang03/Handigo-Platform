@@ -17,6 +17,7 @@ export const AgentFeedbackService = {
     const { order, feedback, canReview, reason } = await getOrderFeedbackContext(userId, orderId);
     return { orderId: String(order._id), orderCode: order.orderCode, canReview, reason,
       feedback: feedback ? { id: String(feedback._id), rating: feedback.rating, comment: feedback.comment,
+        isVisible: feedback.isVisible,
         images: feedback.images, updatedAt: feedback.updatedAt.toISOString() } : null };
   },
   async preview(userId: string, args: Arguments) {
@@ -55,7 +56,8 @@ export const AgentFeedbackService = {
       throw error;
     }
     return { orderId: args.orderId, orderCode: current.orderCode, feedbackId: String(result._id), rating: result.rating,
-      message: args.mode === "update" ? "Đã cập nhật đánh giá dịch vụ." : "Đã gửi đánh giá dịch vụ." };
+      message: result.isVisible === false ? "Đánh giá đã được lưu ở trạng thái ẩn để quản trị viên kiểm tra. Bạn không cần gửi lại."
+        : args.mode === "update" ? "Đã cập nhật đánh giá dịch vụ." : "Đã gửi đánh giá dịch vụ." };
   },
   async reconcile(userId: string, args: Arguments, expected: unknown, sessionId: string, actionId: string, createdAt: string) {
     const current = await this.get(userId, args.orderId);
@@ -67,6 +69,7 @@ export const AgentFeedbackService = {
       || (feedback.comment ?? "") !== preview.description || !isDeepStrictEqual(feedback.images, preview.customerAttachments)
       || Date.parse(feedback.updatedAt) < Date.parse(createdAt)) return null;
     return { orderId: args.orderId, orderCode: current.orderCode, feedbackId: feedback.id, rating: feedback.rating,
-      message: "Đã kiểm tra và xác nhận đánh giá đã được lưu đúng nội dung." };
+      message: feedback.isVisible === false ? "Đánh giá đã được lưu ở trạng thái ẩn để quản trị viên kiểm tra. Bạn không cần gửi lại."
+        : "Đã kiểm tra và xác nhận đánh giá đã được lưu đúng nội dung." };
   },
 };

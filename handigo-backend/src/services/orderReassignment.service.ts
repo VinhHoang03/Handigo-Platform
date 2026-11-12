@@ -109,7 +109,7 @@ export const requestProviderReassignment = async (
             reassignment,
           },
         },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
       if (!updatedOrder) {
         throw new AppError("Đơn hàng vừa được xử lý bởi một yêu cầu khác.", 409);
@@ -214,7 +214,7 @@ export const requestDirectProviderReassignment = async (
         reassignment,
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!order) return null;
 
@@ -284,7 +284,7 @@ export const respondToProviderReassignment = async (
     const expiredOrder = await Order.findOneAndUpdate(
       { _id: order._id, status: "created", "reassignment.status": "awaiting_customer" },
       { $set: { "reassignment.status": "expired", "reassignment.respondedAt": now } },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     if (expiredOrder) {
       return cancelSystemOrderWithSettlement(
@@ -299,7 +299,7 @@ export const respondToProviderReassignment = async (
     const declinedOrder = await Order.findOneAndUpdate(
       responseFilter,
       { $set: { "reassignment.status": "declined", "reassignment.respondedAt": now } },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     if (!declinedOrder) throw expectedVersion ? new ActionPreconditionError()
       : new AppError("Yêu cầu đổi kỹ thuật viên vừa được xử lý.", 409);
@@ -327,7 +327,7 @@ export const respondToProviderReassignment = async (
         matchingSearch,
       },
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!matchingOrder) throw expectedVersion ? new ActionPreconditionError()
     : new AppError("Yêu cầu đổi kỹ thuật viên vừa được xử lý.", 409);
@@ -361,7 +361,7 @@ export const expirePendingReassignments = async (orderId?: string | string[]) =>
       ? await Order.findOneAndUpdate(
           { _id: order._id, status: "created", "reassignment.status": "awaiting_customer", "reassignment.expiresAt": { $lte: now } },
           { $set: { "reassignment.status": "expired", "reassignment.respondedAt": now } },
-          { new: true, runValidators: true },
+          { returnDocument: "after", runValidators: true },
         )
       : currentOrder;
     if (!claimedOrder) continue;

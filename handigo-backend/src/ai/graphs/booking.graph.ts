@@ -9,6 +9,7 @@ import { withAgentTimeout } from "../agent/timeout";
 import { AppError } from "../../utils/appError";
 
 export const BOOKING_WRITE_TOOLS = ["create_booking", "save_booking_address", "cancel_booking",
+  "request_booking_reschedule", "respond_booking_reschedule", "cancel_booking_reschedule",
   "select_order_provider", "respond_provider_reassignment"] as const;
 
 export const buildBookingActionGraph = (deps: ConfirmedActionDependencies) =>

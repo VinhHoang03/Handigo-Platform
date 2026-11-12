@@ -221,7 +221,7 @@ const createAndSendRegisterOtp = async (
       passwordHash: user.passwordHash, registerOtp: user.registerOtp ?? null },
     { $set: { ...changes, registerOtp: hashOtp(otp), registerOtpExpire: getOtpExpireDate() },
       ...(Object.prototype.hasOwnProperty.call(changes, "phone") && changes.phone === undefined ? { $unset: { phone: 1 } } : {}) },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!updated) throw new AppError("Thông tin đăng ký đã thay đổi. Vui lòng thử lại.", 409);
 
@@ -317,7 +317,7 @@ export const verifyRegisterOtp = async (
       providerOnboardingStatus: isProviderRegistration ? "PROFILE_INCOMPLETE" : null,
       providerOnboardingStep: isProviderRegistration ? 1 : null },
       $unset: { registrationIntent: 1, registerOtp: 1, registerOtpExpire: 1 } },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!verifiedUser) throw new AppError("Thông tin đăng ký đã thay đổi. Vui lòng yêu cầu mã mới.", 409);
 
@@ -474,7 +474,7 @@ const linkOAuthAccount = async (
           resetPasswordTokenHash: 1, resetPasswordExpire: 1 },
         $inc: { tokenVersion: 1 },
       } : {}) },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!linked) throw new AppError("Thông tin tài khoản đã thay đổi. Vui lòng đăng nhập lại.", 409);
   return linked;

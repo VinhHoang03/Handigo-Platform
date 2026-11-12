@@ -129,7 +129,7 @@ const withConversationWrite = async <T>(
     return await withTransactionRetry(session, async () => {
       const conversation = await Conversation.findOneAndUpdate(
         { _id: conversationId, isDeleted: false }, { $inc: { __v: 1 } },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
       if (!conversation) throw new AppError("Không tìm thấy cuộc trò chuyện", 404);
       return work(conversation, session);

@@ -17,6 +17,54 @@ const notification = (userId, extra = {}) => ({
 });
 const listResult = items => ({ items, pagination: { page: 1, totalPages: 1 } });
 
+test('Thông báo duyệt cũ và mới của provider mở lịch sử hồ sơ, bỏ lời yêu cầu đăng nhập lại', () => {
+  const runtime = setup();
+  const utils = runtime.load('components/common/notification-bell/notificationBell.utils.ts');
+  for (const actionUrl of ['/login', '/provider/profile', '/provider/profile#application-history', undefined]) {
+    const item = notification('A', { type: 'SYSTEM', content: 'Hồ sơ của bạn đã được phê duyệt. Vui lòng đăng nhập lại để cập nhật quyền Provider và bắt đầu nhận việc.', data: { providerApplicationId: 'ho-so', status: 'approved', applicationType: 'initial', actionUrl } });
+    assert.equal(utils.getNotificationTarget(item, 'PROVIDER'), '/provider/profile#application-history');
+    assert.equal(utils.getNotificationContent(item), 'Hồ sơ của bạn đã được phê duyệt.');
+  }
+  const other = notification('A', { content: 'Vui lòng đăng nhập lại để tiếp tục.', data: {} });
+  assert.equal(utils.getNotificationContent(other), other.content);
+});
+
+test('Sự kiện duyệt chỉ đăng xuất phiên CUSTOMER cũ, không đăng xuất phiên PROVIDER đã đăng nhập lại', () => {
+  const item = notification('A', { type: 'SYSTEM', content: 'Hồ sơ của bạn đã được phê duyệt. Vui lòng đăng nhập lại để cập nhật quyền.', data: { providerApplicationId: 'ho-so', status: 'approved', applicationType: 'initial' } });
+  const customer = setup();
+  customer.render();
+  customer.sockets[0].handlers['notification:new'](item);
+  assert(customer.calls.includes('logout'));
+  const provider = setup();
+  provider.setUser('A', 'PROVIDER');
+  provider.render('PROVIDER');
+  provider.sockets[0].handlers['notification:new'](item);
+  assert.equal(provider.calls.includes('logout'), false);
+  assert.equal(provider.toasts[0][0], 'Hồ sơ của bạn đã được phê duyệt.');
+});
+
+test('Bấm nhiều lần thông báo duyệt tại chuông giữ phiên provider và mở lịch sử hồ sơ', async () => {
+  const runtime = setup();
+  runtime.setUser('A', 'PROVIDER');
+  const navigation = [];
+  const item = notification('A', { type: 'SYSTEM', data: { providerApplicationId: 'ho-so', status: 'approved', applicationType: 'initial', actionUrl: '/login' } });
+  runtime.modules['react-router-dom'] = { useNavigate: () => target => navigation.push(target) };
+  runtime.modules['@/features/notification/hooks/useNotificationAccount'] = runtime.load('features/notification/hooks/useNotificationAccount.ts');
+  runtime.modules['./notification-bell/notificationBell.utils'] = runtime.load('components/common/notification-bell/notificationBell.utils.ts');
+  runtime.modules['./Toast'] = runtime.modules['@/components/common/Toast'];
+  runtime.modules['./notification-bell/useReassignmentPrompt'] = { useReassignmentPrompt: () => ({ action: null }) };
+  runtime.modules['./notification-bell/useNotificationFeed'] = { useNotificationFeed: () => ({ open: true, canUseUserNotifications: true, unreadCount: 0, query: { page: 1 }, totalPages: 1, setOpen() {}, markAsRead: async () => ({ ...item, isRead: true }) }) };
+  runtime.modules['./notification-bell/NotificationBellPanel'] = { NotificationBellPanel: 'panel' };
+  const { NotificationBell } = runtime.loadWrapper('components/common/NotificationBell.tsx');
+  const wrapper = NotificationBell({ role: 'PROVIDER' });
+  const element = runtime.renderHook(() => wrapper.type(wrapper.props));
+  const panel = element.props.children.find(child => child?.type === 'panel');
+  for (let click = 0; click < 2; click++) { panel.props.onOpen(item); await new Promise(setImmediate); }
+  assert.deepEqual(navigation, ['/provider/profile#application-history', '/provider/profile#application-history']);
+  assert.equal(runtime.calls.includes('logout'), false);
+  assert(NotificationBell({ role: 'PROVIDER' }));
+});
+
 test('KH-42: thông báo đề nghị nhận việc mở luồng phản hồi thay vì chi tiết chưa có quyền xem', () => {
   const runtime = setup();
   const utils = runtime.load('components/common/notification-bell/notificationBell.utils.ts');
@@ -35,7 +83,7 @@ function setup() {
   const calls = [];
   let cursor = 0;
   let timerId = 0;
-  let auth = { user: { id: 'A' }, isAuthenticated: true };
+  let auth = { user: { id: 'A', role: 'CUSTOMER' }, isAuthenticated: true };
   const authStore = select => select(auth);
   authStore.getState = () => ({ ...auth, logout() { calls.push('logout'); auth = { user: null, isAuthenticated: false }; }, setUser() {} });
   const sameDeps = (a, b) => a && b && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
@@ -123,7 +171,7 @@ function setup() {
     while (effects.length) effects.shift()();
     return result;
   };
-  const render = () => renderHook(() => useNotificationFeed('CUSTOMER', options));
+  const render = (role = 'CUSTOMER') => renderHook(() => useNotificationFeed(role, options));
   return { api, calls, sockets, toasts, modules, load, render, renderHook,
     loadWrapper(file) {
       const filename = path.join(sourceRoot, file);
@@ -137,7 +185,7 @@ function setup() {
       } });
       return exports;
     },
-    setUser(id) { auth = { user: id ? { id } : null, isAuthenticated: Boolean(id) }; },
+    setUser(id, role = 'CUSTOMER') { auth = { user: id ? { id, role } : null, isAuthenticated: Boolean(id) }; },
     flushTimers() { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); },
     unmount() { slots.forEach(slot => slot?.cleanup?.()); },
   };

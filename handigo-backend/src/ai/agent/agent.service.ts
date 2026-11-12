@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { RequestUser } from "../../middlewares/authContext";
 import { AppError } from "../../utils/appError";
+import { formatRepairSafetyAdvice, repairSafetyAdvice } from "../knowledge/repair-advice";
 import type { SessionStore } from "../session/session.service";
 import { MessageRepository } from "../session/message.repository";
 import type { ToolContext } from "../tools/tool.interface";
@@ -235,7 +236,10 @@ export class AgentService {
               session.bookingDraft.revision += 1;
             }
           }
-          if (session.pendingAction) {
+          const safety = repairSafetyAdvice(input.message);
+          if (safety) {
+            this.loop.reply(session, "WAITING_USER_INPUT", formatRepairSafetyAdvice(safety));
+          } else if (session.pendingAction) {
             this.loop.reply(session, "WAITING_CONFIRMATION", "Hãy dùng nút xác nhận cho hành động đang chờ, hoặc từ chối trước khi sửa yêu cầu.");
           } else {
             if (!session.currentGoal || session.state === "COMPLETED") {

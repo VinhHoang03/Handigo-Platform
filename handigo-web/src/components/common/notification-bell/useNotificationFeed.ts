@@ -5,7 +5,7 @@ import type {
   NotificationQuery,
 } from "@/features/notification/types/notification.types";
 import type { AppRole } from "../Navbar";
-import { getErrorMessage, getNotificationPath, isNotificationForUser } from "./notificationBell.utils";
+import { getErrorMessage, getNotificationContent, getNotificationPath, isNotificationForUser } from "./notificationBell.utils";
 import { useNotificationReadActions } from "./useNotificationReadActions";
 import { useNotificationSocket } from "./useNotificationSocket";
 import { useToast } from "../Toast";
@@ -102,14 +102,20 @@ export function useNotificationFeed(
       if (!isCurrentAccount() || !isNotificationForUser(notification, accountId)) return;
       setUnreadCount((current) => current + 1);
 
+      if (role === "CUSTOMER" && notification.type === "ORDER" &&
+        notification.data?.action === "provider_started_moving") {
+        addToast(notification.content, "info", 10000);
+      }
+
       if (notification.type === "SYSTEM" && notification.data?.providerApplicationId &&
         (notification.data.status === "approved" || notification.data.status === "rejected")) {
         const approved = notification.data.status === "approved";
-        addToast(notification.content, approved ? "success" : "info", approved ? 0 : 10000);
+        addToast(getNotificationContent(notification), approved ? "success" : "info", approved ? 0 : 10000);
         if (notification.data.applicationType === "initial") {
           if (approved) {
-            // Phiên đã bị thu hồi khi duyệt; hiển thị lý do trước khi yêu cầu đăng nhập lại.
-            useAuthStore.getState().logout();
+            // Chỉ phiên CUSTOMER cũ cần đổi quyền; phiên PROVIDER mới không bị đăng xuất do thông báo lặp.
+            const store = useAuthStore.getState();
+            if (store.user?.role === "CUSTOMER") store.logout();
           } else {
             void getMeApi().then((user) => {
               const store = useAuthStore.getState();

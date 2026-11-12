@@ -11,6 +11,7 @@ export function OrderTrackingMap({
   compact = false,
 }: OrderTrackingMapProps) {
   const {
+    etaLabel,
     searchMessage,
     nearbyMessage,
     routeMessage,
@@ -34,6 +35,7 @@ export function OrderTrackingMap({
   return (
     <section className="overflow-hidden rounded-3xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm">
       <TrackingHeader
+        etaLabel={etaLabel}
         liveTrackingEnabled={liveTrackingEnabled}
         otherPartyLabel={otherPartyLabel}
         addressLine={addressLine}

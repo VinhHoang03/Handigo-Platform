@@ -1,4 +1,5 @@
 import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
+import { AutomaticReviewControl } from "../ai/AutomaticReviewControl";
 import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -19,7 +20,7 @@ import { useCaseDetailController } from "../components/cases/useCaseDetailContro
 import { ViolationFormModal } from "../components/cases/ViolationFormModal";
 
 export default function AdminCasesPage() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<AdminCaseTab>(() => params.get('tab') === 'violations' ? 'violations' : 'reports');
   const [query, setQuery] = useState<AdminReportQuery>({ page: 1, limit: 10, reportType: params.get("reportType") === "service_quality" ? "service_quality" : undefined });
   const [items, setItems] = useState<CaseRow[]>([]);
@@ -50,7 +51,8 @@ export default function AdminCasesPage() {
 
   const detail = useCaseDetailController(tab, load, setError);
   const openInitialDetail = useRef(detail.openDetail);
-  const [initialReportId] = useState(() => params.get('tab') === 'reports' ? params.get('reportId') : null);
+  useEffect(() => { openInitialDetail.current = detail.openDetail; });
+  const initialReportId = params.get('tab') === 'reports' ? params.get('reportId') : null;
   useEffect(() => {
     let active = true;
     void Promise.resolve().then(() => {
@@ -72,7 +74,10 @@ export default function AdminCasesPage() {
         <div>
           <AdminPageTitle title="Báo cáo và vi phạm" />
         </div>
-        <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {tab === "reports" && <AutomaticReviewControl feature="complaint_summary" onClose={() => void load()} />}
+          <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
+        </div>
       </header>
 
       <CaseTabs tab={tab} onSwitch={switchTab} />
@@ -117,20 +122,14 @@ export default function AdminCasesPage() {
         selectedTitle={detail.selectedTitle}
         detailEvidence={detail.detailEvidence}
         busy={detail.busy}
-        actionError={detail.actionError}
-        evidenceNote={detail.evidenceNote}
-        onEvidenceNoteChange={detail.setEvidenceNote}
-        onRequestEvidence={detail.onRequestEvidence}
-        nextStatus={detail.nextStatus}
-        onNextStatusChange={detail.setNextStatus}
-        reviewNote={detail.reviewNote}
-        onReviewNoteChange={detail.setReviewNote}
-        resolutionNote={detail.resolutionNote}
-        onResolutionNoteChange={detail.setResolutionNote}
-        onReviewReport={detail.onReviewReport}
+        onReviewBusyChange={detail.setBusy}
         onReverifyReport={detail.onReverifyReport}
         onOpenViolationForm={detail.openViolationForm}
-        onClose={detail.closeDetail}
+        onClose={() => {
+          detail.closeDetail();
+          if (initialReportId) setParams(current => { current.delete("reportId"); return current; }, { replace: true });
+        }}
+        onAIUpdated={() => { if (detail.selected?.kind === "report") void detail.openDetail(detail.selected.item._id); void load(); }}
       />
 
       {detail.violationSource && (

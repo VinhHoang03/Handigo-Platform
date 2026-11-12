@@ -13,13 +13,13 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
   const cancellationMinutes = policies.customerCancellationMinutes ?? 5;
 
   return <div className="space-y-6">
-    <p className="text-sm leading-6 text-on-surface-variant">Các điều khoản dưới đây áp dụng cho đặt ngay, hẹn giờ và lịch định kỳ. Mức phí, tiền cọc và ưu đãi cụ thể của đơn được hiển thị trong phần tóm tắt trước khi xác nhận.</p>
+    <p className="text-sm leading-6 text-on-surface-variant">Các điều khoản dưới đây áp dụng cho đặt ngay và hẹn giờ. Mức phí, tiền cọc và ưu đãi cụ thể của đơn được hiển thị trong phần tóm tắt trước khi xác nhận.</p>
 
     <section className="space-y-3">
       <h3 className="font-semibold text-on-surface">1. Đặt lịch, tìm thợ và thanh toán</h3>
       <ul className={listClass}>
         <li>Khách cần cung cấp đúng dịch vụ, số lượng, địa chỉ, thông tin liên hệ và mô tả công việc. Lịch hẹn không được sớm hơn phút hiện tại.</li>
-        <li>Đơn cần thanh toán trước phải hoàn tất trong thời hạn hiển thị; thời gian giữ lịch chờ thanh toán mặc định theo cấu hình hiện tại là {number(policies.paymentHoldMinutes)} phút. Hết hạn có thể tự hủy; lịch định kỳ có thời hạn thanh toán riêng cho từng buổi được ghi trong đơn.</li>
+        <li>Đơn cần thanh toán trước phải hoàn tất trong thời hạn hiển thị; thời gian giữ lịch chờ thanh toán mặc định theo cấu hình hiện tại là {number(policies.paymentHoldMinutes)} phút. Hết hạn có thể tự hủy.</li>
         <li>Hệ thống tìm thợ trong bán kính {number(matching.initialRadiusKm)} km, mở rộng đến {number(matching.expandedRadiusKm)} km sau {number(matching.expandAfterMinutes)} phút và tìm thêm tối đa {number(matching.expandedDurationMinutes)} phút trong vòng mở rộng. Mỗi đề nghị có thời hạn phản hồi tối đa {number(matching.providerResponseSeconds)} giây và có thể kết thúc sớm khi chuyển vòng tìm kiếm.</li>
         <li>Với vòng tìm thợ tự động, nếu hết vòng mà không có thợ nhận, đơn được hủy và hoàn 100% khoản đã thanh toán. Với thợ được chọn trực tiếp, khách có thể được yêu cầu chọn thợ khác hoặc đồng ý tìm thợ thay thế.</li>
         <li>Chỉ khoản thanh toán được hệ thống xác nhận mới được tính vào số tiền hoàn hoặc cọc chuyển cho thợ. Khoản hoàn và trạng thái xử lý được hiển thị tại chi tiết đơn và lịch sử giao dịch.</li>
@@ -31,7 +31,7 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
       <ul className={listClass}>
         <li>Giá được tính theo dịch vụ, tùy chọn và số lượng đã chọn. Đơn giá cố định không thu cọc khảo sát riêng. Khách thanh toán số tiền của đơn bằng ví Handigo, chuyển khoản qua PayOS hoặc tiền mặt nếu phương thức đó khả dụng.</li>
         <li>Khách hủy khi chưa có thợ nhận: hoàn 100% khoản đã thanh toán.</li>
-        <li>Khách được hủy trong vòng {cancellationMinutes} phút kể từ khi thợ nhận đơn nếu thợ chưa xác nhận đến nơi và chưa bắt đầu làm việc. Hoàn 100% khoản đã thanh toán về ví Handigo, không thu phí hủy. Quy tắc này áp dụng cho cả đặt ngay, hẹn giờ và lịch định kỳ.</li>
+        <li>Khách được hủy trong vòng {cancellationMinutes} phút kể từ khi thợ nhận đơn nếu thợ chưa xác nhận đến nơi và chưa bắt đầu làm việc. Hoàn 100% khoản đã thanh toán về ví Handigo, không thu phí hủy. Quy tắc này áp dụng cho cả đặt ngay và hẹn giờ.</li>
         <li>Hết {cancellationMinutes} phút hoặc thợ đã bắt đầu làm việc thì khách không thể hủy đơn. Với tiền mặt chưa thanh toán, không phát sinh khoản hoàn tiền.</li>
         <li>Khi thợ hủy đơn đặt ngay/đơn gấp trước khi làm, khách có thể chọn tìm thợ thay thế hoặc hủy để được hoàn tiền. Đơn do hệ thống hoặc quản trị viên hủy trước khi làm được hoàn toàn bộ khoản đã thanh toán.</li>
       </ul>
@@ -47,16 +47,15 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
         <li><strong>Khách hủy khi thợ đã nhận đơn:</strong> được hủy trong vòng {cancellationMinutes} phút kể từ khi thợ nhận nếu thợ chưa xác nhận đến nơi và chưa bắt đầu làm việc. Hoàn 100% khoản đã thanh toán về ví Handigo, bao gồm cọc thực trả.</li>
         <li><strong>Thợ đã xác nhận đến nơi rồi hủy, với mọi lý do:</strong> thợ nhận 5.000đ vào ví, khách được hoàn tiền cọc thực trả trừ 5.000đ về ví Handigo; không tìm thợ thay thế. Quy tắc này áp dụng cả khi đã lưu báo giá và chưa bắt đầu làm việc.</li>
         <li>Với đơn báo giá cũ chưa có xác nhận đến nơi, thợ hủy sau khi đã báo giá vẫn áp dụng chính sách chuyển cọc thực trả vào ví thợ.</li>
-        <li>Thời hạn hủy của khách áp dụng cho cả đặt ngay, hẹn giờ và lịch định kỳ. Hết {cancellationMinutes} phút hoặc thợ đã bắt đầu làm việc thì khách không được hủy.</li>
+        <li>Thời hạn hủy của khách áp dụng cho cả đặt ngay và hẹn giờ. Hết {cancellationMinutes} phút hoặc thợ đã bắt đầu làm việc thì khách không được hủy.</li>
       </ul>
     </section>
 
     <section className="space-y-3">
-      <h3 className="font-semibold text-on-surface">4. Ưu đãi, lịch định kỳ và hoàn thành đơn</h3>
+      <h3 className="font-semibold text-on-surface">4. Ưu đãi và hoàn thành đơn</h3>
       <ul className={listClass}>
         <li>Với dịch vụ giá cố định, thợ đã xác nhận đến nơi rồi hủy trước khi bắt đầu làm việc sẽ nhận 5.000đ vào ví, không phụ thuộc lý do. Khách thanh toán ví hoặc QR được hoàn khoản đã trả trừ 5.000đ về ví Handigo; tiền mặt chưa thu do Handigo chi 5.000đ hỗ trợ thợ. Đơn bị hủy và không ghép thợ mới.</li>
         <li>Ưu đãi và mã giảm giá áp dụng theo điều kiện của từng chương trình. Với mã giảm cọc, khoản hoàn hoặc chuyển cho thợ được tính theo cọc thực trả sau ưu đãi. Không hoàn tiền cho phần giá trị được miễn hoặc giảm.</li>
-        <li>Mỗi buổi định kỳ được theo dõi và xử lý thanh toán, hủy, hoàn tiền riêng. Khi chọn hủy các buổi còn lại, hệ thống tính theo trạng thái thực tế của từng buổi.</li>
         <li>Đơn đã bắt đầu thực hiện hoặc đã hoàn thành không thể hủy theo luồng thông thường. Khách cần liên hệ thợ hoặc gửi yêu cầu hỗ trợ/khiếu nại trong hệ thống khi có vấn đề.</li>
       </ul>
     </section>

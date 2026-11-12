@@ -108,7 +108,7 @@ export function ApplicationDetail({
                   <StatusBadge value={event.status} />
                 </div>
                 <p className="mt-1 text-sm text-on-surface-variant">
-                  {actorName(event.actorId)} · {formatDateTime(event.occurredAt)}
+                  {event.actorType === 'system' ? 'AI quản trị (tự động)' : actorName(event.actorId)} · {formatDateTime(event.occurredAt)}
                 </p>
                 {event.rejectionReason && (
                   <p className="mt-2 text-sm">

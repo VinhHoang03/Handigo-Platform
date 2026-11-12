@@ -66,7 +66,7 @@ export const refreshTemporaryLock = async (userId: string | Types.ObjectId) => {
     if (!source || source.status !== "active" || !source.endAt || source.endAt > new Date()) return user;
     // Ghi cùng tài khoản với áp dụng hình phạt để các quyết định đồng thời không bị bỏ qua.
     const locked = await User.findOneAndUpdate({ _id: userId, status: "locked", temporaryLockId: user.temporaryLockId },
-      { $inc: { __v: 1 } }, { new: true, runValidators: true, session });
+      { $inc: { __v: 1 } }, { returnDocument: "after", runValidators: true, session });
     if (!locked) return user;
     if (await Violation.exists({ userId, ...effectivePenaltyFilter(),
       penaltyType: { $in: suspensionTypes } }).session(session)) return user;

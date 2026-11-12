@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Outlet, Route } from "react-router-dom";
+import { Navigate, Outlet, Route } from "react-router-dom";
 import { RouteGuard } from "@/components/common/RouteGuard";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { AdminLayoutContext } from "@/components/common/dashboard/adminLayout.context";
@@ -41,6 +41,7 @@ function AdminRouteLayout() {
 export function AdminRoutes() {
   return (
     <Route element={<AdminRouteLayout />}>
+      <Route path="/admin/ai" element={<Navigate to="/admin/provider-applications" replace />} />
       <Route
         path="/admin"
         element={

@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { validateProductionConfig } from "./configs/production";
 import { createLogger } from "./utils/logger";
 import { startTemporaryLockMonitor, stopTemporaryLockMonitor } from "./services/penaltyPolicy.service";
+import { startViolationEmailMonitor, stopViolationEmailMonitor } from "./services/violationEmail.service";
 
 dotenv.config();
 
@@ -44,6 +45,9 @@ const startServer = async () => {
     ]);
 
     await connectDB();
+    const { startAdminAIWorker, stopAdminAIWorker } = await import("./ai/admin/admin-ai.worker");
+    await startAdminAIWorker();
+    await startViolationEmailMonitor();
 
     const server = http.createServer(app);
     server.requestTimeout = REQUEST_TIMEOUT_MS;
@@ -84,6 +88,8 @@ const startServer = async () => {
       forceShutdownTimer.unref();
 
       try {
+        await stopViolationEmailMonitor();
+        await stopAdminAIWorker();
         await stopAgentOrderProgressMonitor();
         await stopProviderRewardsMonitor();
         server.closeIdleConnections();

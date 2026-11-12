@@ -4,6 +4,7 @@ import { uniqueBookingAddresses } from "../agent/booking-draft";
 import { ToolRegistry } from "./tool-registry";
 import type { ToolPolicy } from "./tool.interface";
 import { searchServicesTool } from "./implementations/search-services.tool";
+import { getRepairAdviceTool } from "./implementations/get-repair-advice.tool";
 import { getServiceTool } from "./implementations/get-service.tool";
 import { getPriceTool } from "./implementations/get-price.tool";
 import { getAvailableTimesTool } from "./implementations/get-available-times.tool";
@@ -32,9 +33,19 @@ import { getBookingQuotationTool, rejectBookingQuotationTool } from "./implement
 import { getBookingProviderTool } from "./implementations/assigned-provider.tool";
 import { getBookingFeedbackTool, submitBookingFeedbackTool } from "./implementations/feedback.tools";
 import { addComplaintEvidenceTool } from "./implementations/complaint-evidence.tool";
+import { getBookingRescheduleTool, requestBookingRescheduleTool, respondBookingRescheduleTool, cancelBookingRescheduleTool } from "./implementations/reschedule.tools";
+import { getMyRewardsTool, getRewardHistoryTool, getMyRewardVouchersTool, redeemRewardTool,
+  getMyWalletTool, getWalletHistoryTool, createWalletDepositTool, getWalletDepositStatusTool, cancelWalletDepositTool } from "./implementations/customer-account.tools";
+import { getBookingArrivalEstimateTool } from "./implementations/arrival-estimate.tool";
+import { analyzeRepairImagesTool } from "./implementations/analyze-repair-images.tool";
 
 export function registerTools(policies: Record<string, ToolPolicy>) {
   return new ToolRegistry(policies, true)
+    .register(getBookingRescheduleTool).register(requestBookingRescheduleTool).register(respondBookingRescheduleTool).register(cancelBookingRescheduleTool)
+    .register(getMyRewardsTool).register(getRewardHistoryTool).register(getMyRewardVouchersTool).register(redeemRewardTool)
+    .register(getMyWalletTool).register(getWalletHistoryTool).register(createWalletDepositTool).register(getWalletDepositStatusTool).register(cancelWalletDepositTool)
+    .register(getBookingArrivalEstimateTool).register(analyzeRepairImagesTool)
+    .register(getRepairAdviceTool)
     .register(getBookingProviderTool).register(getBookingFeedbackTool).register(submitBookingFeedbackTool).register(addComplaintEvidenceTool)
     .register(updateBookingDraftTool)
     .register(searchMyBookingsTool).register(rebookBookingTool).register(getPreviousProvidersTool).register(getBookingRefundsTool)

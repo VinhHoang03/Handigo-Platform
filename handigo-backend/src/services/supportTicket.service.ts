@@ -415,12 +415,15 @@ export const updateSupportTicketStatus = async (
     );
   }
 
+  const wasTerminal = TERMINAL_STATUSES.includes(ticket.status);
   ticket.status = payload.status;
   ticket.assignedAdminId = ticket.assignedAdminId ?? new Types.ObjectId(adminId);
   ticket.resolutionNote = payload.resolutionNote ?? ticket.resolutionNote ?? null;
   if (TERMINAL_STATUSES.includes(payload.status)) {
-    ticket.resolvedBy = new Types.ObjectId(adminId);
-    ticket.resolvedAt = new Date();
+    if (!wasTerminal) {
+      ticket.resolvedBy = new Types.ObjectId(adminId);
+      ticket.resolvedAt = new Date();
+    }
   } else {
     ticket.resolvedBy = null;
     ticket.resolvedAt = null;
@@ -469,7 +472,7 @@ export const assignSupportTicket = async (
       assignedAdminId: new Types.ObjectId(targetAdminId),
       status: existingTicket.status === "open" ? "in_progress" : existingTicket.status,
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   ).populate(populateTicket());
 
   if (!ticket) throw new AppError("Yêu cầu hỗ trợ đã thay đổi. Vui lòng tải lại và thử lại.", 409);

@@ -47,6 +47,9 @@ export function FeedbackCard({
         </div>
       </div>
       {metadata && <div className="mt-2">{metadata}</div>}
+      {feedback.isVisible === false && <p role="status" className="mt-3 rounded-xl bg-surface-container-low p-3 text-sm text-on-surface-variant">
+        Đánh giá đang ẩn và chưa hiển thị công khai. Quản trị viên có thể kiểm tra và cho hiển thị; bạn không cần gửi lại.
+      </p>}
 
       {feedback.comment && (
         <p className={`${compact ? "mt-2" : "mt-4"} ${replySummaryOnly ? 'line-clamp-3' : ''} whitespace-pre-wrap break-words leading-relaxed`}>{feedback.comment}</p>

@@ -38,7 +38,7 @@ export function TicketSidebar({ ticket, admins, adminsLoading, adminsError, onRe
   return (
     <aside className="space-y-5">
 
-      {!ticket.createdViolationId && ticket.status !== "cancelled" && (
+      {!ticket.createdViolationId && !isTerminal && (
         <button type="button" onClick={onCreateViolation} className="w-full rounded-xl bg-error px-4 py-3 font-bold text-on-error">
           Tạo vi phạm và áp dụng hình phạt
         </button>

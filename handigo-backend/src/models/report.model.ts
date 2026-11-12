@@ -181,6 +181,7 @@ const ReportSchema = new Schema<IReport>(
 ReportSchema.index({ legacyComplaintId: 1 }, { unique: true, sparse: true });
 ReportSchema.index({ orderId: 1, reporterId: 1, reportType: 1, isDeleted: 1 });
 ReportSchema.index({ status: 1, createdAt: -1 });
+ReportSchema.index({ status: 1, updatedAt: 1, _id: 1 });
 ReportSchema.index({ reporterId: 1, createdAt: -1 });
 ReportSchema.index({ targetUserId: 1, status: 1 });
 
