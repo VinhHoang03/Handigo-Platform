@@ -2,7 +2,7 @@ import mongoose, { ClientSession, Types } from "mongoose";
 import { AuditLog } from "../models/auditLog.model";
 import type { RequestUser } from "../middlewares/authContext";
 import { Order, type IOrder } from "../models/order.model";
-import { calculateBookingSettlement } from "../utils/bookingPolicy";
+import { getOrderSettlement } from "../utils/orderSettlement";
 import { Payment } from "../models/payment.model";
 import { IPromotion, Promotion } from "../models/promotion.model";
 import { Voucher } from "../models/voucher.model";
@@ -49,8 +49,9 @@ const isPromotionActive = (promotion: IPromotion, now = new Date()) => {
 const getOriginalAmount = (order: any) => Math.max(order.pricing?.bookingAmount || 0, 0);
 
 const settlementFields = (order: Pick<IOrder, "pricing" | "inspectionRequired">, amount: number) => {
-  if (order.pricing.baseAmount === undefined && !order.inspectionRequired) return {};
-  const settlement = calculateBookingSettlement(amount, order.pricing.platformCommissionRate, order.inspectionRequired);
+  const settlement = getOrderSettlement(
+    order.pricing, order.inspectionRequired, amount,
+  );
   return { "pricing.platformCommissionAmount": settlement.platformCommissionAmount, "pricing.providerEarningAmount": settlement.providerEarningAmount };
 };
 

@@ -8,6 +8,7 @@ import User from "../models/user.model";
 import { toObjectId } from "../utils/mongo";
 import { buildTransactionCode, withTransactionRetry } from "../utils/transaction";
 import { getGroupedWalletTransactionHistory } from "./walletHistory.service";
+import { getOrderSettlement } from "../utils/orderSettlement";
 import { Wallet } from "../models/wallet.model";
 import {
   WalletTransaction,
@@ -736,15 +737,18 @@ export const recordCompletedOrderSettlement = async (
     createIfMissing: true,
     session,
   });
-  const grossAmount = order.pricing.totalPaidAmount;
-  const platformFee = order.pricing.platformCommissionAmount;
-  const netEarning = order.pricing.providerEarningAmount;
+  const {
+    grossAmount, customerPaidAmount, platformDiscountAmount,
+    platformCommissionAmount: platformFee, providerEarningAmount: netEarning,
+  } = getOrderSettlement(order.pricing, order.inspectionRequired);
 
   if (
-    ![grossAmount, platformFee, netEarning].every(Number.isFinite) ||
+    ![grossAmount, customerPaidAmount, platformDiscountAmount, platformFee, netEarning].every(Number.isFinite) ||
     grossAmount < 0 ||
     platformFee < 0 ||
     netEarning < 0 ||
+    customerPaidAmount < 0 ||
+    platformDiscountAmount < 0 ||
     platformFee + netEarning !== grossAmount
   ) {
     throw new WalletError(
@@ -756,7 +760,8 @@ export const recordCompletedOrderSettlement = async (
 
   const balanceBefore = wallet.balance;
   const isCashOrder = order.paymentMethod === "cash";
-  if (isCashOrder && balanceBefore < platformFee) {
+  const cashSubsidy = isCashOrder && !order.inspectionRequired ? platformDiscountAmount : 0;
+  if (isCashOrder && balanceBefore + cashSubsidy < platformFee) {
     throw new WalletError(
       "INSUFFICIENT_BALANCE",
       "Số dư ví không đủ để thanh toán phí nền tảng của đơn hàng",
@@ -767,13 +772,15 @@ export const recordCompletedOrderSettlement = async (
   const balanceAfterGross = order.inspectionRequired
     ? balanceBefore + netEarning
     : isCashOrder
-    ? balanceBefore
+    ? balanceBefore + cashSubsidy
     : balanceBefore + grossAmount;
   const balanceAfterSettlement = order.inspectionRequired
     ? balanceAfterGross
     : balanceAfterGross - platformFee;
   wallet.balance = balanceAfterSettlement;
   await wallet.save({ session });
+  order.pricing.platformCommissionAmount = platformFee;
+  order.pricing.providerEarningAmount = netEarning;
 
   const commonMetadata = {
     providerId: provider._id,
@@ -783,6 +790,8 @@ export const recordCompletedOrderSettlement = async (
     grossAmount,
     platformFee,
     netEarning,
+    customerPaidAmount,
+    platformDiscountAmount,
   };
 
   const earningTransaction = await createWalletTransaction(
@@ -793,7 +802,7 @@ export const recordCompletedOrderSettlement = async (
       type: "provider_earning",
       direction: "in",
       amount: order.inspectionRequired ? netEarning : grossAmount,
-      balanceAfter: balanceAfterGross,
+      balanceAfter: isCashOrder ? balanceBefore : balanceAfterGross,
       description: order.inspectionRequired
         ? undefined
         : isCashOrder
@@ -807,6 +816,25 @@ export const recordCompletedOrderSettlement = async (
     },
     session,
   );
+
+  if (cashSubsidy > 0) {
+    await createWalletTransaction({
+      walletId: wallet._id as Types.ObjectId,
+      userId: provider.userId,
+      relatedOrderId: order._id as Types.ObjectId,
+      type: "adjustment",
+      direction: "in",
+      amount: cashSubsidy,
+      balanceAfter: balanceAfterGross,
+      description: "Nền tảng bù ưu đãi cho đơn thanh toán tiền mặt",
+      transactionCodePrefix: "PLATFORM_DISCOUNT",
+      metadata: {
+        ...commonMetadata,
+        affectsWalletBalance: true,
+        platformFundedDiscount: true,
+      },
+    }, session);
+  }
 
   const platformFeeTransaction =
     platformFee > 0

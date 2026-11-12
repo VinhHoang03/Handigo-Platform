@@ -1,3 +1,22 @@
+class OrderReschedulePreview {
+  const OrderReschedulePreview({
+    required this.approvalRequired,
+    required this.warningRequired,
+    required this.providerMonthlyAppliedCount,
+  });
+
+  factory OrderReschedulePreview.fromJson(Map<String, dynamic> json) =>
+      OrderReschedulePreview(
+        approvalRequired: json['approvalRequired'] == true,
+        warningRequired: json['warningRequired'] == true,
+        providerMonthlyAppliedCount:
+            (json['providerMonthlyAppliedCount'] as num?)?.toInt() ?? 0,
+      );
+
+  final bool approvalRequired, warningRequired;
+  final int providerMonthlyAppliedCount;
+}
+
 class OrderRescheduleEligibility {
   const OrderRescheduleEligibility({
     required this.canRequest,
