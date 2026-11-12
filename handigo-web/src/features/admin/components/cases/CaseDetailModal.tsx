@@ -1,3 +1,4 @@
+import { ReportReviewForm } from "./ReportReviewForm";
 import { Modal } from "@/components/common/Modal";
 import { caseDateTime } from "./case-table-columns";
 import type { SelectedAdminCase } from "./case-detail.types";
@@ -5,17 +6,23 @@ import { CASE_STATUS_LABELS, PENALTY_LABELS, VIOLATION_SEVERITY_LABELS, getCaseS
 import { NoShowReviewDetails } from "./NoShowReviewDetails";
 import { NoShowVerificationSummary } from "./NoShowVerificationSummary";
 import { getNoShowUserDescription } from "./no-show-review.utils";
+import { ComplaintReviewPanel } from "../../ai/ComplaintReviewPanel";
+import { FileText, Film } from "lucide-react";
 
-function EvidenceLinks({ urls }: { urls: string[] }) {
+function EvidenceLinks({ urls, files = [] }: { urls: string[]; files?: Array<{ url: string; fileType: string; fileName?: string | null }> }) {
   if (!urls.length) return <p className="text-sm text-on-surface-variant">Chưa có bằng chứng.</p>;
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {urls.map((url, index) => (
-        <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border border-outline-variant">
-          <img src={url} alt={`Bằng chứng ${index + 1}`} className="h-36 w-full object-cover" />
-          <p className="p-2 text-xs font-semibold text-primary">Mở ảnh gốc</p>
-        </a>
-      ))}
+      {urls.map((url, index) => {
+        const file = files.find(entry => entry.url === url);
+        const image = !file || file.fileType === "image";
+        const Icon = file?.fileType === "video" ? Film : FileText;
+        return <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="min-w-0 overflow-hidden rounded-xl border border-outline-variant hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary">
+          {image ? <img src={url} alt={`Bằng chứng ${index + 1}`} width={320} height={144} loading="lazy" className="h-36 w-full object-cover" />
+            : <div className="flex min-h-36 flex-col items-center justify-center gap-2 p-3 text-center"><Icon aria-hidden="true" size={28} /><span className="break-all text-sm">{file?.fileName || (file?.fileType === "video" ? "Video bằng chứng" : "Tài liệu bằng chứng")}</span></div>}
+          <p className="p-2 text-xs font-semibold text-primary">{image ? "Mở ảnh gốc" : file?.fileType === "video" ? "Mở video gốc" : "Mở tài liệu gốc"}</p>
+        </a>;
+      })}
     </div>
   );
 }
@@ -27,20 +34,11 @@ interface CaseDetailModalProps {
   selectedTitle?: string;
   detailEvidence: string[];
   busy: boolean;
-  actionError: string;
-  evidenceNote: string;
-  onEvidenceNoteChange: (value: string) => void;
-  onRequestEvidence: () => void;
-  nextStatus: string;
-  onNextStatusChange: (value: string) => void;
-  reviewNote: string;
-  onReviewNoteChange: (value: string) => void;
-  resolutionNote: string;
-  onResolutionNoteChange: (value: string) => void;
-  onReviewReport: () => void;
   onReverifyReport?: () => void;
   onOpenViolationForm: () => void;
   onClose: () => void;
+  onAIUpdated?: () => void;
+  onReviewBusyChange?: (busy: boolean) => void;
 }
 
 export function CaseDetailModal({
@@ -50,23 +48,15 @@ export function CaseDetailModal({
   selectedTitle,
   detailEvidence,
   busy,
-  evidenceNote,
-  onEvidenceNoteChange,
-  onRequestEvidence,
-  nextStatus,
-  onNextStatusChange,
-  reviewNote,
-  onReviewNoteChange,
-  resolutionNote,
-  onResolutionNoteChange,
-  onReviewReport,
   onReverifyReport,
   onOpenViolationForm,
   onClose,
+  onAIUpdated,
+  onReviewBusyChange,
 }: CaseDetailModalProps) {
   const hasReviewPanel = selected?.kind === "violation"
     || (selected?.kind === "report" && selected.item.status !== "cancelled" && !selected.item.createdViolationId
-      && (!selected.item.isCustomerNoShow || ["pending", "under_review"].includes(selected.item.status)));
+      && selected.item.isCustomerNoShow && ["pending", "under_review"].includes(selected.item.status));
   return (
     <Modal open={open} title={selectedTitle || "Chi tiết hồ sơ"} onClose={onClose} size="xl" closeOnOverlayClick={!busy}>
       {detailLoading && !selected ? (
@@ -95,6 +85,8 @@ export function CaseDetailModal({
                 </>
               )}
             </section>
+            {selected.kind === "report" && !selected.item.isCustomerNoShow && <ComplaintReviewPanel key={selected.item._id} reportId={selected.item._id}
+              active={!["confirmed", "resolved", "rejected", "cancelled"].includes(selected.item.status) && !selected.item.createdViolationId} onUpdated={onAIUpdated} reviewable={selected.item.status !== "cancelled" && !selected.item.createdViolationId} reviewBusy={busy} onReviewBusyChange={onReviewBusyChange} />}
             {selected.kind === "report" && selected.item.isCustomerNoShow && <NoShowVerificationSummary report={selected.item} />}
             {selected.kind === "report" && selected.item.isCustomerNoShow && ["pending", "under_review"].includes(selected.item.status)
               && !selected.item.createdViolationId && onReverifyReport && <div className="space-y-2 rounded-xl border border-outline-variant p-3 text-sm">
@@ -102,7 +94,7 @@ export function CaseDetailModal({
                 <p className="text-xs text-on-surface-variant">Đối chiếu lại cuộc gọi trên bằng chứng và khoảng thời gian chờ đã lưu. Kết quả cũ được ghi vào lịch sử; admin tiếp tục quyết định xử lý báo cáo.</p>
               </div>}
             {selected.kind === "report" && selected.item.noShowDetails && <NoShowReviewDetails details={selected.item.noShowDetails} report={selected.item} />}
-            {selected.kind !== "violation" && !(selected.kind === "report" && selected.item.noShowDetails?.evidence.length) && <section><h3 className="mb-3 font-bold">Bằng chứng</h3><EvidenceLinks urls={detailEvidence} /></section>}
+            {selected.kind !== "violation" && !(selected.kind === "report" && selected.item.noShowDetails?.evidence.length) && <section><h3 className="mb-3 font-bold">Bằng chứng</h3><EvidenceLinks urls={detailEvidence} files={selected.item.evidenceFiles} /></section>}
             {selected.kind === "report" && selected.item.evidenceFiles.some(file => file.note) && <section className="space-y-2 text-sm"><h3 className="font-bold">Ghi chú bằng chứng</h3>{selected.item.evidenceFiles.filter(file => file.note).map((file, index) => <p key={`${file.url}-${index}`}><b>{file.uploadedBy?.fullName || file.fileName || "Bằng chứng"}:</b> {file.note}</p>)}</section>}
             {selected.kind === "report" && selected.item.requestedEvidenceNote && (
               <section className="rounded-xl bg-warning-container p-4 text-sm text-on-warning-container">
@@ -119,30 +111,10 @@ export function CaseDetailModal({
           </div>
 
           {hasReviewPanel && <aside className="space-y-5">
-            {selected.kind === "report" && !selected.item.isCustomerNoShow && !["confirmed", "resolved", "rejected", "cancelled"].includes(selected.item.status) && (
-              <section className="rounded-2xl border border-outline-variant p-4">
-                <h3 className="font-bold">Yêu cầu bổ sung bằng chứng</h3>
-                <textarea value={evidenceNote} onChange={(event) => onEvidenceNoteChange(event.target.value)} minLength={5} maxLength={3000} rows={4} className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
-                <button type="button" onClick={onRequestEvidence} disabled={busy || evidenceNote.trim().length < 5} className="btn-primary mt-3 w-full">Gửi yêu cầu</button>
-              </section>
-            )}
-            {selected.kind === "report" && selected.item.status !== "cancelled" && !selected.item.createdViolationId
-              && (!selected.item.isCustomerNoShow || ["pending", "under_review"].includes(selected.item.status)) && (
-              <section className="rounded-2xl border border-outline-variant p-4">
-                <h3 className="font-bold">Xem xét báo cáo</h3>
-                {selected.item.isCustomerNoShow && <p className="mt-2 text-sm text-on-surface-variant">Chấp thuận báo cáo sẽ hủy đơn và Handigo chi hỗ trợ thợ 5.000đ; không thu thêm của khách. Kiểm tra mốc đến nơi, liên hệ và ảnh bằng chứng trước khi quyết định.</p>}
-                <select value={nextStatus} onChange={(event) => onNextStatusChange(event.target.value)} className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant px-3">
-                  <option value="">Chọn trạng thái</option>
-                  <option value="under_review">Đang xem xét</option>
-                  <option value="confirmed">{selected.item.isCustomerNoShow ? 'Chấp thuận và hỗ trợ 5.000đ' : 'Xác nhận'}</option>
-                  <option value="rejected">Từ chối</option>
-                  {!selected.item.isCustomerNoShow && <option value="resolved">Đã xử lý</option>}
-                </select>
-                <textarea value={reviewNote} onChange={(event) => onReviewNoteChange(event.target.value)} maxLength={3000} rows={3} placeholder="Ghi chú xem xét..." className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
-                <textarea value={resolutionNote} onChange={(event) => onResolutionNoteChange(event.target.value)} maxLength={3000} rows={3} placeholder="Kết luận xử lý..." className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
-                <button type="button" onClick={onReviewReport} disabled={busy || !nextStatus} className="btn-primary mt-3 w-full">Cập nhật</button>
-              </section>
-            )}
+            {selected.kind === "report" && selected.item.isCustomerNoShow && ["pending", "under_review"].includes(selected.item.status) && !selected.item.createdViolationId && <section className="space-y-3">
+              <p className="text-sm text-on-surface-variant">Chấp thuận báo cáo sẽ hủy đơn và Handigo chi hỗ trợ thợ 5.000đ; không thu thêm của khách. Kiểm tra mốc đến nơi, liên hệ và ảnh bằng chứng trước khi quyết định.</p>
+              <ReportReviewForm key={selected.item._id} reportId={selected.item._id} customerNoShow busy={busy} onBusyChange={onReviewBusyChange} onUpdated={onAIUpdated} />
+            </section>}
             {selected.kind === "violation" && (
               <section className="rounded-2xl border border-outline-variant p-4 text-sm">
                 <p><b>Mức độ:</b> {VIOLATION_SEVERITY_LABELS[selected.item.severity]}</p>
@@ -152,10 +124,9 @@ export function CaseDetailModal({
               </section>
             )}
           </aside>}
-          {selected.kind !== "violation" && !["cancelled", "rejected"].includes(selected.item.status) && !selected.item.createdViolationId
-            && !(selected.kind === "report" && selected.item.isCustomerNoShow && selected.item.status !== "confirmed") && (
+          {selected.kind === "report" && selected.item.status === "confirmed" && !selected.item.createdViolationId && (
             <div className="flex justify-end border-t border-outline-variant/40 pt-4 xl:col-span-full">
-              <button type="button" onClick={onOpenViolationForm} className="w-full rounded-xl bg-error px-6 py-3 font-bold text-on-error sm:w-auto sm:min-w-48">Tạo vi phạm</button>
+              <button type="button" onClick={onOpenViolationForm} disabled={busy} className="w-full rounded-xl bg-error px-6 py-3 font-bold text-on-error disabled:opacity-50 sm:w-auto sm:min-w-48">Tạo vi phạm</button>
             </div>
           )}
           {selected.kind !== "violation" && selected.item.createdViolationId && (

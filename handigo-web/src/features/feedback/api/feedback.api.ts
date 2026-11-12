@@ -1,5 +1,5 @@
 import api from '@/api/client';
-import type { Feedback, FeedbackList, FeedbackPayload, FeedbackQuery, OrderFeedbackContext } from '../types/feedback.types';
+import type { Feedback, FeedbackList, FeedbackPayload, FeedbackQuery, OrderFeedbackContext, FeedbackModerationList, ModerationReport, ModerationReportQuery } from '../types/feedback.types';
 import type { Order } from '@/types/booking';
 import type { QuotationDetail } from '@/features/provider/types/providerOrder.types';
 
@@ -11,6 +11,12 @@ export interface AdminFeedbackDetail {
 
 const data = <T>(response: { data: { data: T } }) => response.data.data;
 export const feedbackApi = {
+  moderationReport: async (params: ModerationReportQuery) =>
+    data<ModerationReport>(await api.get('/admin/feedbacks/moderation-report', { params })),
+  moderationList: async (page: number, resourceId?: string, kind?: 'comment' | 'reply') =>
+    data<FeedbackModerationList>(await api.get('/feedback/moderation', { params: { page, limit: 5, resourceId, kind } })),
+  reviewModeration: async (id: string, status: 'approved' | 'rejected') =>
+    api.patch(`/feedback/moderation/${id}`, { status }),
   getByOrder: async (orderId: string) => data<Feedback | null>(await api.get(`/feedback/orders/${orderId}`)),
   getOrderContext: async (orderId: string) => data<OrderFeedbackContext>(await api.get(`/feedback/orders/${orderId}/context`)),
   getProviderFeedbackByOrder: async (orderId: string) => data<Feedback | null>(await api.get(`/feedback/provider/orders/${orderId}`)),
@@ -25,7 +31,8 @@ export const feedbackApi = {
   adminList: async (query: FeedbackQuery) => data<FeedbackList>(await api.get('/admin/feedbacks', { params: query })),
   adminDetail: async (id: string) => data<AdminFeedbackDetail>(await api.get(`/admin/feedbacks/${id}`)),
   reply: async (id: string, content: string, images?: string[]) => data<Feedback>(await api.put(`/feedback/${id}/reply`, { content, images })),
-  setVisibility: async (id: string, isVisible: boolean) => data<Feedback>(await api.patch(`/feedback/${id}/visibility`, { isVisible })),
+  setVisibility: async (id: string, isVisible: boolean, expectedVersion?: string) =>
+    data<Feedback>(await api.patch(`/feedback/${id}/visibility`, { isVisible, expectedVersion })),
   uploadImages: async (files: File[]) => {
     const form = new FormData();
     files.forEach((file) => form.append('images', file));

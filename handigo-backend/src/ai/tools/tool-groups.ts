@@ -4,16 +4,16 @@ import { z } from "zod";
 const orders = ["get_my_bookings", "get_booking", "search_my_bookings"];
 export const TOOL_GROUPS = {
   booking: ["search_services", "get_service", "get_service_catalog", "get_price", "get_available_times",
-    ...orders, "rebook_booking", "get_previous_providers",
+    ...orders, "get_my_rewards", "get_reward_history", "get_my_reward_vouchers", "redeem_reward", "rebook_booking", "get_previous_providers",
     "get_addresses", "get_booking_vouchers", "search_booking_providers", "save_booking_address", "update_booking_draft", "create_booking"],
   support: [...orders, "create_support_ticket", "get_my_support_tickets", "get_support_ticket",
     "reply_support_ticket", "cancel_support_ticket"],
   complaint: [...orders, "create_complaint", "get_my_complaints", "get_complaint", "cancel_complaint", "add_complaint_evidence"],
-  order: [...orders, "get_booking_provider", "get_booking_feedback", "submit_booking_feedback", "rebook_booking", "get_previous_providers", "get_booking_quotation", "reject_booking_quotation", "get_booking_refunds", "get_order_provider_options", "select_order_provider", "respond_provider_reassignment", "get_cancellation_preview", "cancel_booking"],
-  payment: [...orders, "get_booking_quotation", "get_booking_refunds", "create_payment", "get_payment_status", "cancel_payment"],
+  order: [...orders, "get_booking_reschedule", "request_booking_reschedule", "respond_booking_reschedule", "cancel_booking_reschedule", "get_booking_arrival_estimate", "get_booking_provider", "get_booking_feedback", "submit_booking_feedback", "rebook_booking", "get_previous_providers", "get_booking_quotation", "reject_booking_quotation", "get_booking_refunds", "get_order_provider_options", "select_order_provider", "respond_provider_reassignment", "get_cancellation_preview", "cancel_booking"],
+  payment: [...orders, "get_my_wallet", "get_wallet_history", "create_wallet_deposit", "get_wallet_deposit_status", "cancel_wallet_deposit", "get_booking_quotation", "get_booking_refunds", "create_payment", "get_payment_status", "cancel_payment"],
 } as const;
 
-export const COMMON_TOOLS = ["search_customer_knowledge", "get_system_info"];
+export const COMMON_TOOLS = ["search_customer_knowledge", "get_system_info", "get_repair_advice", "analyze_repair_images"];
 export const toolGroupSchema = z.object({
   intent: z.enum(["booking", "support", "complaint", "order", "payment"]),
 }).strict();
@@ -26,9 +26,9 @@ export function inferToolIntent(message: string): ToolIntent | undefined {
   const matches: ToolIntent[] = [];
   if (/\b(khieu nai|bang chung|complaint)\b/.test(text)) matches.push("complaint");
   if (/\b(yeu cau ho tro|phieu ho tro|ticket|lien he ho tro)\b/.test(text)) matches.push("support");
-  if (/\b(thanh toan|ma qr|huy qr|quet qr|giao dich|nap vi)\b/.test(text)) matches.push("payment");
-  if (/\b(huy don|phi huy|tien do don|trang thai don|danh gia|bao gia|hoan tien|doi tho|chon lai tho|lien he tho|vi tri tho)\b/.test(text)) matches.push("order");
-  if (/\b(dat (lich|don|dich vu|lai)|dich vu|bang gia|don gia|voucher|ma (giam gia|uu dai)|dia chi|tho tung)\b/.test(text)) matches.push("booking");
+  if (/\b(thanh toan|ma qr|huy qr|quet qr|giao dich|nap vi|so du|lich su vi|vi con|vi cua toi)\b/.test(text)) matches.push("payment");
+  if (/\b(doi lich|doi gio|doi ngay|tho den|tho toi|bao lau|huy don|phi huy|tien do don|trang thai don|danh gia|bao gia|hoan tien|doi tho|chon lai tho|lien he tho|vi tri tho)\b/.test(text)) matches.push("order");
+  if (/\b(diem thuong|doi diem|tich diem|dat (lich|don|dich vu|lai)|dich vu|bang gia|don gia|voucher|ma (giam gia|uu dai)|dia chi|tho tung)\b/.test(text)) matches.push("booking");
   if (matches.length === 1) return matches[0];
   if (!matches.length && /\bord-[a-z0-9]+\b/.test(text)) return "order";
   return undefined;
@@ -36,7 +36,7 @@ export function inferToolIntent(message: string): ToolIntent | undefined {
 
 export const selectToolGroup = {
   name: "select_tool_group",
-  description: "Chọn nhóm công cụ theo yêu cầu mới nhất và ngữ cảnh: booking = tìm dịch vụ, giá, đặt/sửa/tiếp tục bản nháp, đặt lại đơn cũ hoặc tìm thợ từng phục vụ; support = yêu cầu hỗ trợ; complaint = khiếu nại hoặc bổ sung ảnh bằng chứng; order = tra thợ thực hiện/liên hệ/vị trí, tạo/sửa/xem đánh giá dịch vụ, tìm đơn nhiều tiêu chí, đọc/từ chối báo giá, tra hoàn tiền, hủy đơn, phí hủy, chọn lại thợ cho đơn đã tạo; payment = thanh toán, hủy riêng QR nhưng giữ đơn, đọc báo giá hoặc tra hoàn tiền/giao dịch. Chọn một nhóm mỗi lần; có thể chuyển nhóm khi cần bước khác. Không làm thay đổi dữ liệu khách hàng.",
+  description: "Chọn nhóm theo yêu cầu mới nhất: booking = dịch vụ, giá, bản nháp, đặt lại, thợ từng phục vụ, điểm thưởng và đổi voucher; support = yêu cầu hỗ trợ; complaint = khiếu nại/bằng chứng; order = dời lịch đơn đã tạo, phản hồi/thu hồi đề nghị dời lịch, thời gian thợ đến, liên hệ/vị trí thợ, đánh giá, tìm đơn, đọc/từ chối báo giá, hoàn tiền, hủy đơn, chọn lại thợ; payment = số dư/lịch sử ví, tạo/tra/hủy nạp ví, thanh toán, hủy QR giữ đơn, báo giá/hoàn tiền/giao dịch. Có thể chuyển nhóm khi cần bước khác. Không làm thay đổi dữ liệu khách hàng.",
   requiresConfirmation: false,
   inputSchema: z.toJSONSchema(toolGroupSchema, { io: "input" }),
 };

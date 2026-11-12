@@ -1,5 +1,7 @@
 import { ImagePlus, Send, X } from "lucide-react";
+import { FeedbackModerationQueue } from '@/features/feedback/components/FeedbackModerationQueue';
 interface FeedbackReplyFormProps {
+  feedbackId: string;
   content: string;
   onContentChange: (value: string) => void;
   maxContentLength: number;
@@ -13,6 +15,7 @@ interface FeedbackReplyFormProps {
 }
 
 export function FeedbackReplyForm({
+  feedbackId,
   content,
   onContentChange,
   maxContentLength,
@@ -21,13 +24,14 @@ export function FeedbackReplyForm({
   onFilesSelected,
   maxImages,
   submitting,
+  submitError,
   onSubmit,
 }: FeedbackReplyFormProps) {
   return (
     <div className="rounded-2xl border border-primary/20 bg-surface-container-lowest p-4 sm:p-5">
       <div className="mb-3">
         <h3 className="font-bold text-on-surface">Phản hồi đánh giá</h3>
-        <p className="text-xs text-on-surface-variant">Bạn chỉ có thể gửi một phản hồi chính thức.</p>
+        <p className="text-xs text-on-surface-variant">Bạn chỉ có thể gửi một phản hồi chính thức. Vui lòng tránh chửi tục, miệt thị và đe dọa.</p>
       </div>
       <textarea
         value={content}
@@ -39,6 +43,10 @@ export function FeedbackReplyForm({
         className="w-full resize-none rounded-2xl border border-outline-variant/50 bg-surface-container-lowest px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-60"
       />
       <div className="mt-1 text-right text-xs text-on-surface-variant">{content.length}/{maxContentLength}</div>
+      {submitError && <p role="alert" className="mt-2 text-sm text-error">{submitError}</p>}
+      <div className="mt-3">
+        <FeedbackModerationQueue resourceId={feedbackId} kind="reply" revision={String(submitting)} onRestore={onContentChange} />
+      </div>
 
       {previewUrls.length > 0 && (
         <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">

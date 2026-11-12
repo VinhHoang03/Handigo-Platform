@@ -12,6 +12,7 @@ import { recordOrderStatus } from "../utils/orderHistory";
 import { resolveAutomaticPromotion, claimPromotion, releaseOrderPromotion } from "./promotion.service";
 import { assertFeatureAllowed } from "./penaltyPolicy.service";
 import { withOrderAddress } from "../utils/orderAddress";
+import { getOrderSettlement, withPendingOrderSettlement } from "../utils/orderSettlement";
 import { OrderStatus } from "../models/orderStatus.model";
 import { ensureAddressCoordinates, createAddress } from "./address.service";
 import { AppError } from "../utils/appError";
@@ -81,8 +82,12 @@ async function attachQuotationFinalAmounts<T extends {
   currentQuotationId?: unknown;
   addressId?: unknown;
   addressSnapshot?: IOrder["addressSnapshot"];
+  pricing?: IOrder["pricing"];
+  status?: string;
+  paymentStatus?: string;
+  inspectionRequired?: boolean;
 }>(orders: T[]): Promise<Array<T & { quotationFinalAmount?: number }>> {
-  orders = orders.map(withOrderAddress);
+  orders = orders.map((order) => withPendingOrderSettlement(withOrderAddress(order)));
   const quotationIds = orders
     .map((order) => getPopulatedId(order.currentQuotationId))
     .filter((id): id is string => Boolean(id));
@@ -420,7 +425,7 @@ export const OrderService = {
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
       const promotionDiscountAmount = automaticPromotion?.discountAmount ?? 0;
       const { platformCommissionAmount, providerEarningAmount } = calculateBookingSettlement(
-        Math.max(totalAmount - promotionDiscountAmount - voucherDiscountAmount, 0),
+        inspectionRequired ? Math.max(totalAmount - promotionDiscountAmount - voucherDiscountAmount, 0) : totalAmount,
         platformCommissionRate,
         inspectionRequired,
       );
@@ -967,7 +972,7 @@ export const OrderService = {
       id: userId,
       role: isCustomer ? "CUSTOMER" : "PROVIDER",
     });
-    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory, customerCancellationDeadline, ...rescheduleContext };
+    return { ...withPendingOrderSettlement(withOrderAddress(order)), matchingSearch, matchingExpiresAt, statusHistory, customerCancellationDeadline, ...rescheduleContext };
   },
 
   async startOrder(orderId: string, providerUserId: string, enableWorkConfirmation = false): Promise<IOrder> {
@@ -1143,15 +1148,14 @@ export const OrderService = {
         const totalAmount = transactionalOrder.inspectionRequired && transactionalOrder.pricing.baseAmount === undefined
           ? transactionalOrder.depositAmount
           : transactionalOrder.pricing.totalPaidAmount;
-        const commissionRate = transactionalOrder.inspectionRequired
-          ? 0
-          : Math.max(transactionalOrder.pricing.platformCommissionRate, 0);
-        const { platformCommissionAmount } = calculateBookingSettlement(totalAmount, commissionRate, transactionalOrder.inspectionRequired);
+        const settlement = getOrderSettlement(
+          transactionalOrder.pricing, transactionalOrder.inspectionRequired, totalAmount,
+        );
         transactionalOrder.pricing.platformCommissionAmount =
-          platformCommissionAmount;
+          settlement.platformCommissionAmount;
         transactionalOrder.pricing.totalPaidAmount = totalAmount;
         transactionalOrder.pricing.providerEarningAmount =
-          totalAmount - platformCommissionAmount;
+          settlement.providerEarningAmount;
         if (transactionalOrder.inspectionRequired) {
           transactionalOrder.pricing.platformCommissionRate = 0;
         }

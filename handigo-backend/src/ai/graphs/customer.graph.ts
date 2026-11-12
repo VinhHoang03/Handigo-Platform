@@ -11,8 +11,11 @@ import type { ToolRegistry } from "../tools/tool-registry";
 import { ReadOnlyGraphState, type ReadOnlyGraphData } from "../runtime/graph-state";
 import { projectReadOnlySession } from "../runtime/session-adapter";
 import { READ_ONLY_GRAPH_TOOLS, routeReadOnlyDecision } from "../runtime/graph-router";
+import { REPAIR_ADVICE_PROMPT } from "../agent/repair-advice-prompt";
+import { formatRepairSafetyAdvice, repairSafetyAdvice } from "../knowledge/repair-advice";
 
 const PROMPT = `Bạn là trợ lý tra cứu Handigo dành cho khách hàng. Trả lời tiếng Việt có dấu, ngắn gọn.
+${REPAIR_ADVICE_PROMPT}
 Phiên thử nghiệm này chỉ tra cứu, không thay đổi bản nháp, đặt đơn, thanh toán hoặc gửi hồ sơ.
 Khi được yêu cầu thao tác, hướng khách dùng chức năng tương ứng trên ứng dụng; không hứa đã thực hiện.
 Chính sách/cách sử dụng phải tra search_customer_knowledge và nêu tên nguồn. Không có nguồn thì nói rõ và hướng dẫn hỗ trợ.
@@ -68,6 +71,11 @@ export function buildReadOnlyCustomerGraph(deps: ReadOnlyGraphDependencies) {
       deps.signal.throwIfAborted();
       const start = Date.now();
       const data = structuredClone(previous);
+      const safety = repairSafetyAdvice(data.turn.message);
+      if (safety) {
+        data.turn.reply = { state: "WAITING_USER_INPUT", message: formatRepairSafetyAdvice(safety) };
+        return { data };
+      }
       if (data.turn.iterations >= maxIterations) {
         data.turn.reply = data.turn.modelRetryCount ? { state: "FAILED", message: "Trợ lý chưa thể hoàn tất sau nhiều lần thử. Bạn có thể gửi lại yêu cầu sau." }
           : { state: "WAITING_USER_INPUT", message: "Chưa đủ thông tin để trả lời. Bạn có thể nêu rõ dịch vụ hoặc mã đơn cần tra cứu." };

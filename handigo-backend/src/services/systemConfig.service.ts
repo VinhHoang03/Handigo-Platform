@@ -137,8 +137,9 @@ const createAuditLog = async (
   configId: Types.ObjectId,
   before: Record<string, unknown> | null,
   after: Record<string, unknown>,
+  session: mongoose.ClientSession,
 ) => {
-  await AuditLog.create({
+  await AuditLog.create([{
     actorId: new Types.ObjectId(admin.id),
     actorRole: "admin",
     action,
@@ -147,7 +148,7 @@ const createAuditLog = async (
     oldValue: before,
     newValue: after,
     description: `${action} ${after.key}`,
-  });
+  }], { session });
 };
 
 const buildListFilter = (query: SystemConfigListQuery) => {
@@ -229,17 +230,20 @@ export const createConfig = async (admin: RequestUser, input: CreateSystemConfig
     updatedAt: now,
   };
 
+  await AuditLog.init();
   try {
-    const result = await collection().insertOne(config as SystemConfigDocument);
-    const created = {
-      _id: result.insertedId,
-      ...config,
-    };
-    const response = serializeConfig(created);
+    return await mongoose.connection.transaction(async (session) => {
+      const result = await collection().insertOne(config as SystemConfigDocument, { session });
+      const created = {
+        _id: result.insertedId,
+        ...config,
+      };
+      const response = serializeConfig(created);
 
-    await createAuditLog(admin, "CREATE_SYSTEM_CONFIG", result.insertedId, null, response);
+      await createAuditLog(admin, "CREATE_SYSTEM_CONFIG", result.insertedId, null, response, session);
 
-    return response;
+      return response;
+    });
   } catch (error: any) {
     if (error?.code === 11000) {
       throw new AppError("Key cấu hình hệ thống đã tồn tại", 409);
@@ -256,52 +260,60 @@ export const updateConfig = async (
 ) => {
   assertAdmin(admin);
   await ensureIndexes();
+  await AuditLog.init();
 
-  const existing = await collection().findOne({ key });
+  return mongoose.connection.transaction(async (session) => {
+    const existing = await collection().findOne({ key }, { session });
 
-  if (!existing) {
-    throw new AppError("Không tìm thấy cấu hình hệ thống", 404);
-  }
+    if (!existing) {
+      throw new AppError("Không tìm thấy cấu hình hệ thống", 404);
+    }
 
-  const nextType = input.type ?? existing.type;
-  validateOrderOperationConfig(key, input.value, nextType, input.isPublic ?? existing.isPublic);
-  validateRewardOffer(key, input.value, nextType, input.isPublic ?? existing.isPublic);
-  validateBookingPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
-  validateBusinessPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
-  assertConfigValueMatchesType(input.value, nextType);
-  await assertMatchingConfig(key, input.value, nextType);
+    const nextType = input.type ?? existing.type;
+    validateOrderOperationConfig(key, input.value, nextType, input.isPublic ?? existing.isPublic);
+    validateRewardOffer(key, input.value, nextType, input.isPublic ?? existing.isPublic);
+    validateBookingPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
+    validateBusinessPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
+    assertConfigValueMatchesType(input.value, nextType);
+    await assertMatchingConfig(key, input.value, nextType);
 
-  const now = new Date();
-  const update = {
-    value: input.value,
-    type: nextType,
-    description: input.description === undefined ? existing.description ?? null : input.description ?? null,
-    isPublic: input.isPublic === undefined ? existing.isPublic : input.isPublic,
-    updatedBy: new Types.ObjectId(admin.id),
-    updatedAt: now,
-  };
+    const now = new Date();
+    const update = {
+      value: input.value,
+      type: nextType,
+      description: input.description === undefined ? existing.description ?? null : input.description ?? null,
+      isPublic: input.isPublic === undefined ? existing.isPublic : input.isPublic,
+      updatedBy: new Types.ObjectId(admin.id),
+      updatedAt: now,
+    };
 
-  await collection().updateOne({ key }, { $set: update });
+    await collection().updateOne({ key }, { $set: update }, { session });
 
-  const updated = {
-    ...existing,
-    ...update,
-  };
-  const before = serializeConfig(existing);
-  const after = serializeConfig(updated);
+    const updated = {
+      ...existing,
+      ...update,
+    };
+    const before = serializeConfig(existing);
+    const after = serializeConfig(updated);
 
-  await createAuditLog(admin, "UPDATE_SYSTEM_CONFIG", existing._id, before, after);
+    await createAuditLog(admin, "UPDATE_SYSTEM_CONFIG", existing._id, before, after, session);
 
-  return after;
+    return after;
+  });
 };
 
 export const getNumberConfigValue = async (key: string, fallbackValue: number) => {
   await ensureIndexes();
 
   const config = await collection().findOne({ key });
-  if (!config || config.type !== "NUMBER") {
+  if (!config) {
     return fallbackValue;
   }
+  if (key === "PLATFORM_FEE_PERCENT") {
+    try { validateBusinessPolicy(key, config.value, config.type, config.isPublic); }
+    catch { throw new AppError("Cấu hình phí nền tảng không hợp lệ. Vui lòng liên hệ quản trị viên.", 503); }
+  }
+  if (config.type !== "NUMBER") return fallbackValue;
 
   const value = Number(config.value);
   return Number.isFinite(value) ? value : fallbackValue;
@@ -339,6 +351,12 @@ export const getOrderOperationPolicy = async (session?: mongoose.ClientSession) 
 };
 
 const validateBusinessPolicy = (key: string, value: unknown, type: SystemConfigType, isPublic: boolean) => {
+  if (key === "PLATFORM_FEE_PERCENT") {
+    if (type !== "NUMBER" || typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100) {
+      throw new AppError("Phí nền tảng phải là số từ 0 đến 100 phần trăm.", 400);
+    }
+    return;
+  }
   if (key !== "REFUND_POLICY" && key !== "REWARD_POLICY") return;
   if (type !== "JSON" || isPublic) throw new AppError("Chính sách nghiệp vụ phải là JSON nội bộ.", 400);
   const parsed = key === "REFUND_POLICY" ? refundPolicySchema.safeParse(value) : rewardPolicySchema.safeParse(value);

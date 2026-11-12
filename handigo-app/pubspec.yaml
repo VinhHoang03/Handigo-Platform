@@ -30,6 +30,7 @@ dependencies:
   flutter_map: ^8.3.2
   latlong2: ^0.9.1
   audioplayers: ^6.7.1
+  material_symbols_icons: ^4.2960.0
 
 dev_dependencies:
   flutter_test:

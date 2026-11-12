@@ -13,7 +13,7 @@ function setup() {
     orderId: { _id: new Types.ObjectId(), orderCode: 'HD123', voucherSnapshot: { name: 'Ưu đãi', code: 'WELCOME10' } } }];
   const modules = {
     mongoose: { Types }, '../models/auditLog.model': {}, '../models/payment.model': {},
-    '../models/promotion.model': {}, '../models/voucher.model': {}, '../utils/bookingPolicy': {},
+    '../models/promotion.model': {}, '../models/voucher.model': {}, '../utils/orderSettlement': {},
     '../utils/appError': {}, './penaltyPolicy.service': {},
     '../models/order.model': { Order: { find: () => ({ select() { return this; }, lean: async () => [] }) } },
     '../models/voucherUsage.model': { VoucherUsage: {

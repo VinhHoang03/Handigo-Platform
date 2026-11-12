@@ -7,11 +7,34 @@ import '../../account/domain/account_models.dart';
 import '../../services/domain/service_category.dart';
 import '../domain/provider_models.dart';
 import '../domain/provider_income.dart';
+import '../domain/provider_rewards.dart';
 import '../../account/data/account_repository.dart';
 
 class ProviderRepository {
   const ProviderRepository(this._api);
   final ApiClient _api;
+
+  Future<ProviderRewardWeek> rewardWeek(String weekStart) async {
+    final response = await _api.request(
+      '/providers/me/rewards',
+      authenticated: true,
+      query: {'weekStart': weekStart},
+    );
+    return ProviderRewardWeek.fromJson(
+      response['data'] as Map<String, dynamic>,
+    );
+  }
+
+  Future<ProviderRewardHistory> rewardHistory(String? before) async {
+    final response = await _api.request(
+      '/providers/me/rewards/history',
+      authenticated: true,
+      query: {'before': ?before},
+    );
+    return ProviderRewardHistory.fromJson(
+      response['data'] as Map<String, dynamic>,
+    );
+  }
 
   Future<({double latitude, double longitude, bool approximate})>
   assignmentCoordinates(String address, String ward, String province) async {
@@ -456,6 +479,15 @@ class ProviderRepository {
         if (current != null) 'quotationId': current.id,
         if (current != null) 'expectedRevision': current.revision,
       },
+    );
+  }
+
+  Future<void> confirmCashPayment(String orderId, double expectedAmount) async {
+    await _api.request(
+      '/orders/$orderId/cash-payment/confirm',
+      method: 'POST',
+      authenticated: true,
+      data: {'expectedAmount': expectedAmount},
     );
   }
 

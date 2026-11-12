@@ -14,7 +14,9 @@ import { WalletTransaction } from "../models/walletTransaction.model";
 import { Refund } from "../models/refund.model";
 import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
 import type { CreatePaymentInput, PaymentHistoryQuery } from "../validations/payment.validator";
-import { handleWalletDepositPayosWebhook } from "./wallet.service";
+import { handleWalletDepositPayosWebhook, recordCompletedOrderSettlement } from "./wallet.service";
+import { earnOrderRewards } from "./reward.service";
+import { emitToUser } from "../sockets/socketServer";
 import { buildTransactionCode, withTransactionRetry } from "../utils/transaction";
 import { createLogger } from "../utils/logger";
 import { markOrderVoucherAsUsed } from "./voucher.service";
@@ -37,7 +39,34 @@ export interface ConfirmedPaymentCancellation {
 }
 
 const isFixedPriceWorkPayment = (order: InstanceType<typeof Order>) =>
-  !order.inspectionRequired && order.status === "in_progress" && order.paymentStatus === "unpaid";
+  !order.inspectionRequired && ["in_progress", "completed"].includes(order.status) && order.paymentStatus === "unpaid";
+
+// Thanh toán sau nghiệm thu phải quyết toán cùng transaction và không ghi thu nhập lần hai.
+const settleCompletedFixedPricePayment = async (order: InstanceType<typeof Order>, session: ClientSession) => {
+  if (order.inspectionRequired || order.status !== "completed" || order.paymentStatus !== "paid") return;
+  const existing = await WalletTransaction.exists({ relatedOrderId: order._id,
+    type: { $in: ["provider_earning", "platform_fee"] }, status: "success", isDeleted: false }).session(session);
+  if (!existing) {
+    const provider = await Provider.findOne({ _id: order.providerId, isDeleted: false }).session(session);
+    if (!provider) throw new AppError("Không tìm thấy thợ thực hiện đơn hàng.", 409);
+    await recordCompletedOrderSettlement(order, provider, session);
+  }
+  await earnOrderRewards(order, session);
+};
+
+// Chỉ gửi tín hiệu đọc lại đơn sau khi thanh toán đã commit.
+const publishOrderPaymentUpdate = async (orderId: string) => {
+  try {
+    const order = await Order.findById(orderId).select("customerId providerId").lean();
+    if (!order) return;
+    const provider = order.providerId ? await Provider.findById(order.providerId).select("userId").lean() : null;
+    for (const userId of [order.customerId, provider?.userId]) {
+      if (userId) emitToUser(userId.toString(), "order:updated", { orderId });
+    }
+  } catch {
+    paymentLogger.warn("Đã ghi nhận thanh toán; chưa gửi được cập nhật đơn hàng.", { orderId });
+  }
+};
 
 // Kiểm tra lại bên trong transaction để số tiền trừ đúng với bản khách đã xác nhận.
 const assertConfirmedPayment = (order: InstanceType<typeof Order>, amount: number,
@@ -330,7 +359,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
           balance: { $gte: chargedAmount },
         },
         { $inc: { balance: -chargedAmount } },
-        { new: true, session },
+        { returnDocument: "after", session },
       );
 
       if (!wallet && !waivedDeposit) {
@@ -345,7 +374,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       const createdPayment = switchingCash ? await Payment.findOneAndUpdate({
         _id: duplicatePayment!._id, method: "cash", status: "pending", isDeleted: false,
       }, { $set: { ...paymentData, "metadata.previousMethod": "cash", "metadata.methodChangedAt": new Date() } },
-      { new: true, session, runValidators: true }) : (await Payment.create(
+      { returnDocument: "after", session, runValidators: true }) : (await Payment.create(
         [
           {
             orderId: transactionalOrder._id,
@@ -403,6 +432,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       }
 
       await markOrderVoucherAsUsed(transactionalOrder, session);
+      await settleCompletedFixedPricePayment(transactionalOrder, session);
       await transactionalOrder.save({ session });
       paymentOrder = transactionalOrder;
       return createdPayment;
@@ -421,6 +451,8 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
   if (shouldDispatch) {
     triggerDispatch(paymentOrder._id.toString());
   }
+
+  await publishOrderPaymentUpdate(paymentOrder._id.toString());
 
   await createNotificationRecord({
     userId: paymentOrder.customerId,
@@ -503,7 +535,7 @@ const reserveExternalPayment = async (
       }, { $set: { method: "payos", transactionCode, gatewayOrderCode,
         gatewayResponse: { orderCode: Number(gatewayOrderCode), provider: "payos" },
         "metadata.previousMethod": "cash", "metadata.methodChangedAt": new Date() } },
-      { new: true, session, runValidators: true }) : (await Payment.create(
+      { returnDocument: "after", session, runValidators: true }) : (await Payment.create(
         [
           {
             orderId: order._id,
@@ -1030,7 +1062,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   const wallet = await Wallet.findOneAndUpdate(
     { userId: provider.userId, balance: { $gte: platformFee } },
     { $inc: { balance: -platformFee } },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!wallet) {
@@ -1125,6 +1157,8 @@ const syncPaidPayosPaymentToOrder = async (
   if (markVoucherUsed) {
     await markOrderVoucherAsUsed(order, session);
   }
+  if (payment.paymentType === "full") order.paymentMethod = "bank";
+  await settleCompletedFixedPricePayment(order, session);
   await order.save({ session });
   return shouldDispatch;
 };
@@ -1142,7 +1176,7 @@ type PayosPaymentLink = {
 const refundUnappliedPayosPayment = async (payment: InstanceType<typeof Payment>, session: ClientSession) => {
   const order = await Order.findOneAndUpdate(
     { _id: payment.orderId, customerId: payment.customerId },
-    { $inc: { __v: 1 } }, { new: true, session, runValidators: true },
+    { $inc: { __v: 1 } }, { returnDocument: "after", session, runValidators: true },
   );
   if (!order) throw new AppError("Không tìm thấy đơn hàng của giao dịch PayOS.", 404);
   const replacement = await Payment.findOne({
@@ -1165,7 +1199,7 @@ const refundUnappliedPayosPayment = async (payment: InstanceType<typeof Payment>
   const wallet = await Wallet.findOneAndUpdate(
     { userId: payment.customerId, isDeleted: false },
     { $inc: { balance: payment.amount }, $setOnInsert: { pendingBalance: 0, currency: "VND" } },
-    { new: true, upsert: true, session, runValidators: true },
+    { returnDocument: "after", upsert: true, session, runValidators: true },
   );
   if (!wallet) throw new AppError("Không thể hoàn khoản thanh toán đến muộn vào ví.", 409);
   payment.status = "refunded";
@@ -1307,6 +1341,7 @@ const reconcilePayosPayment = async (payment: InstanceType<typeof Payment>) => {
   const reconciledOrder = await Order.findById(orderId);
 
   if (reconciledPayment) publishPaymentStatus(reconciledPayment);
+  if (reconciledPayment?.status === "paid") await publishOrderPaymentUpdate(orderId);
 
   if (notification) {
     try { emitRealtimeNotification(notification); }
@@ -1517,6 +1552,7 @@ export const handlePayosWebhook = async (payload: any) => {
     throw new AppError("Không thể xử lý webhook PayOS", 500);
   }
   publishPaymentStatus(resultPayment);
+  if (resultPayment.status === "paid") await publishOrderPaymentUpdate(resultPayment.orderId.toString());
   if (notification) {
     try { emitRealtimeNotification(notification); }
     catch { paymentLogger.warn("Đã ghi nhận thanh toán; chưa phát được thông báo tức thời."); }
@@ -1730,7 +1766,7 @@ export const compensateProviderFromInspectionDeposit = async (
       $setOnInsert: { userId: provider.userId, pendingBalance: 0, currency: "VND" },
       $inc: { balance: payment.amount },
     },
-    { new: true, upsert: true },
+    { returnDocument: "after", upsert: true },
   );
 
   const transaction = await WalletTransaction.create({

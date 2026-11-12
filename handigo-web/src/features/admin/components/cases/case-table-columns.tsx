@@ -22,7 +22,7 @@ export const caseTableColumns: Array<DataTableColumn<CaseRow>> = [
       const title = "violationType" in item ? item.violationType : item.title;
       return (
         <>
-          <p className="max-w-xl whitespace-normal break-normal font-bold leading-6"><CaseTitle title={title} /></p>
+          <p className="w-full max-w-[36rem] whitespace-normal break-words font-bold leading-6"><CaseTitle title={title} /></p>
         </>
       );
     },

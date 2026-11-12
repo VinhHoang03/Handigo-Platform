@@ -4,7 +4,7 @@ import {
   notificationTypeLabels,
 } from "./notification-type-meta";
 import { Check } from "lucide-react";
-import { getNotificationUnavailableReason } from "@/components/common/notification-bell/notificationBell.utils";
+import { getNotificationContent, getNotificationUnavailableReason } from "@/components/common/notification-bell/notificationBell.utils";
 import { getRoleLabel } from "@/components/common/navbar/navbar.types";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
@@ -88,7 +88,7 @@ function NotificationListItem({
               )}
             </div>
             <p className="mt-1 text-sm leading-6 text-on-surface-variant">
-              {item.content}
+              {getNotificationContent(item)}
             </p>
             {unavailableReason && (
               <p className="mt-2 text-sm text-on-surface-variant">

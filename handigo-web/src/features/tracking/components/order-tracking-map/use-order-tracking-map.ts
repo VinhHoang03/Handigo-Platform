@@ -23,12 +23,14 @@ import { HardHat, MapPinned } from "lucide-react";
 /** Toàn bộ state/refs/effects phục vụ vòng đời bản đồ theo dõi đơn hàng. */
 export function useOrderTrackingMap(order: Order, viewerRole: "CUSTOMER" | "PROVIDER") {
   const [now, setNow] = useState(() => Date.now());
+  const trackingEnabled = Boolean(order.providerId);
+  const liveTrackingEnabled = trackingEnabled && canShareLiveLocation(order.status);
   const search = order.status === "created" && !order.providerId ? order.matchingSearch : null;
   useEffect(() => {
-    if (!search) return;
+    if (!search && !liveTrackingEnabled) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [search]);
+  }, [search, liveTrackingEnabled]);
   const searchRadiusKm = search
     ? now >= new Date(search.expandsAt).getTime() ? search.expandedRadiusKm : search.initialRadiusKm
     : null;
@@ -49,8 +51,6 @@ export function useOrderTrackingMap(order: Order, viewerRole: "CUSTOMER" | "PROV
   })), [nearby.providers]);
   const address = getOrderAddress(order);
   const addressLine = getAddressLine(address);
-  const trackingEnabled = Boolean(order.providerId);
-  const liveTrackingEnabled = trackingEnabled && canShareLiveLocation(order.status);
   const savedCustomerCoordinate = useMemo(() => getAddressCoordinate(address), [address]);
 
   const { geocodedCoordinate, isGeocoding } = useGeocodedAddress(address, savedCustomerCoordinate);
@@ -121,6 +121,14 @@ export function useOrderTrackingMap(order: Order, viewerRole: "CUSTOMER" | "PROV
     [trackingRoute],
   );
   const hasRoadRoute = liveTrackingEnabled && routePath.length >= 2;
+  const providerLocationIsFresh = providerCoordinate?.updatedAt &&
+    now - new Date(providerCoordinate.updatedAt).getTime() <= 60_000;
+  const etaLabel = viewerRole === "CUSTOMER" && liveTrackingEnabled && order.status === "accepted"
+    ? !providerCoordinate ? "Đang chờ vị trí thợ để ước tính thời gian đến."
+      : !providerLocationIsFresh ? "Vị trí thợ chưa cập nhật, đang chờ ước tính mới."
+        : hasRoadRoute ? `Thợ dự kiến đến sau khoảng ${Math.max(1, Math.ceil(trackingRoute!.durationSeconds / 60))} phút.`
+          : "Chưa có ước tính thời gian đến, đang tải tuyến đường."
+    : null;
 
   const distanceLabel =
     customerCoordinate && providerCoordinate
@@ -146,6 +154,7 @@ export function useOrderTrackingMap(order: Order, viewerRole: "CUSTOMER" | "PROV
   });
 
   return {
+    etaLabel,
     searchMessage,
     nearbyMessage: nearby.message,
     routeMessage: liveTrackingEnabled && providerCoordinate

@@ -3,6 +3,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../auth/domain/app_user.dart';
 import '../domain/order_summary.dart';
+import '../domain/order_reschedule.dart';
 
 class OrderRepository {
   const OrderRepository(this._api);
@@ -41,28 +42,34 @@ class OrderRepository {
     return OrderDetail.fromJson(response['data'] as Map<String, dynamic>);
   }
 
-  Future<bool> previewReschedule(String orderId, DateTime scheduledAt) async {
+  Future<OrderReschedulePreview> previewReschedule(
+    String orderId,
+    DateTime scheduledAt,
+  ) async {
     final response = await _api.request(
       '/orders/$orderId/reschedule-preview',
       method: 'POST',
       data: {'scheduledAt': scheduledAt.toUtc().toIso8601String()},
       authenticated: true,
     );
-    return (response['data'] as Map<String, dynamic>)['approvalRequired']
-        as bool;
+    return OrderReschedulePreview.fromJson(
+      response['data'] as Map<String, dynamic>,
+    );
   }
 
   Future<void> requestReschedule(
     OrderDetail order,
     DateTime scheduledAt,
-    String reason,
-  ) async {
+    String reason, {
+    bool warningAcknowledged = false,
+  }) async {
     await _api.request(
       '/orders/${order.id}/reschedule-requests',
       method: 'POST',
       data: {
         'scheduledAt': scheduledAt.toUtc().toIso8601String(),
         'reason': reason,
+        if (warningAcknowledged) 'warningAcknowledged': true,
         if (order.updatedAt != null)
           'expectedOrderUpdatedAt': order.updatedAt!.toUtc().toIso8601String(),
       },

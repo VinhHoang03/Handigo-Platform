@@ -107,8 +107,23 @@ export const updateUserStatus = async (
   }
 
   await mongoose.connection.transaction(async (session) => {
+    // Ghi cùng tài khoản để các quyết định đồng thời xung đột và được kiểm tra lại.
+    const user = await User.findOneAndUpdate({ _id: userId, isDeleted: false },
+      { $inc: { __v: 1 } }, { returnDocument: "after", runValidators: true, session });
+    if (!user) throw new AppError("Không tìm thấy người dùng", 404);
+    if (user.role === "ADMIN" && status === "locked") {
+      throw new AppError("Không thể khóa tài khoản quản trị trong phiên bản này", 400);
+    }
+    if (user.status === status) {
+      throw new AppError("Trạng thái tài khoản đã thay đổi hoặc thao tác đã được thực hiện. Vui lòng tải lại danh sách.", 409);
+    }
     await User.updateOne({ _id: userId, isDeleted: false },
-      { $set: { status }, $unset: { temporaryLockId: 1 } }, { session, runValidators: true });
+      { $set: { status, ...(status === "locked" ? { tokenVersion: (user.tokenVersion ?? 0) + 1 } : {}) },
+        $unset: { temporaryLockId: 1 } }, { session, runValidators: true });
+    if (status === "locked") {
+      await Session.updateMany({ userId, revokedAt: null },
+        { revokedAt: new Date() }, { session, runValidators: true });
+    }
     if (status === "active") await Violation.updateMany({ userId, status: "active", isDeleted: false,
       penaltyType: { $in: ["TEMPORARY_SUSPEND", "PERMANENT_BAN", "account_locked", "provider_suspended"] } },
       { $set: { status: "resolved" } }, { session, runValidators: true });
@@ -116,10 +131,6 @@ export const updateUserStatus = async (
 
   if (status === "locked") {
     disconnectUserSockets(userId);
-    await Session.updateMany(
-      { userId: user._id, revokedAt: null },
-      { revokedAt: new Date() },
-    );
   }
 
   return getUserById(userId);

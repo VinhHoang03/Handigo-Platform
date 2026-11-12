@@ -42,7 +42,9 @@ class AppUser {
   final String? gender;
   final bool isGoogleAccount;
   final String? providerOnboardingStatus;
-  bool get canViewOrders =>
-      role == UserRole.customer ||
-      (role == UserRole.provider && providerOnboardingStatus == 'APPROVED');
+  bool get canAccessProvider =>
+      role == UserRole.provider &&
+      (providerOnboardingStatus?.isNotEmpty != true ||
+          providerOnboardingStatus == 'APPROVED');
+  bool get canViewOrders => role == UserRole.customer || canAccessProvider;
 }

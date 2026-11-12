@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/providers/app_providers.dart';
-import '../../auth/domain/app_user.dart';
 import '../../service_catalog/presentation/service_catalog_provider.dart';
 import '../data/provider_application_repository.dart';
 import '../domain/provider_application_models.dart';
@@ -14,9 +13,10 @@ import '../domain/provider_application_models.dart';
 final providerApplicationRepositoryProvider = Provider(
   (ref) => ProviderApplicationRepository(ref.watch(apiClientProvider)),
 );
-final providerApplicationProvider = FutureProvider<ProviderApplication?>(
-  (ref) => ref.watch(providerApplicationRepositoryProvider).mine(),
-);
+final providerApplicationProvider = FutureProvider<ProviderApplication?>((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerApplicationRepositoryProvider).mine();
+});
 
 enum _IdentityProcess { idle, uploading, reading }
 
@@ -1649,6 +1649,7 @@ class _ProviderOnboardingScreenState
         ),
         _ActionBar(
           label: 'Hoàn tất',
+          saving: saving,
           onPrimary: _leaveStatusScreen,
           onSecondary: () => ref.read(authControllerProvider).logout(),
           secondaryLabel: 'Đăng xuất',
@@ -1657,15 +1658,30 @@ class _ProviderOnboardingScreenState
     );
   }
 
-  void _leaveStatusScreen() {
+  Future<void> _leaveStatusScreen() async {
+    if (saving) return;
+    final auth = ref.read(authControllerProvider);
+    if (current?.status == 'approved' && auth.user?.canAccessProvider != true) {
+      setState(() => saving = true);
+      final refreshed = await auth.refreshUser();
+      if (!mounted) return;
+      setState(() => saving = false);
+      if (!refreshed || auth.user?.canAccessProvider != true) {
+        _message(
+          auth.message ?? 'Chưa cập nhật được quyền đối tác. Vui lòng thử lại.',
+        );
+        return;
+      }
+    }
+    if (auth.user?.canAccessProvider == true) {
+      context.go('/provider');
+      return;
+    }
     if (context.canPop()) {
       context.pop();
       return;
     }
-    final role = ref.read(authControllerProvider).user?.role;
-    context.go(
-      role == UserRole.provider ? '/provider/account' : '/customer/account',
-    );
+    context.go('/customer/account');
   }
 
   Widget _rejection(ProviderApplication item) => Container(

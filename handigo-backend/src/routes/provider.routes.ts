@@ -13,6 +13,7 @@ import {
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { approvedProviderMiddleware } from "../middlewares/approvedProvider.middleware";
+import { getMyProviderRewardHistory, getMyProviderRewardWeek } from "../controllers/providerRewards.controller";
 
 const router = Router();
 
@@ -22,6 +23,8 @@ router.get("/:providerId/public", getPublicProviderProfile);
 router.get("/me", authMiddleware, roleMiddleware("PROVIDER"), getMyProfile);
 router.use(authMiddleware, roleMiddleware("PROVIDER"), approvedProviderMiddleware);
 
+router.get("/me/rewards", getMyProviderRewardWeek);
+router.get("/me/rewards/history", getMyProviderRewardHistory);
 router.patch("/me", updateMyProfile);
 router.post("/me/identity", submitIdentity);
 router.post("/me/certificates", createCertificate);

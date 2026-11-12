@@ -19,7 +19,7 @@ export const markProviderOffline = async (userId: string, onlyOnline = false) =>
   const provider = await Provider.findOneAndUpdate(
     { userId, isDeleted: false, ...(onlyOnline ? { availabilityStatus: "online" } : {}) },
     { $set: { availabilityStatus: "offline" } },
-    { new: true, runValidators: true, projection: { updatedAt: 1 } },
+    { returnDocument: "after", runValidators: true, projection: { updatedAt: 1 } },
   ).lean();
   if (provider) emitToUser(userId, "provider:availability", { availabilityStatus: "offline" });
   return provider?.updatedAt ?? null;

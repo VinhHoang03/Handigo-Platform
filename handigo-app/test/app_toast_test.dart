@@ -26,10 +26,15 @@ void main() {
     final context = await setup(tester);
     AppToast.show(context, 'Thành công', type: AppToastType.success);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
     final toast = find
         .ancestor(of: find.text('Thành công'), matching: find.byType(Material))
         .first;
-    expect(tester.widget<Material>(toast).color, AppTheme.successGreen);
+    expect(tester.widget<Material>(toast).color, Colors.white);
+    expect(
+      tester.widget<Icon>(find.byIcon(Icons.check_circle_outline)).color,
+      const Color(0xFF15803D),
+    );
     expect(tester.getTopLeft(toast).dy, 12);
     expect(
       tester.getBottomRight(toast).dx,
@@ -41,12 +46,14 @@ void main() {
     expect(find.text('Thành công'), findsNothing);
     AppToast.show(context, 'Cảnh báo', type: AppToastType.warning);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
     final warning = find
         .ancestor(of: find.text('Cảnh báo'), matching: find.byType(Material))
         .first;
+    expect(tester.widget<Material>(warning).color, Colors.white);
     expect(
-      tester.widget<Material>(warning).color,
-      AppTheme.light.colorScheme.error,
+      tester.widget<Icon>(find.byIcon(Icons.warning_amber_rounded)).color,
+      const Color(0xFFB45309),
     );
     expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
     await tester.tap(find.byTooltip('Đóng thông báo'));

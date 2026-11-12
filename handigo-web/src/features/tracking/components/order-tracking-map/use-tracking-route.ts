@@ -27,6 +27,14 @@ export function useTrackingRoute({
   const routeOrderIdRef = useRef(orderId);
 
   const [trackingRoute, setTrackingRoute] = useState<TrackingRoute | null>(null);
+  const [refreshAt, setRefreshAt] = useState(() => Date.now());
+
+  // Tính tiếp vị trí mới nhất nếu mẫu GPS đến trong thời gian giới hạn gọi API.
+  useEffect(() => {
+    if (!liveTrackingEnabled) return;
+    const timer = window.setInterval(() => setRefreshAt(Date.now()), ROUTE_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [liveTrackingEnabled]);
 
   useEffect(() => {
     if (routeOrderIdRef.current !== orderId) {
@@ -82,7 +90,7 @@ export function useTrackingRoute({
         );
         setTrackingRoute(null);
       });
-  }, [customerCoordinate, liveTrackingEnabled, orderId, providerCoordinate]);
+  }, [customerCoordinate, liveTrackingEnabled, refreshAt, orderId, providerCoordinate]);
 
   // Huỷ request đang chờ khi component unmount.
   useEffect(() => () => {

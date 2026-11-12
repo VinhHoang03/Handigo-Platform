@@ -36,7 +36,7 @@ export function ApplicationReviewHistory({ application }: { application: AdminAp
           <h3 className="text-sm font-bold uppercase tracking-wide text-on-surface-variant">📋 Lịch sử xét duyệt</h3>
           <ol className="space-y-2">
             {application.reviewHistory?.map((event, index) => {
-              const actor = typeof event.actorId === "string" ? "Người dùng hệ thống" : event.actorId.fullName;
+              const actor = event.actorType === "system" ? "AI quản trị (tự động)" : typeof event.actorId === "string" || !event.actorId ? "Người dùng hệ thống" : event.actorId.fullName;
               return (
                 <li key={`${event.action}-${event.occurredAt}-${index}`} className={`rounded-xl border ${borderColor(event.action)} bg-surface-container-low p-3 text-sm`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">

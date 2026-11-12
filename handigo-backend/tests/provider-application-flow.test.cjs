@@ -14,7 +14,7 @@ const serviceId = '507f1f77bcf86cd799439014';
 function loadSource(relativePath, modules) {
   const file = path.join(__dirname, relativePath);
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true },
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
   }).outputText;
   const exports = {};
   vm.runInNewContext(code, { exports, require: (name) => {
@@ -36,7 +36,7 @@ function setup(applicationType = 'initial', status = 'pending', failCommit = fal
   const provider = { serviceIds: [], certificates: [], async save() { events.push('provider-save'); } };
   const session = {
     async withTransaction(callback) {
-      await callback();
+      await callback(session);
       if (failCommit) throw new Error('Không thể commit');
       events.push('commit');
     },
@@ -61,7 +61,7 @@ function setup(applicationType = 'initial', status = 'pending', failCommit = fal
       async findOneAndUpdate(filter, update) { userUpdates.push({ filter, update }); return {}; },
     },
     Session: { async updateMany() { events.push('revoke'); } },
-    Service: {},
+    Service: { updateMany: async () => ({ matchedCount: application.serviceIds.length }) },
   };
   const notifications = [];
   const modules = {
@@ -165,13 +165,14 @@ test('Từ chối hồ sơ ban đầu vẫn cập nhật onboarding và hướng
   assert.match(context.notifications[0].data.actionUrl, /applicationId=/);
 });
 
-test('Duyệt hồ sơ ban đầu tạo profile, cập nhật quyền và thông báo đăng nhập lại', async () => {
+test('Duyệt hồ sơ ban đầu tạo profile, cập nhật quyền và thông báo kết quả', async () => {
   const context = setup();
   await context.review(adminId, applicationId, { status: 'approved' });
   assert.equal(context.userUpdates[0].update.$set.role, 'PROVIDER');
   assert.equal(context.userUpdates[0].update.$set.providerOnboardingStatus, 'APPROVED');
   assert.ok(context.events.includes('revoke'));
-  assert.match(context.notifications[0].content, /đăng nhập lại/);
+  assert.match(context.notifications[0].content, /phê duyệt/);
+  assert.equal(context.notifications[0].data.status, 'approved');
   assert.ok(context.events.indexOf('emit') > context.events.indexOf('commit'));
 });
 

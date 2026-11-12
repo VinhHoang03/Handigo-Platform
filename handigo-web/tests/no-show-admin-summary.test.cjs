@@ -18,6 +18,8 @@ function load(name) {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   vm.runInNewContext(code, { exports, require(module) {
+    if (module === './ReportReviewForm') return { ReportReviewForm: () => React.createElement('form', { 'aria-label': 'Xử lý báo cáo' }, 'Xử lý báo cáo') };
+    if (module === '../../ai/ComplaintReviewPanel') return { ComplaintReviewPanel: () => null };
     if (module === './case-table-columns') return { caseDateTime: new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }) };
     if (module === 'lucide-react') return { AlertCircle: () => null, CheckCircle2: () => null, HelpCircle: () => null };
     if (module === '@/components/common/Modal') return { Modal: ({ children }) => React.createElement('div', {}, children) };
@@ -136,7 +138,7 @@ test('Hồ sơ đã xử lý ẩn form xét duyệt; hồ sơ chờ vẫn có th
   const props = { open: true, detailLoading: false, selected: { kind: 'report', item: report({ noShowDetails: details() }) },
     detailEvidence: [], busy: false, evidenceNote: '', nextStatus: '', reviewNote: '', resolutionNote: '' };
   const done = renderToStaticMarkup(React.createElement(CaseDetailModal, props));
-  assert.doesNotMatch(done, /Xem xét báo cáo/); assert.match(done, /Tạo vi phạm/);
+  assert.doesNotMatch(done, /Xử lý báo cáo/); assert.match(done, /Tạo vi phạm/);
   assert.doesNotMatch(done, /<aside|xl:grid-cols-/);
   const doneTree = CaseDetailModal(props);
   const footerButton = all(doneTree, node => node.type === 'button' && node.props.children === 'Tạo vi phạm');
@@ -146,8 +148,20 @@ test('Hồ sơ đã xử lý ẩn form xét duyệt; hồ sơ chờ vẫn có th
   assert.equal(gridChildren.at(-1).props.children.props.children, 'Tạo vi phạm');
   props.selected.item.status = 'pending';
   const pending = renderToStaticMarkup(React.createElement(CaseDetailModal, props));
-  assert.match(pending, /Xem xét báo cáo/); assert.match(pending, /Chờ admin xem xét/);
+  assert.match(pending, /Xử lý báo cáo/); assert.match(pending, /Chờ admin xem xét/);
   assert.match(pending, /<aside/); assert.doesNotMatch(pending, />Tạo vi phạm</);
+});
+
+test('Báo cáo chỉ có nút tạo vi phạm khi đã xác nhận và chưa liên kết vi phạm', () => {
+  for (const isCustomerNoShow of [false, true]) {
+    for (const status of ['pending', 'under_review', 'evidence_requested', 'confirmed', 'resolved', 'rejected', 'cancelled']) {
+      const props = { open: true, detailLoading: false, selected: { kind: 'report', item: report({ status, isCustomerNoShow }) }, detailEvidence: [], busy: false };
+      const html = renderToStaticMarkup(React.createElement(CaseDetailModal, props));
+      assert.equal(html.includes('>Tạo vi phạm</button>'), status === 'confirmed', `${status}: hiển thị sai nút tạo vi phạm.`);
+      props.selected.item.createdViolationId = { _id: 'vi-pham-da-tao' };
+      assert.doesNotMatch(renderToStaticMarkup(React.createElement(CaseDetailModal, props)), />Tạo vi phạm<\/button>/);
+    }
+  }
 });
 
 test('Phần đầu chỉ hiển thị mô tả của thợ, bỏ các dòng hệ thống tự chèn', () => {

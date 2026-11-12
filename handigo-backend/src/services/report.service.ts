@@ -1,4 +1,5 @@
 import mongoose, { ClientSession, Types } from "mongoose";
+import type { AutomatedReviewContext, AssistedComplaintReview } from "../ai/admin/admin-ai.review-context";
 import { AppError } from "../utils/appError";
 import { Conversation } from "../models/conversation.model";
 import { Feedback } from "../models/feedback.model";
@@ -252,7 +253,7 @@ export const createReport = async (
     ? await withReportTransaction(async (session) => {
       const order = await Order.findOneAndUpdate(
         { _id: payload.orderId, isDeleted: false }, { $inc: { __v: 1 } },
-        { session, new: true, runValidators: true },
+        { session, returnDocument: "after", runValidators: true },
       );
       if (!order) throw new AppError("Không tìm thấy đơn dịch vụ", 404);
       const context = await getServiceQualityReportContext(reporterId, role, payload.orderId!, session);
@@ -378,6 +379,8 @@ export const reviewReport = async (
     reviewNote?: string | null;
     resolutionNote?: string | null;
   },
+  automated?: AutomatedReviewContext,
+  assisted?: AssistedComplaintReview,
 ) => {
   assertObjectId(adminId, "Admin id");
   assertObjectId(reportId, "Report id");
@@ -385,6 +388,7 @@ export const reviewReport = async (
   const report = await Report.findOne({ _id: reportId, isDeleted: false });
   if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
   if (report.isCustomerNoShow) {
+    if (automated) throw new AppError("Báo cáo khách vắng mặt phải xử lý qua quy trình xác minh riêng.", 422);
     await reviewCustomerNoShowReport(reportId, adminId, payload);
     return getAdminReportById(reportId);
   }
@@ -398,20 +402,34 @@ export const reviewReport = async (
     throw new AppError("Vui lòng sử dụng chức năng yêu cầu bổ sung bằng chứng", 400);
   }
   await withReportTransaction(async (session) => {
+    if (automated) await automated.beforeWrite(session);
+    if (assisted) await assisted.beforeWrite(session);
     const current = await lockReport(reportId, session);
     if (!current) throw new AppError("Không tìm thấy báo cáo", 404);
     if (current.createdViolationId && payload.status !== "confirmed") {
       throw new AppError("Báo cáo đã có bản ghi vi phạm, không thể đổi sang trạng thái khác", 400);
     }
     if (current.status === "cancelled") throw new AppError("Báo cáo đã hủy, không thể cập nhật", 400);
+    if (!automated && !assisted && ["confirmed", "rejected", "resolved"].includes(payload.status)) {
+      const { AdminAIAssessment } = await import("../ai/admin/admin-ai.models");
+      if (await AdminAIAssessment.exists({ feature: "complaint_summary", sourceType: "report", sourceId: reportId, preview: false,
+        "output.complaintResolution.workflow": { $ne: null } }).session(session)) {
+        throw new AppError("Hồ sơ đã sử dụng phương án AI. Vui lòng xác nhận công việc và quyết định qua phương án AI; phân tích lại nếu dữ liệu đã thay đổi.", 409);
+      }
+    }
+    if (automated && (automated.complaintAction !== "intake" || payload.status !== "under_review" || current.status !== "pending" || current.createdViolationId || current.isCustomerNoShow)) throw new AppError("AI chỉ được tự tiếp nhận khiếu nại đang chờ; quyết định kết thúc cần Admin xác nhận.", 409);
+    if (assisted && (current.isCustomerNoShow || current.createdViolationId || REPORT_TERMINAL_STATUSES.includes(current.status))) throw new AppError("Khiếu nại đã kết thúc hoặc thuộc quy trình xử lý riêng.", 409);
     current.status = payload.status;
-    current.reviewedBy = new Types.ObjectId(adminId);
+    current.reviewedBy = automated ? null : new Types.ObjectId(adminId);
+    current.reviewedByType = automated ? "system" : "admin";
     current.reviewedAt = new Date();
-    current.handledBy = REPORT_TERMINAL_STATUSES.includes(payload.status) ? new Types.ObjectId(adminId) : null;
+    current.handledBy = !automated && REPORT_TERMINAL_STATUSES.includes(payload.status) ? new Types.ObjectId(adminId) : null;
     current.handledAt = REPORT_TERMINAL_STATUSES.includes(payload.status) ? new Date() : null;
     current.reviewNote = payload.reviewNote ?? current.reviewNote ?? null;
     current.resolutionNote = payload.resolutionNote ?? current.resolutionNote ?? null;
     await current.save({ session });
+    if (automated?.afterWrite) await automated.afterWrite(session);
+    if (assisted?.afterWrite) await assisted.afterWrite(session);
   });
   return getAdminReportById(reportId);
 };
@@ -427,7 +445,7 @@ const withReportTransaction = async <T>(work: (session: ClientSession) => Promis
 const lockReport = (id: string, session: ClientSession, reporterId?: string) =>
   Report.findOneAndUpdate(
     { _id: id, isDeleted: false, ...(reporterId ? { reporterId } : {}) },
-    { $inc: { __v: 1 } }, { session, new: true, runValidators: true },
+    { $inc: { __v: 1 } }, { session, returnDocument: "after", runValidators: true },
   );
 
 const assertReportAcceptsEvidence = (report: { status: ReportStatus; isCustomerNoShow?: boolean }) => {
@@ -474,20 +492,26 @@ export const addReportEvidence = async (
   return role === "ADMIN" ? getAdminReportById(reportId) : getReportForUser(userId, reportId);
 };
 
-export const requestReportEvidence = async (adminId: string, reportId: string, requestedEvidenceNote: string) => {
+export const requestReportEvidence = async (adminId: string, reportId: string, requestedEvidenceNote: string, automated?: AutomatedReviewContext, assisted?: AssistedComplaintReview) => {
   assertObjectId(adminId, "Admin id");
   assertObjectId(reportId, "Report id");
   const parsed = requestReportEvidenceSchema.safeParse({ requestedEvidenceNote });
   if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
   await withReportTransaction(async (session) => {
+    if (automated) await automated.beforeWrite(session);
+    if (assisted) await assisted.beforeWrite(session);
     const report = await lockReport(reportId, session);
     if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
     assertReportAcceptsEvidence(report);
+    if (report.createdViolationId || (automated && (automated.complaintAction !== "request_evidence" || report.status === "evidence_requested"))) throw new AppError("Khiếu nại đã có yêu cầu bổ sung hoặc quyết định xử lý.", 409);
     report.status = "evidence_requested";
     report.requestedEvidenceNote = parsed.data.requestedEvidenceNote;
-    report.reviewedBy = new Types.ObjectId(adminId);
+    report.reviewedBy = automated ? null : new Types.ObjectId(adminId);
+    report.reviewedByType = automated ? "system" : "admin";
     report.reviewedAt = new Date();
     await report.save({ session });
+    if (automated?.afterWrite) await automated.afterWrite(session);
+    if (assisted?.afterWrite) await assisted.afterWrite(session);
   });
   return getAdminReportById(reportId);
 };

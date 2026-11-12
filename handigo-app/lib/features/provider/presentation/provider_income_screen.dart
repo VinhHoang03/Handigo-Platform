@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_exception.dart';
@@ -17,6 +18,8 @@ import 'provider_account_screens.dart';
 import 'provider_screens.dart';
 import 'provider_order_detail_screen.dart';
 import 'provider_income_range_sheet.dart';
+import 'provider_income_year_sheet.dart';
+import 'provider_rewards_tab.dart';
 
 final providerFinanceNowProvider = Provider<DateTime Function()>(
   (ref) => DateTime.now,
@@ -47,6 +50,8 @@ final providerFinanceHistoryProvider = FutureProvider.autoDispose
 void _refreshFinances(WidgetRef ref) {
   ref.invalidate(providerIncomeProvider);
   ref.invalidate(providerFinanceHistoryProvider);
+  ref.invalidate(providerRewardWeekProvider);
+  ref.invalidate(providerRewardHistoryProvider);
   ref.invalidate(providerWalletProvider);
   ref.invalidate(providerWalletSummaryProvider);
   ref.invalidate(providerWalletTransactionsProvider);
@@ -118,6 +123,11 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
     if (value == 1) _walletVisited = true;
   });
 
+  String get _title => switch (_tab) {
+    1 => 'Ví Handigo',
+    _ => 'Thu nhập',
+  };
+
   Future<void> _selectPeriod(ProviderIncomePeriod period) async {
     final now = vietnamDateTime(ref.read(providerFinanceNowProvider)());
     if (period == ProviderIncomePeriod.customRange) {
@@ -132,27 +142,10 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
         _period = period;
       });
     } else if (period == ProviderIncomePeriod.year) {
-      final year = await showDialog<int>(
-        context: context,
-        builder: (dialog) => AlertDialog(
-          title: const Text('Chọn năm xem thu nhập'),
-          content: SizedBox(
-            width: 320,
-            height: 300,
-            child: YearPicker(
-              firstDate: DateTime(1),
-              lastDate: DateTime(now.year, 12, 31),
-              selectedDate: DateTime(_selectedYear ?? now.year),
-              onChanged: (value) => Navigator.pop(dialog, value.year),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialog),
-              child: const Text('Hủy'),
-            ),
-          ],
-        ),
+      final year = await showProviderIncomeYearSheet(
+        context,
+        now: now,
+        selectedYear: _selectedYear,
       );
       if (year == null || !mounted) return;
       setState(() {
@@ -187,11 +180,15 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
               : const _FinanceWallet()
         else
           const SizedBox.shrink(),
+        ProviderRewardsTab(
+          now: ref.read(providerFinanceNowProvider),
+          active: _tab == 2,
+        ),
       ],
     );
     if (widget.asTab) {
       return AccountDetailScaffold(
-        title: _tab == 0 ? 'Thu nhập' : 'Ví Handigo',
+        title: _title,
         showBackButton: false,
         actions: [
           IconButton(
@@ -206,26 +203,43 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: SizedBox(
                 width: double.infinity,
-                child: SegmentedButton<int>(
-                  style: SegmentedButton.styleFrom(
-                    foregroundColor: accountMuted,
-                    selectedForegroundColor: accountPrimary,
-                    selectedBackgroundColor: accountPrimarySoft,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8EDF3),
+                    borderRadius: BorderRadius.circular(18),
                   ),
-                  segments: const [
-                    ButtonSegment(
-                      value: 0,
-                      icon: Icon(Icons.insights_outlined),
-                      label: Text('Thu nhập'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: SegmentedButton<int>(
+                      style: SegmentedButton.styleFrom(
+                        foregroundColor: accountMuted,
+                        selectedForegroundColor: Colors.white,
+                        selectedBackgroundColor: accountPrimary,
+                        side: BorderSide.none,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      segments: const [
+                        ButtonSegment(value: 0, label: Text('Thu nhập')),
+                        ButtonSegment(value: 1, label: Text('Ví')),
+                        ButtonSegment(
+                          value: 2,
+                          label: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Symbols.military_tech, fill: 1, size: 15),
+                              SizedBox(width: 4),
+                              Flexible(child: Text('Tiền thưởng')),
+                            ],
+                          ),
+                        ),
+                      ],
+                      showSelectedIcon: false,
+                      selected: {_tab},
+                      onSelectionChanged: (value) => _selectTab(value.single),
                     ),
-                    ButtonSegment(
-                      value: 1,
-                      icon: Icon(Icons.account_balance_wallet_outlined),
-                      label: Text('Ví'),
-                    ),
-                  ],
-                  selected: {_tab},
-                  onSelectionChanged: (value) => _selectTab(value.single),
+                  ),
                 ),
               ),
             ),
@@ -241,7 +255,7 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
           onPressed: _back,
           icon: const Icon(Icons.arrow_back_rounded),
         ),
-        title: Text(_tab == 0 ? 'Thu nhập' : 'Ví Handigo'),
+        title: Text(_title),
         actions: [
           IconButton(
             tooltip: 'Tải lại',
@@ -264,6 +278,11 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
             icon: Icon(Icons.account_balance_wallet_outlined),
             selectedIcon: Icon(Icons.account_balance_wallet_rounded),
             label: 'Ví',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.emoji_events_outlined),
+            selectedIcon: Icon(Icons.emoji_events_rounded),
+            label: 'Tiền thưởng',
           ),
         ],
       ),
@@ -831,6 +850,7 @@ class _FinanceHistoryScreenState extends ConsumerState<_FinanceHistoryScreen> {
                           '': 'Tất cả',
                           'deposit': 'Nạp ví',
                           'provider_earning': 'Thu nhập dịch vụ',
+                          'provider_weekly_reward': 'Tiền thưởng tuần',
                           'platform_fee': 'Phí nền tảng',
                           'withdraw': 'Rút tiền',
                           'refund': 'Hoàn tiền',

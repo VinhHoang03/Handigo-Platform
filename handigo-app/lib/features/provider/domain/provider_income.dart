@@ -170,6 +170,7 @@ class ProviderFinanceEntry {
   String get typeLabel =>
       const {
         'provider_earning': 'Thu nhập dịch vụ',
+        'provider_weekly_reward': 'Tiền thưởng tuần',
         'platform_fee': 'Phí nền tảng',
         'deposit': 'Nạp ví',
         'payment': 'Thanh toán',

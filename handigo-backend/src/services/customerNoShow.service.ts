@@ -66,7 +66,7 @@ export const markOrderArrival = async (orderId: string, userId: string) => {
   const updated = await Order.findOneAndUpdate({
     _id: orderId, providerId: provider._id, status: "accepted", isDeleted: false,
     "arrival.providerId": { $ne: provider._id },
-  }, { $set: { arrival: { providerId: provider._id, arrivedAt: new Date(), latitude, longitude } } }, { new: true, runValidators: true });
+  }, { $set: { arrival: { providerId: provider._id, arrivedAt: new Date(), latitude, longitude } } }, { returnDocument: "after", runValidators: true });
   if (!updated) {
     const current = assertAccepted(await Order.findOne({ _id: orderId, providerId: provider._id, isDeleted: false }));
     if (String(current.arrival?.providerId) === String(provider._id)) return current;

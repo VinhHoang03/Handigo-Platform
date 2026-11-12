@@ -1,4 +1,5 @@
 import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
+import { AutomaticReviewControl } from "@/features/admin/ai/AutomaticReviewControl";
 import { TableToolbar } from "@/components/common/dashboard/TableToolbar";
 import type { SuggestionStatus, SuggestionType } from "../types/serviceSuggestion.types";
 
@@ -28,7 +29,10 @@ export function SuggestionListHeader({
         <div>
           <AdminPageTitle title="Quản lý đề xuất dịch vụ và danh mục" />
         </div>
-        <AdminRefreshButton onRefresh={onRefresh} loading={loading} />
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <AutomaticReviewControl feature="service_suggestion" onClose={onRefresh} />
+          <AdminRefreshButton onRefresh={onRefresh} loading={loading} />
+        </div>
       </header>
 
       <TableToolbar

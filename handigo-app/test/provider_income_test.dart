@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:handigo_app/app/providers/app_providers.dart';
 import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/core/network/api_client.dart';
@@ -58,6 +59,42 @@ class _Api extends ApiClient {
     Duration? receiveTimeout,
   }) async {
     calls.add((path: path, method: method, data: data, query: query));
+    const rewardSummary = {
+      'diamonds': 160,
+      'amount': 50000,
+      'completionRate': 90,
+      'cancellationRate': 10,
+      'averageRating': 4.9,
+      'completionMet': true,
+      'cancellationMet': true,
+      'ratingMet': true,
+      'eligible': true,
+    };
+    if (path == '/providers/me/rewards') {
+      return {
+        'data': {
+          'weekStart': query?['weekStart'],
+          'status': query?['weekStart'] == '2026-11-02' ? 'open' : 'settled',
+          'programActive': true,
+          'summary': rewardSummary,
+          'milestones': [
+            {'diamonds': 75, 'amount': 20000},
+            {'diamonds': 150, 'amount': 30000},
+            {'diamonds': 225, 'amount': 50000},
+          ],
+        },
+      };
+    }
+    if (path == '/providers/me/rewards/history') {
+      return {
+        'data': {
+          'items': [
+            {'weekStart': '2026-10-26', 'summary': rewardSummary},
+          ],
+          'nextBefore': null,
+        },
+      };
+    }
     if (path == '/dashboard/earnings') {
       return {
         'data': {
@@ -210,6 +247,65 @@ Future<void> _pickRangeDate(
 }
 
 void main() {
+  testWidgets('Tiền thưởng mở chính sách và lịch sử trong app', (tester) async {
+    await _show(tester, _Api(), asTab: true);
+    await tester.tap(find.text('Tiền thưởng'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tuần này · 02/11 – 08/11'), findsOneWidget);
+    expect(find.text('160 / 225'), findsOneWidget);
+    expect(find.byIcon(Symbols.diamond), findsWidgets);
+    expect(find.text('(71%)'), findsOneWidget);
+    expect(find.text('50.000 ₫'), findsOneWidget);
+    expect(find.text('Đạt 2/3 mốc thưởng'), findsOneWidget);
+    expect(find.text('Còn 65 💎 để nhận thêm +50.000 ₫'), findsOneWidget);
+    await tester.tap(find.text('Đổi tuần'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chọn tuần thưởng'), findsOneWidget);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byWidgetPredicate(
+              (widget) => widget is IconButton && widget.tooltip == 'Tháng sau',
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.text('26/10/2026 – 01/11/2026'));
+    await tester.tap(find.text('Hủy'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tuần này · 02/11 – 08/11'), findsOneWidget);
+    await tester.tap(find.text('Đổi tuần'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('26/10/2026 – 01/11/2026'));
+    await tester.tap(find.text('Áp dụng'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tuần đã chọn · 26/10 – 01/11'), findsOneWidget);
+    expect(find.text('Đã cộng tiền thưởng vào Ví Handigo.'), findsOneWidget);
+
+    final policy = find.text('Xem chính sách thưởng');
+    await tester.scrollUntilVisible(policy.hitTestable(), 120);
+    await tester.pumpAndSettle();
+    await tester.tap(policy);
+    await tester.pumpAndSettle();
+    expect(find.text('Chính sách thưởng'), findsOneWidget);
+    expect(find.text('Đơn cần báo giá'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Quay lại'));
+    await tester.pumpAndSettle();
+    final history = find.text('Lịch sử thưởng theo tuần');
+    await tester.scrollUntilVisible(history.hitTestable(), 120);
+    await tester.pumpAndSettle();
+    await tester.tap(history);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('160 kim cương · Đã cộng 50.000 ₫ vào ví'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Thu nhập và Ví dùng chung kiểu thẻ, chuyển mục giữ bộ lọc', (
     tester,
   ) async {
@@ -407,12 +503,16 @@ void main() {
       expect(find.textContaining('đơn hoàn tất theo bộ lọc'), findsNothing);
       await tester.tap(find.text('Theo năm'));
       await tester.pumpAndSettle();
+      final requestsBeforeYearApply = api.calls.length;
       await tester.tap(
         find.descendant(
           of: find.byType(YearPicker),
           matching: find.text('2025'),
         ),
       );
+      await tester.pumpAndSettle();
+      expect(api.calls.length, requestsBeforeYearApply);
+      await tester.tap(find.text('Áp dụng'));
       await tester.pumpAndSettle();
       var query = api.calls
           .where((call) => call.path == '/dashboard/earnings')

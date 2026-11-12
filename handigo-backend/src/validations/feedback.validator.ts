@@ -54,9 +54,28 @@ export const updateFeedbackSchema = z
 
 export const visibilitySchema = z.object({
   isVisible: z.boolean(),
+  expectedVersion: z.iso.datetime({ message: "Phiên bản đánh giá không hợp lệ." }).optional(),
 });
 
 export const providerReplySchema = z.object({
   content: z.string().trim().min(1).max(1000),
   images: z.array(imageUrlSchema).max(5).optional(),
 });
+
+export const moderationListSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  resourceId: objectIdSchema.optional(),
+  kind: z.enum(["comment", "reply"]).optional(),
+});
+
+export const moderationIdSchema = z.object({ id: objectIdSchema });
+export const moderationReviewSchema = z.object({ status: z.enum(["approved", "rejected"]) }).strict();
+
+export const moderationReportQuerySchema = z.object({
+  days: z.enum(["7", "30", "90", "all"]).default("30"),
+  view: z.enum(["attention", "blocked", "all"]).default("attention"),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});
+export type ModerationReportQuery = z.infer<typeof moderationReportQuerySchema>;

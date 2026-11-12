@@ -10,9 +10,11 @@ const labels: Record<string, string> = {
   originalAmount: "Giá trước giảm", discountAmount: "Giảm giá", providerName: "Chuyên gia ưu tiên",
   previousAddress: "Địa chỉ trước khi sửa", recipientName: "Người nhận", recipientPhone: "Số điện thoại người nhận",
   addressNote: "Ghi chú địa chỉ",
+  currentSchedule: "Lịch hiện tại", offerName: "Ưu đãi", points: "Điểm sử dụng", pointsBalance: "Điểm hiện có",
+  minOrderAmount: "Đơn tối thiểu", maxDiscountAmount: "Giảm tối đa", validityDays: "Hiệu lực", discountValue: "Giá trị ưu đãi", applicableOrderType: "Áp dụng cho",
   rating: "Số sao",
   paymentMethod: "Thanh toán", amount: "Số tiền", description: "Mô tả",
-  orderCode: "Mã đơn", reason: "Lý do hủy", paidAmount: "Đã thanh toán",
+  orderCode: "Mã đơn", reason: "Lý do", paidAmount: "Đã thanh toán",
   refundAmount: "Dự kiến hoàn", cancellationFee: "Phí hủy", note: "Lưu ý",
   paymentLabel: "Khoản thanh toán",
   subject: "Tiêu đề yêu cầu", category: "Nhóm hỗ trợ", priority: "Độ ưu tiên",
@@ -21,16 +23,20 @@ const labels: Record<string, string> = {
   quotationCode: "Mã báo giá", quotationAmount: "Tổng báo giá", providerCompensation: "Chuyển cho thợ",
 };
 const paymentLabels: Record<string, string> = { cash: "Tiền mặt", bank: "Trực tuyến", wallet: "Ví Handigo" };
-function formatValue(key: string, value: unknown, serviceType?: unknown) {
+function formatValue(key: string, value: unknown, serviceType?: unknown, discountType?: unknown) {
   if (value == null) return "";
   if (["quantity", "rating"].includes(key) && typeof value === "number") return value.toLocaleString("vi-VN");
+  if (["points", "pointsBalance"].includes(key) && typeof value === "number") return `${value.toLocaleString("vi-VN")} điểm`;
+  if (key === "validityDays" && typeof value === "number") return `${value} ngày`;
+  if (key === "discountValue" && discountType === "PERCENT" && typeof value === "number") return `${value}%`;
   if (typeof value === "number") return `${value.toLocaleString("vi-VN")} đ`;
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string").map((item) => {
     if (key !== "options" || serviceType !== "variable_price") return item;
     return item.replace(/\s*:\s*0(?:[.,]0+)?\s*(?:đ|₫|VND)\s*$/i, "").replace(/\s*[×x]\s*1\s*$/i, "");
   }).join("\n");
   if (key === "paymentMethod") return paymentLabels[String(value)] ?? String(value);
-  if (["schedule", "responseDeadline"].includes(key) && typeof value === "string" && !Number.isNaN(Date.parse(value))) {
+  if (key === "applicableOrderType") return value === "fixed_price" ? "Dịch vụ giá cố định" : value === "variable_price" ? "Dịch vụ khảo sát" : String(value);
+  if (["schedule", "currentSchedule", "responseDeadline"].includes(key) && typeof value === "string" && !Number.isNaN(Date.parse(value))) {
     return new Date(value).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   }
   return typeof value === "string" ? value : "";
@@ -76,7 +82,7 @@ export function AgentConfirmationCard({ action, disabled, onDecision, readOnly =
     <dl className="px-4 py-2">
       {[...Object.entries(labels).filter(([key]) => key !== "amount"
         && !(action.tool === "create_booking" && (key === "originalAmount" || key === "discountAmount" && !hasVoucherDiscount))), ["amount", labels.amount]].map(([key, label]) => {
-        const value = key === "voucherCode" && voucherField ? voucherField : formatValue(key, action.preview[key], action.preview.serviceType);
+        const value = key === "voucherCode" && voucherField ? voucherField : formatValue(key, action.preview[key], action.preview.serviceType, action.preview.discountType);
         return value ? <div key={key} className={key === "amount" ? "my-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-primary/5 px-3 py-3" : "grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-outline-variant/20 py-2.5 last:border-0 sm:grid-cols-[100px_minmax(0,1fr)]"}>
           <dt className={`text-xs leading-5 text-on-surface-variant ${key === "amount" ? "font-medium" : ""}`}>{key === "voucherCode" && action.tool === "create_booking" ? "Mã giảm giá" : key === "amount" && action.preview.serviceType === "variable_price" ? "Tiền đặt cọc" : label}</dt>
           <dd className={`min-w-0 whitespace-pre-wrap break-words leading-5 [overflow-wrap:anywhere] ${key === "amount" ? "text-2xl font-semibold leading-8 tracking-tight text-primary tabular-nums" : "text-[13px] font-medium"}`}>{value}</dd>

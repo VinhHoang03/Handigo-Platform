@@ -64,7 +64,7 @@ const lockWithdrawalBankAccount = async (
   const account = await BankAccount.findOneAndUpdate(
     { _id: bankAccountId, userId, status: "active", isDeleted: false },
     { $inc: { __v: 1 } },
-    { new: true, session, runValidators: true },
+    { returnDocument: "after", session, runValidators: true },
   );
   if (!account) throw new AppError("Tài khoản nhận tiền không còn hợp lệ hoặc không thuộc chủ yêu cầu rút tiền", 409);
   return account;
@@ -138,7 +138,7 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
             pendingBalance: input.amount,
           },
         },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
 
       if (!wallet) {
@@ -259,7 +259,7 @@ export const approveWithdrawal = async (
           pendingBalance: { $gte: withdrawal.amount },
         },
         { $inc: { pendingBalance: -withdrawal.amount } },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
 
       if (!wallet) {
@@ -359,7 +359,7 @@ export const rejectWithdrawal = async (
             balance: withdrawal.amount,
           },
         },
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
 
       if (!wallet) {

@@ -1,5 +1,8 @@
 // Tập chỉnh tham số và tập kiểm tra tách riêng; không dùng dữ liệu hội thoại khách thật.
 export const knowledgeEvaluationCases = [
+  { id: "tune-repair-ac", set: "tuning", query: "Điều hòa chạy nhưng không mát, có thể do đâu và nên làm gì trước khi thợ đến?", title: "Điều hòa không lạnh hoặc lạnh yếu" },
+  { id: "tune-repair-washer", set: "tuning", query: "Máy giặt không xả nước, trong lồng còn nước, cần kiểm tra gì an toàn?", title: "Máy giặt không xả nước hoặc không vắt" },
+  { id: "heldout-repair-tv", set: "heldout", query: "Ti vi có tiếng nhưng mất hình, menu cũng không hiện", title: "Tivi có tiếng nhưng màn hình đen" },
   { id: "tune-address", set: "tuning", query: "Địa chỉ này chỉ dùng một lần, tôi không muốn lưu vào sổ", title: "Địa chỉ thực hiện, người nhận và sổ địa chỉ" },
   { id: "tune-qr", set: "tuning", query: "Tôi muốn hủy mã QR nhưng vẫn giữ đơn dịch vụ", title: "Hủy QR thanh toán nhưng giữ đơn" },
   { id: "tune-voucher", set: "tuning", query: "Có thể dùng hai mã giảm giá cho một đơn không?", title: "Chọn voucher và thay đổi mã giảm giá" },

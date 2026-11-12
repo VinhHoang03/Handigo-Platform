@@ -51,7 +51,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
       if (auth.isAuthenticated &&
           auth.user?.role == UserRole.provider &&
-          auth.user?.providerOnboardingStatus != 'APPROVED' &&
+          auth.user?.canAccessProvider != true &&
           location != '/customer/provider-onboarding') {
         return '/customer/provider-onboarding';
       }

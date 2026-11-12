@@ -132,7 +132,7 @@ export const settleQuotationPayosPayment = async (payment: InstanceType<typeof P
   if (!await WalletTransaction.exists({ relatedPaymentId: payment._id, type: "provider_earning", status: "success" }).session(session)) {
     const wallet = await Wallet.findOneAndUpdate({ userId: provider.userId, isDeleted: false },
       { $inc: { balance: payment.amount }, $setOnInsert: { pendingBalance: 0, currency: "VND" } },
-      { new: true, upsert: true, session, runValidators: true });
+      { returnDocument: "after", upsert: true, session, runValidators: true });
     if (!wallet) throw new AppError("Chưa thể ghi nhận tiền vào ví thợ.", 409);
     await WalletTransaction.create([{
       walletId: wallet._id, userId: provider.userId, relatedOrderId: order._id, relatedPaymentId: payment._id,
