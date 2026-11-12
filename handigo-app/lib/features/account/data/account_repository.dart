@@ -9,31 +9,61 @@ class AccountRepository {
   final ApiClient _api;
 
   Future<List<VoucherItem>> publicVouchers() async {
-    final response = await _api.request('/vouchers/available',
-      query: {'source': 'public'}, authenticated: true);
-    return (response['data'] as List).map((item) => VoucherItem.fromJson(item as Map<String, dynamic>)).toList();
+    final response = await _api.request(
+      '/vouchers/available',
+      query: {'source': 'public'},
+      authenticated: true,
+    );
+    return (response['data'] as List)
+        .map((item) => VoucherItem.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   Future<PagedResult<VoucherItem>> ownedVouchers({int page = 1}) async {
-    final response = await _api.request('/rewards/vouchers', query: {'page': page}, authenticated: true);
+    final response = await _api.request(
+      '/rewards/vouchers',
+      query: {'page': page},
+      authenticated: true,
+    );
     final data = response['data'] as Map<String, dynamic>;
-    return PagedResult.fromJson({'items': data['items'], 'pagination': data}, VoucherItem.fromJson);
+    return PagedResult.fromJson({
+      'items': data['items'],
+      'pagination': data,
+    }, VoucherItem.fromJson);
   }
 
-  Future<PagedResult<VoucherUsageItem>> voucherUsageHistory({int page = 1}) async {
-    final response = await _api.request('/vouchers/history', query: {'page': page}, authenticated: true);
-    return PagedResult.fromJson(response['data'] as Map<String, dynamic>, VoucherUsageItem.fromJson);
+  Future<PagedResult<VoucherUsageItem>> voucherUsageHistory({
+    int page = 1,
+  }) async {
+    final response = await _api.request(
+      '/vouchers/history',
+      query: {'page': page},
+      authenticated: true,
+    );
+    return PagedResult.fromJson(
+      response['data'] as Map<String, dynamic>,
+      VoucherUsageItem.fromJson,
+    );
   }
 
-  Future<Uint8List> depositQr(String orderCode) => _api.walletDepositQr(orderCode);
+  Future<Uint8List> depositQr(String orderCode) =>
+      _api.walletDepositQr(orderCode);
 
   Future<Map<String, dynamic>> syncDeposit(String orderCode) async =>
-      (await _api.request('/wallets/me/deposit/$orderCode/sync',
-        method: 'PATCH', authenticated: true))['data'] as Map<String, dynamic>;
+      (await _api.request(
+            '/wallets/me/deposit/$orderCode/sync',
+            method: 'PATCH',
+            authenticated: true,
+          ))['data']
+          as Map<String, dynamic>;
 
   Future<Map<String, dynamic>> cancelDeposit(String orderCode) async =>
-      (await _api.request('/wallets/me/deposit/$orderCode/cancel',
-        method: 'PATCH', authenticated: true))['data'] as Map<String, dynamic>;
+      (await _api.request(
+            '/wallets/me/deposit/$orderCode/cancel',
+            method: 'PATCH',
+            authenticated: true,
+          ))['data']
+          as Map<String, dynamic>;
 
   Future<List<Map<String, dynamic>>> bankAccounts() async {
     final data = (await _api.request(
@@ -118,11 +148,16 @@ class AccountRepository {
   );
   Future<PagedResult<WalletTransactionItem>> walletTransactions({
     int page = 1,
+    String? type,
   }) async {
     final data =
         (await _api.request(
               '/wallets/me/transactions',
-              query: {'page': page, 'limit': 20},
+              query: {
+                'page': page,
+                'limit': 20,
+                if (type != null) 'type': type,
+              },
               authenticated: true,
             ))['data']
             as Map<String, dynamic>;
@@ -212,7 +247,7 @@ class AccountRepository {
             as Map<String, dynamic>,
       );
   Future<String> uploadCaseImage(XFile file) =>
-      _api.uploadOrderAttachment(file, purpose: 'case_evidence');
+      _api.uploadOrderAttachment(file);
   Future<PagedResult<SupportItem>> complaints({int page = 1}) async {
     final data =
         (await _api.request(

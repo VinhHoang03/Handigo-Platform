@@ -1,9 +1,8 @@
 import '../../../shared/widgets/app_search_field.dart';
 import 'dart:convert';
-import 'dart:math' as math;
 import '../../../shared/widgets/service_images.dart';
+import '../../../shared/widgets/handigo_logo.dart';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -50,7 +49,7 @@ class _CustomerShellState extends State<CustomerShell> {
     final scheme = Theme.of(context).colorScheme;
     final activeIndex = widget.navigationShell?.currentIndex ?? _index;
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: activeIndex == 2,
       body:
           widget.navigationShell ??
           IndexedStack(index: _index, children: _pages),
@@ -260,13 +259,7 @@ class CustomerAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            'Handigo',
-            style: textTheme.titleMedium?.copyWith(
-              color: scheme.primary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          const HandigoLogo(height: 30),
         ],
       ),
       actions: [
@@ -391,7 +384,15 @@ class _CustomerHomeContentState extends ConsumerState<CustomerHomeContent> {
           onAction: () => context.push('/customer/services'),
         ),
         const SizedBox(height: 10),
-        _ServiceHorizontalList(services: widget.data.services),
+        if (widget.data.services.isEmpty)
+          const _HomeEmpty(message: 'Chưa có dịch vụ nổi bật.')
+        else
+          _HomeCardGrid(
+            children: [
+              for (final service in widget.data.services)
+                _ServiceCard(service: service),
+            ],
+          ),
         const SizedBox(height: 20),
         _HomeSectionHeader(
           title: 'Voucher dành cho bạn',
@@ -404,10 +405,22 @@ class _CustomerHomeContentState extends ConsumerState<CustomerHomeContent> {
           const SizedBox(height: 16),
           const _HomeSectionHeader(title: 'Voucher hiện có'),
           const SizedBox(height: 10),
-          _VoucherHorizontalList(vouchers: widget.data.vouchers),
+          _HomeCardGrid(
+            children: [
+              for (final voucher in widget.data.vouchers)
+                _HomeVoucherCard(
+                  voucher: voucher,
+                  onTap: () => context.push('/customer/vouchers'),
+                ),
+            ],
+          ),
         ],
         const SizedBox(height: 20),
-        const _HomeSectionHeader(title: 'Tin tức'),
+        _HomeSectionHeader(
+          title: 'Tin tức',
+          actionLabel: 'Xem tất cả',
+          onAction: () => context.push('/customer/news'),
+        ),
         const SizedBox(height: 10),
         _NewsGrid(articles: widget.data.news),
       ],
@@ -773,7 +786,9 @@ class _HomeSectionHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        Expanded(
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        ),
         if (actionLabel != null)
           onAction == null
               ? DecoratedBox(
@@ -807,21 +822,31 @@ class _CategoryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleCategories = categories.take(7).toList();
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: visibleCategories.length + 1,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        crossAxisSpacing: 7,
-        mainAxisSpacing: 7,
-        childAspectRatio: .86,
-      ),
-      itemBuilder: (context, index) {
-        if (index == visibleCategories.length) return const _AllCategoryCard();
-        return _CategoryCard(category: visibleCategories[index]);
-      },
+    const columns = 4;
+    final cards = [
+      for (final category in categories.take(7))
+        _CategoryCard(category: category),
+      const _AllCategoryCard(),
+    ];
+    return Column(
+      spacing: 7,
+      children: [
+        for (var rowStart = 0; rowStart < cards.length; rowStart += columns)
+          IntrinsicHeight(
+            child: Row(
+              spacing: 7,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var column = 0; column < columns; column++)
+                  Expanded(
+                    child: rowStart + column < cards.length
+                        ? cards[rowStart + column]
+                        : const SizedBox.shrink(),
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -1126,39 +1151,30 @@ class _CategoryCustomizationSheetState
   }
 }
 
-class _ServiceHorizontalList extends StatelessWidget {
-  const _ServiceHorizontalList({required this.services});
-  final List<Service> services;
+class _HomeCardGrid extends StatelessWidget {
+  const _HomeCardGrid({required this.children});
+
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    if (services.isEmpty) {
-      return const _HomeEmpty(message: 'Chưa có dịch vụ nổi bật.');
-    }
-    final scrollBehavior = ScrollConfiguration.of(context);
-    return ScrollConfiguration(
-      behavior: scrollBehavior.copyWith(
-        dragDevices: {...scrollBehavior.dragDevices, PointerDeviceKind.mouse},
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var index = 0; index < services.length; index++) ...[
-                  if (index > 0) const SizedBox(width: 12),
-                  SizedBox(
-                    width: math.min(224.0, constraints.maxWidth * .45),
-                    child: _ServiceCard(service: services[index]),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 12.0;
+        final width = constraints.maxWidth;
+        final columns = width < 280
+            ? 1
+            : ((width + gap) / 200).floor().clamp(2, 4);
+        final cardWidth = (width - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final child in children)
+              SizedBox(width: cardWidth, child: child),
+          ],
+        );
+      },
     );
   }
 }
@@ -1171,7 +1187,6 @@ class _HomeRewardsSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final numbers = NumberFormat.decimalPattern('vi');
     final scheme = theme.colorScheme;
-    final scrollBehavior = ScrollConfiguration.of(context);
     return ref
         .watch(customerHomeRewardsProvider)
         .when(
@@ -1240,34 +1255,19 @@ class _HomeRewardsSection extends ConsumerWidget {
                 if (rewards.offers.isEmpty)
                   const _HomeEmpty(message: 'Hiện chưa có voucher đổi điểm.')
                 else
-                  ScrollConfiguration(
-                    behavior: scrollBehavior.copyWith(
-                      dragDevices: {
-                        ...scrollBehavior.dragDevices,
-                        PointerDeviceKind.mouse,
-                      },
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          spacing: 12,
-                          children: [
-                            for (final offer in rewards.offers)
-                              _HomeRewardCard(
-                                offer: offer,
-                                onTap: () => _confirmRedeem(
-                                  context,
-                                  ref,
-                                  offer,
-                                  rewards.balance,
-                                ),
-                              ),
-                          ],
+                  _HomeCardGrid(
+                    children: [
+                      for (final offer in rewards.offers)
+                        _HomeRewardCard(
+                          offer: offer,
+                          onTap: () => _confirmRedeem(
+                            context,
+                            ref,
+                            offer,
+                            rewards.balance,
+                          ),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
               ],
             );
@@ -1308,7 +1308,6 @@ class _HomeRewardCard extends StatelessWidget {
           fit: StackFit.passthrough,
           children: [
             Container(
-              width: 170,
               constraints: const BoxConstraints(minHeight: 170),
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 48),
               decoration: BoxDecoration(
@@ -1373,31 +1372,6 @@ class _HomeRewardCard extends StatelessWidget {
   }
 }
 
-class _VoucherHorizontalList extends StatelessWidget {
-  const _VoucherHorizontalList({required this.vouchers});
-
-  final List<HomeVoucher> vouchers;
-
-  @override
-  Widget build(BuildContext context) {
-    if (vouchers.isEmpty) {
-      return const _HomeEmpty(message: 'Hiện chưa có voucher.');
-    }
-    return SizedBox(
-      height: 154,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: vouchers.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) => _HomeVoucherCard(
-          voucher: vouchers[index],
-          onTap: () => context.push('/customer/vouchers'),
-        ),
-      ),
-    );
-  }
-}
-
 class _HomeVoucherCard extends StatelessWidget {
   const _HomeVoucherCard({required this.voucher, required this.onTap});
 
@@ -1410,8 +1384,8 @@ class _HomeVoucherCard extends StatelessWidget {
     final discount = voucher.discountType.toUpperCase() == 'PERCENT'
         ? 'Giảm ${voucher.discountValue.toStringAsFixed(0)}%'
         : 'Giảm ${_compactMoney(voucher.discountValue)}';
-    return SizedBox(
-      width: 248,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 154),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
@@ -1444,6 +1418,7 @@ class _HomeVoucherCard extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
@@ -1453,32 +1428,39 @@ class _HomeVoucherCard extends StatelessWidget {
                             size: 21,
                             color: Colors.white,
                           ),
-                          const Spacer(),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .16),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 4,
-                              ),
-                              child: Text(
-                                voucher.code,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: .16),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    voucher.code,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const Spacer(),
+                      const SizedBox(height: 16),
                       Text(
                         discount,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -1514,6 +1496,93 @@ class _HomeVoucherCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class CustomerNewsScreen extends ConsumerStatefulWidget {
+  const CustomerNewsScreen({super.key});
+
+  @override
+  ConsumerState<CustomerNewsScreen> createState() => _CustomerNewsScreenState();
+}
+
+class _CustomerNewsScreenState extends ConsumerState<CustomerNewsScreen> {
+  String? _category;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Tin tức')),
+    body: ref
+        .watch(customerNewsProvider)
+        .when(
+          loading: () => const AppLoading(),
+          error: (_, _) => AppMessage(
+            message: 'Không thể tải tin tức.',
+            onRetry: () => ref.invalidate(customerNewsProvider),
+          ),
+          data: (articles) {
+            final categories = articles
+                .map((article) => article.category)
+                .toSet();
+            final selected = categories.contains(_category) ? _category : null;
+            final visible = selected == null
+                ? articles
+                : articles
+                      .where((article) => article.category == selected)
+                      .toList();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (categories.isNotEmpty)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      spacing: 8,
+                      children: [
+                        for (final category in [null, ...categories])
+                          ChoiceChip(
+                            label: Text(category ?? 'Tất cả'),
+                            selected: selected == category,
+                            onSelected: (_) =>
+                                setState(() => _category = category),
+                          ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(customerNewsProvider);
+                      try {
+                        await ref.read(customerNewsProvider.future);
+                      } catch (_) {
+                        /* Lỗi hiển thị ở màn hình. */
+                      }
+                    },
+                    child: ListView.separated(
+                      key: ValueKey(selected),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      itemCount: visible.isEmpty ? 1 : visible.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) => visible.isEmpty
+                          ? const _HomeEmpty(message: 'Chưa có tin tức mới.')
+                          : _HomeNewsCard(
+                              article: visible[index],
+                              onTap: () =>
+                                  _showNewsArticle(context, visible[index]),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+  );
 }
 
 class _NewsGrid extends StatelessWidget {

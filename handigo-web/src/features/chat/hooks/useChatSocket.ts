@@ -8,6 +8,7 @@ export function useChatSocket(
   onMessageUpdated: (message: ChatMessage) => void,
   onMessageDeleted: (messageId: string) => void,
   onReconnect?: () => void,
+  onOrderUpdated?: () => void,
 ) {
   useEffect(() => {
     if (!conversationId) return;
@@ -16,6 +17,7 @@ export function useChatSocket(
     const joinConversation = () => {
       for (const id of conversationIds) socket.emit('conversation:join', { conversationId: id });
       onReconnect?.();
+      onOrderUpdated?.();
     };
     const handleMessage = (message: ChatMessage) => {
       if (conversationIds.includes(message.conversationId)) onMessage(message);
@@ -30,12 +32,14 @@ export function useChatSocket(
     socket.on('message:new', handleMessage);
     socket.on('message:updated', handleUpdatedMessage);
     socket.on('message:deleted', handleDeletedMessage);
+    if (onOrderUpdated) socket.on('order:updated', onOrderUpdated);
     return () => {
       socket.off('connect', joinConversation);
       socket.off('message:new', handleMessage);
       socket.off('message:updated', handleUpdatedMessage);
       socket.off('message:deleted', handleDeletedMessage);
+      if (onOrderUpdated) socket.off('order:updated', onOrderUpdated);
       dispose();
     };
-  }, [conversationId, onMessage, onMessageDeleted, onMessageUpdated, onReconnect]);
+  }, [conversationId, onMessage, onMessageDeleted, onMessageUpdated, onReconnect, onOrderUpdated]);
 }

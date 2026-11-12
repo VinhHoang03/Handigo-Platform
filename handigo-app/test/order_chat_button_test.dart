@@ -66,7 +66,7 @@ Future<(_Repository, GoRouter)> _show(WidgetTester tester, Widget child) async {
 void main() {
   for (final status in ['created', 'cancelled']) {
     testWidgets(
-      'Nút nhắn tin đơn $status hiện và bấm báo lý do tại danh sách',
+      'Nút nhắn tin đơn $status bị vô hiệu hóa tại danh sách',
       (tester) async {
         final (repository, router) = await _show(
           tester,
@@ -85,22 +85,10 @@ void main() {
                 find.widgetWithText(OutlinedButton, 'Nhắn tin'),
               )
               .onPressed,
-          isNotNull,
-        );
-        await tester.tap(find.text('Nhắn tin'));
-        await tester.pumpAndSettle();
-        expect(
-          find.text(
-            status == 'created'
-                ? 'Chưa có thợ nhận đơn nên chưa thể nhắn tin.'
-                : 'Đơn đã hủy nên không thể nhắn tin.',
-          ),
-          findsOneWidget,
+          isNull,
         );
         expect(repository.calls, 0);
         expect(router.routeInformationProvider.value.uri.path, '/');
-        AppToast.dismiss(tester.element(find.byType(OrderSummaryCard)));
-        await tester.pumpAndSettle();
       },
     );
   }

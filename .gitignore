@@ -81,6 +81,14 @@ GRAPH_REPORT.md
 *.local
 *.tmp
 
+# Skill Impeccable và ngữ cảnh thiết kế chỉ dùng trên máy cá nhân.
+/.agents/skills/impeccable/
+.impeccable/
+/PRODUCT.md
+/handigo-web/DESIGN.md
+/handigo-app/PRODUCT.md
+/handigo-app/DESIGN.md
+
 # IDE và editor directories
 .vscode/*
 !.vscode/extensions.json

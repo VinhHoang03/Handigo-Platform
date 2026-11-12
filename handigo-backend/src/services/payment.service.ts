@@ -188,6 +188,9 @@ const assertAppointmentPaymentReady = (
 ) => {
   if (paymentType === "remaining") return;
   if (isFixedPriceWorkPayment(order)) return;
+  if (order.status === "created" && order.paymentStatus === "unpaid" && order.paymentDueAt && order.paymentDueAt <= new Date()) {
+    throw new AppError("Thời hạn thanh toán đơn hàng đã kết thúc.", 409);
+  }
   if (order.orderType !== "scheduled") return;
   if (order.status === "created" && !order.providerId) return;
   if (

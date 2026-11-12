@@ -31,18 +31,46 @@ Future<bool> confirmRewardRedemption(
       builder: (context, setState) => PopScope(
         canPop: !busy,
         child: AlertDialog(
-          backgroundColor: rewardSurface(context),
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
           surfaceTintColor: Colors.transparent,
           scrollable: true,
           title: Text('Đổi voucher ${rewardOfferName(offer, numbers)}'),
-          content: Text(
-            'Điều kiện áp dụng\n'
-            '${rewardOfferConditions(offer, numbers)}\n'
-            '${validityDays == null ? '' : 'Hiệu lực $validityDays ngày kể từ khi đổi.\n'}\n'
-            'Điểm cần dùng: ${numbers.format(offer.points)}\n'
-            'Điểm hiện có: ${numbers.format(balance)}'
-            '${canRedeem ? '' : '\nBạn chưa đủ điểm để đổi voucher này.'}'
-            '${errorMessage == null ? '' : '\n$errorMessage'}',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(rewardOfferConditions(offer, numbers)),
+              if (validityDays != null) ...[
+                const SizedBox(height: 4),
+                Text('Hiệu lực $validityDays ngày kể từ khi đổi.'),
+              ],
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Điểm cần dùng: ${numbers.format(offer.points)}',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Điểm hiện có: ${numbers.format(balance)}'),
+                  ],
+                ),
+              ),
+              if (!canRedeem || errorMessage != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  errorMessage ?? 'Bạn chưa đủ điểm để đổi voucher này.',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
           ),
           actions: [
             TextButton(

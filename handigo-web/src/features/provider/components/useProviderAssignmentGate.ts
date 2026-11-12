@@ -83,20 +83,42 @@ export function useProviderAssignmentGate() {
       );
       void loadPendingAssignment();
     };
+    const handleWorkConfirmation = () => {
+      addToast('Vui lòng mở đơn và xác nhận đang làm việc trong 15 phút.', 'info');
+      if (!navigator.userActivation?.hasBeenActive) return;
+      navigator.vibrate?.([200, 100, 200]);
+      if (!window.AudioContext) return;
+      const audio = new AudioContext();
+      if (audio.state !== 'running') {
+        void audio.close().catch(() => {});
+        return;
+      }
+      const tone = audio.createOscillator();
+      const volume = audio.createGain();
+      volume.gain.setValueAtTime(0.12, audio.currentTime);
+      volume.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.35);
+      tone.frequency.value = 660;
+      tone.connect(volume).connect(audio.destination);
+      tone.onended = () => { void audio.close().catch(() => {}); };
+      tone.start();
+      tone.stop(audio.currentTime + 0.35);
+    };
 
     socket.on('assignment:new', handleNewAssignment);
     socket.on('direct-request:new', handleNewAssignment);
     socket.on('assignment:closed', handleClosedAssignment);
+    socket.on('order:work-confirmation', handleWorkConfirmation);
     socket.on('connect', loadPendingAssignment);
 
     return () => {
       socket.off('assignment:new', handleNewAssignment);
       socket.off('direct-request:new', handleNewAssignment);
       socket.off('assignment:closed', handleClosedAssignment);
+      socket.off('order:work-confirmation', handleWorkConfirmation);
       socket.off('connect', loadPendingAssignment);
       dispose();
     };
-  }, [enabled, loadPendingAssignment, setError, token]);
+  }, [addToast, enabled, loadPendingAssignment, setError, token]);
 
   useEffect(() => {
     if (!assignment) {

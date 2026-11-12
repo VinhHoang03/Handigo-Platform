@@ -10,12 +10,14 @@ import 'package:handigo_app/core/network/paged_result.dart';
 import 'package:handigo_app/features/account/data/account_repository.dart';
 import 'package:handigo_app/features/account/domain/account_models.dart';
 import 'package:handigo_app/features/account/presentation/account_screens.dart';
+import 'package:handigo_app/features/account/presentation/customer_withdrawals.dart';
 
 class _Repository extends AccountRepository {
   _Repository(super.api);
   final banks = <Map<String, dynamic>>[];
   Map<String, dynamic>? saved;
   int walletReads = 0, paymentReads = 0;
+  String? transactionType;
 
   @override
   Future<List<Map<String, dynamic>>> bankAccounts() async => List.of(banks);
@@ -30,8 +32,10 @@ class _Repository extends AccountRepository {
   @override
   Future<PagedResult<WalletTransactionItem>> walletTransactions({
     int page = 1,
+    String? type,
   }) async {
     walletReads++;
+    transactionType = type;
     return PagedResult(
       items: [
         WalletTransactionItem(
@@ -72,6 +76,39 @@ void main() {
     final api = ApiClient(Dio(), CookieJar());
     addTearDown(api.close);
     repository = _Repository(api);
+  });
+
+  testWidgets('Lịch sử ví có hai tab và hai thao tác nạp, rút', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          accountRepositoryProvider.overrideWithValue(repository),
+          customerWithdrawalsProvider(1).overrideWith(
+            (ref) async => const PagedResult(
+              items: [
+                {'amount': 50000, 'status': 'pending'},
+              ],
+              page: 1,
+              totalPages: 1,
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: CustomerPaymentHistoryScreen(walletActivity: true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Tab), findsNWidgets(2));
+    expect(find.text('Nạp ví'), findsOneWidget);
+    expect(find.text('Rút tiền'), findsOneWidget);
+    expect(repository.transactionType, 'deposit');
+    expect(find.text('Giao dịch ví trang 1'), findsOneWidget);
+    await tester.tap(find.text('Lịch sử rút tiền'));
+    await tester.pumpAndSettle();
+    expect(find.text('Giao dịch ví trang 1'), findsNothing);
+    expect(find.text('Chờ duyệt'), findsOneWidget);
+    expect(repository.paymentReads, 0);
   });
 
   Future<void> showWallet(WidgetTester tester) async {

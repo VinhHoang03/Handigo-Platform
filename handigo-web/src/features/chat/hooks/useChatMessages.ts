@@ -4,7 +4,7 @@ import type { ChatMessage } from '../types/chat.types';
 import { loadChatHistory, mergeChatHistory, type MessageChange } from '../utils/chatHistory';
 import { useChatSocket } from './useChatSocket';
 
-export function useChatMessages(conversationKey: string | null) {
+export function useChatMessages(conversationKey: string | null, onOrderUpdated?: () => void) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -58,7 +58,7 @@ export function useChatMessages(conversationKey: string | null) {
     }
   }, [conversationKey]);
   const reconnect = useCallback(() => { void synchronize(); }, [synchronize]);
-  useChatSocket(conversationKey, addMessage, addMessage, removeMessage, reconnect);
+  useChatSocket(conversationKey, addMessage, addMessage, removeMessage, reconnect, onOrderUpdated);
 
   useEffect(() => {
     pages.current = {};

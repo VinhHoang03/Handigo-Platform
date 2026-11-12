@@ -16,7 +16,7 @@ function loadService(name, modules, internals = []) {
   }).outputText;
   const exports = {};
   vm.runInNewContext(code, {
-    exports, Date, Map, AbortSignal, setTimeout: () => ({ unref() {} }),
+    exports, Date, Map, AbortSignal, setTimeout: () => ({ unref() {} }), clearTimeout() {},
     require(name) {
       if (name in modules) return modules[name];
       if (name === 'crypto' || name === 'node:crypto') return require(name);
@@ -192,7 +192,10 @@ function cancellationSetup(method = 'wallet', { automatic = true, unavailable = 
         refund ??= { _id: new Types.ObjectId(), ...update.$setOnInsert };
         setFields(refund, update.$set); return refund;
       },
-      async updateOne(_, update) { setFields(refund, update.$set); },
+      async updateOne(_, update, options) {
+        if (!refund && options?.upsert) refund = { _id: new Types.ObjectId(), ...update.$setOnInsert };
+        if (refund) setFields(refund, update.$set);
+      },
     } },
     './voucher.service': { async releaseVoucherReservation() {} },
     './promotion.service': { async releaseOrderPromotion() {} },
@@ -297,13 +300,26 @@ test('Thợ đã nhận đúng lúc quét hết hạn: giữ đơn và không c�
   assert.equal(context.transactions.length, 0);
 });
 
-test('Điều phối thay thế chờ hết thời gian hiện có dù đã vượt số lượt thử cũ', async () => {
+for (const method of ['wallet', 'payos']) {
+  test(`Khách đồng ý tìm thợ khác nhưng hết hạn: hoàn ${method} một lần`, async () => {
+    const context = cancellationSetup(method, { automatic: false });
+    await context.cancel();
+    await context.cancel();
+    assert.equal(context.order.status, 'cancelled');
+    assert.equal(context.order.reassignment.status, 'failed');
+    assert.equal(context.payment.status, 'refunded');
+    assert.equal(context.wallet.balance, 200000);
+    assert.equal(context.transactions.length, 1);
+  });
+}
+
+for (const automatic of [true, false]) test(`Tìm thợ thay thế (tự động: ${automatic}) chờ đủ hạn cấu hình dù đã vượt số lượt thử cũ`, async () => {
   const now = Date.now();
   const order = { _id: new Types.ObjectId(), status: 'created', readyForMatching: true,
     createdAt: new Date(0), matchingStartedAt: new Date(now),
     matchingSearch: { initialRadiusKm: 5, expandedRadiusKm: 10,
       expandsAt: new Date(now + 180000), expiresAt: new Date(now + 360000) },
-    reassignment: { automatic: true, status: 'matching' } };
+    reassignment: { automatic, status: 'matching' } };
   const cancellations = [];
   const service = loadService('dispatch.service', {
     mongoose: { Types },

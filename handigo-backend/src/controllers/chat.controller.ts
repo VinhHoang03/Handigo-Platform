@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { requireRequestUser } from "../middlewares/authContext";
 import * as chatService from "../services/chat.service";
 import { emitToConversation } from "../sockets/socketServer";
@@ -49,6 +49,29 @@ export const getMessages = async (req: Request, res: Response) => {
     return sendControllerError(res, error);
   }
 };
+
+export const getConversationAvailability = async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req);
+    const data = await chatService.getConversationAvailability(user.id, user.role, req.params.conversationId as string);
+    return res.json({ success: true, data, message: "Đã kiểm tra trạng thái trò chuyện." });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
+
+export const authorizeChatImageUpload = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = requireRequestUser(req);
+    await chatService.authorizeChatImageUpload(user.id, user.role, req.params.conversationId as string);
+    return next();
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
+
+export const uploadChatImage = (_req: Request, res: Response) =>
+  res.status(201).json({ success: true, data: { url: res.locals.imageUrl }, message: "Đã tải ảnh lên." });
 
 export const sendMessage = async (req: Request, res: Response) => {
   try {

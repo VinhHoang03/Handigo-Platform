@@ -7,6 +7,7 @@ import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/handigo_logo.dart';
 import '../../../shared/widgets/account_overview_widgets.dart';
 import '../../account/domain/account_models.dart';
 import 'provider_screens.dart';
@@ -72,6 +73,7 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
           onPressed: () => showAboutDialog(
             context: context,
             applicationName: 'Handigo Đối tác',
+            applicationIcon: const HandigoLogo(height: 24),
           ),
           icon: const Icon(Icons.help_outline_rounded),
         ),
@@ -2262,6 +2264,7 @@ String _transactionType(String value) =>
       'payment': 'Thanh toán đơn hàng',
       'refund': 'Hoàn tiền',
       'provider_earning': 'Thu nhập dịch vụ sau phí',
+      'provider_weekly_reward': 'Tiền thưởng tuần',
       'platform_fee': 'Phí nền tảng',
       'withdraw': 'Rút tiền',
       'withdraw_rejected': 'Hoàn tiền rút bị từ chối',

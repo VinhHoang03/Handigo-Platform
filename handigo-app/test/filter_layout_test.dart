@@ -9,6 +9,48 @@ import 'package:handigo_app/features/notifications/domain/notification_models.da
 import 'package:handigo_app/features/notifications/presentation/notification_screens.dart';
 
 void main() {
+  testWidgets('Kéo làm mới danh sách thông báo đang trống', (tester) async {
+    var loads = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          notificationListProvider.overrideWith((ref) async {
+            loads++;
+            return PagedResult<AppNotification>(
+              items: [
+                if (loads > 1)
+                  const AppNotification(
+                    id: 'order',
+                    title: 'Đơn mới',
+                    content: 'Bạn có đơn mới',
+                    type: 'ORDER',
+                    isRead: true,
+                  ),
+              ],
+              page: 1,
+              totalPages: 1,
+            );
+          }),
+        ],
+        child: const MaterialApp(home: NotificationCenterScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Bạn chưa có thông báo nào.'), findsOneWidget);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 400));
+    await tester.pumpAndSettle();
+    expect(loads, 2);
+    expect(find.text('Đơn mới'), findsOneWidget);
+    final payment = find.widgetWithText(ChoiceChip, 'Thanh toán');
+    await tester.tap(payment);
+    await tester.pumpAndSettle();
+    expect(find.text('Chưa có thông báo thuộc nhóm này.'), findsOneWidget);
+    await tester.tap(find.text('Xem tất cả thông báo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Đơn mới'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final dark in [false, true]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('Bộ lọc thông báo đổi nhóm, tối $dark, cỡ chữ $scale', (

@@ -123,6 +123,7 @@ class _Harness {
   Future<void> show(
     WidgetTester tester, {
     UserRole role = UserRole.provider,
+    String? onboardingStatus = 'APPROVED',
     double scale = 1,
   }) async {
     tester.view.devicePixelRatio = 1;
@@ -162,7 +163,7 @@ class _Harness {
                 fullName: 'Đối tác kiểm thử',
                 email: 'test@example.test',
                 role: role,
-                providerOnboardingStatus: 'APPROVED',
+                providerOnboardingStatus: onboardingStatus,
               )
               ..status = AuthStatus.authenticated,
           ),
@@ -457,6 +458,17 @@ void main() {
       tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
       isNotNull,
     );
+    await h.clear(tester);
+  });
+
+  testWidgets('Provider không có trạng thái hồ sơ vẫn nhận thông báo đơn', (
+    tester,
+  ) async {
+    final h = _Harness();
+    await h.show(tester, onboardingStatus: null);
+    await h.incoming(tester, h.item('1'));
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(h.sound.plays, 1);
     await h.clear(tester);
   });
 

@@ -19,23 +19,18 @@ class BookingAddressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final radius = BorderRadius.circular(14);
     return Semantics(
       selected: selected,
       child: Card(
-        color: Colors.white,
+        color: selected
+            ? scheme.surfaceContainerLow
+            : scheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: radius,
-          side: BorderSide(
-            color: selected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outlineVariant,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: radius),
         child: InkWell(
           onTap: onTap,
           borderRadius: radius,
@@ -47,35 +42,34 @@ class BookingAddressCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Row(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Flexible(
-                              child: Text(
-                                address.recipientName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            Text(
+                              address.recipientName,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             if (address.isDefault) ...[
-                              const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer,
+                                  color: scheme.primaryFixed,
                                   borderRadius: BorderRadius.circular(99),
                                 ),
                                 child: Text(
                                   'Mặc định',
                                   style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onPrimaryContainer,
+                                    color: scheme.onPrimaryFixed,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -87,6 +81,9 @@ class BookingAddressCard extends StatelessWidget {
                       if (action != null) ...[
                         const SizedBox(width: 8),
                         action!,
+                      ] else if (selected) ...[
+                        const SizedBox(width: 8),
+                        Icon(Icons.check_circle, color: scheme.primary),
                       ],
                     ],
                   ),

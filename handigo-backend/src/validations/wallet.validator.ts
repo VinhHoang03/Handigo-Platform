@@ -9,6 +9,7 @@ export const walletTransactionTypeSchema = z.enum([
   "payment",
   "refund",
   "provider_earning",
+  "provider_weekly_reward",
   "platform_fee",
   "withdraw",
   "withdraw_rejected",

@@ -21,6 +21,7 @@ import {
   cancellationPreviewQuerySchema,
   cancelOrderSchema,
   completeOrderSchema,
+  startOrderSchema,
   customerNoShowSchema,
   customerNoShowEvidenceSchema,
   createRepairQuotationSchema,
@@ -57,6 +58,7 @@ import {
   cancelOrder,
   previewCancellation,
   startOrder,
+  confirmWorking,
   arriveOrder,
   customerNoShowEligibility,
   createCustomerNoShowReport,
@@ -230,8 +232,12 @@ router.post(
   roleMiddleware("PROVIDER"),
   approvedProviderMiddleware,
   validate(orderIdParamSchema, "params"),
+  validate(startOrderSchema),
   startOrder,
 );
+
+router.post("/:orderId/work-confirmation", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  validate(orderIdParamSchema, "params"), confirmWorking);
 
 router.post(
   "/:orderId/quotation/payment/confirm",

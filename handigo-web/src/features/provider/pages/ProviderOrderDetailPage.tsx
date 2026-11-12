@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { PendingAssignmentCard } from '../components/PendingAssignmentCard';
 import { getCustomer } from '../utils/providerOrder.utils';
@@ -45,6 +46,7 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
     handleAccept,
     handleReject,
     handleStart,
+    handleConfirmWorking,
     handleArrival,
     checkNoShow,
     handleNoShow,
@@ -56,6 +58,14 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
     handleCreateQuotation,
     reload,
   } = useProviderOrderDetail(orderId, navigate);
+  const workExpiresAt = order?.workConfirmation?.expiresAt;
+  const [expiredWorkWindow, setExpiredWorkWindow] = useState<string | null>(null);
+  useEffect(() => {
+    if (!workExpiresAt) return;
+    const timer = window.setTimeout(() => setExpiredWorkWindow(workExpiresAt),
+      Math.max(new Date(workExpiresAt).getTime() - Date.now(), 0));
+    return () => window.clearTimeout(timer);
+  }, [workExpiresAt]);
 
   if (loading) {
     return (
@@ -157,6 +167,14 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
         </div>
 
         <OrderTrackingMap order={order} viewerRole="PROVIDER" />
+        {order.status === 'in_progress' && workExpiresAt && expiredWorkWindow !== workExpiresAt && (
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning bg-warning-container p-4 text-on-warning-container">
+            <p role="status">Xác nhận bạn vẫn đang làm việc trước {new Date(workExpiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}.</p>
+            <button type="button" className="btn-primary" disabled={busy} onClick={() => void handleConfirmWorking()}>
+              Tôi vẫn đang làm việc
+            </button>
+          </section>
+        )}
         {!quotation && !order.currentQuotationId && <OrderArrivalPanel order={order} busy={busy} onArrival={handleArrival}
           onCancel={() => setCancelOpen(true)} checkNoShow={checkNoShow} onNoShow={handleNoShow} />}
 
