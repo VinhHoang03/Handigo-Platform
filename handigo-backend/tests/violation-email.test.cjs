@@ -201,3 +201,137 @@ test('Lỗi lưu hàng đợi được truyền ra transaction để hủy cả 
   await assert.rejects(enqueueViolationEmail(violation(), { email: 'khach@example.com' }, {}), /Không lưu được hàng đợi/);
   assert.equal(send.mock.callCount(), 0);
 });
+
+for (const email of [undefined, null, '', '   ']) {
+  test(`Email người nhận ${String(email)} không tạo công việc gửi thư`, async t => {
+    t.mock.method(console, 'warn', () => {});
+    const create = t.mock.method(ViolationEmail, 'create', async () => {});
+    await enqueueViolationEmail(violation(), { email }, {});
+    assert.equal(create.mock.callCount(), 0);
+  });
+}
+
+test('Email người nhận được trim, họ tên thiếu dùng lời chào mặc định', async t => {
+  t.mock.method(ViolationEmail, 'create', async items => {
+    assert.equal(items[0].to, 'khach@example.test');
+    assert.match(items[0].text, /Xin chào bạn/);
+  });
+  await enqueueViolationEmail(violation(), { email: '  khach@example.test  ' }, {});
+});
+
+test('Email dữ liệu cũ thiếu lý do và quyết định dùng nội dung thay thế', () => {
+  const item = { ...violation(), reason: null, adminDecision: null, penalty: null };
+  const email = buildViolationEmail(item, '', 'ma-cu');
+  assert.match(email.text, /Không có thông tin bổ sung/);
+  assert.match(email.text, /Quyết định xử lý: Cảnh cáo/);
+  assert.ok(!email.text.includes('undefined'));
+  assert.ok(!email.text.includes('null'));
+});
+
+test('Mọi trường văn bản trong HTML email được escape, không lộ ghi chú nội bộ', () => {
+  const payload = '<img src=x onerror=alert(1)>';
+  const item = { ...violation(), violationType: payload, reason: payload, adminDecision: payload };
+  const email = buildViolationEmail(item, payload, payload);
+  assert.ok(!email.html.includes('<img'));
+  assert.equal((email.html.match(/&lt;img/g) || []).length, 5);
+  assert.ok(!email.html.includes(item.penalty.note));
+});
+
+test('Lỗi SMTP không ghi thông tin nhạy cảm vào log', async t => {
+  worker(t, 1);
+  const logs = [];
+  t.mock.method(console, 'warn', (...args) => logs.push(args.join(' ')));
+  t.mock.method(mail, 'sendNotificationEmail', async () => { throw new Error('smtp-private@example.test mat-khau-gia-lap'); });
+  await processViolationEmails();
+  assert.equal(logs.length, 1);
+  assert.ok(!logs[0].includes('smtp-private'));
+  assert.ok(!logs[0].includes('mat-khau-gia-lap'));
+});
+
+test('Lỗi nhận công việc từ database không gọi SMTP, truyền lỗi để worker lên lịch lượt sau', async t => {
+  t.mock.method(ViolationEmail, 'updateMany', async () => {});
+  t.mock.method(ViolationEmail, 'findOneAndUpdate', async () => { throw new Error('Database tạm mất kết nối'); });
+  const send = t.mock.method(mail, 'sendNotificationEmail', async () => {});
+  await assert.rejects(processViolationEmails(), /Database tạm mất kết nối/);
+  assert.equal(send.mock.callCount(), 0);
+});
+
+test('Lỗi database khi ghi retry không bị coi là gửi thành công', async t => {
+  worker(t, 1, true);
+  const writes = [];
+  t.mock.method(ViolationEmail, 'updateOne', async (_filter, update) => {
+    writes.push(update.$set.status);
+    throw new Error('Không ghi được lịch thử lại');
+  });
+  await assert.rejects(processViolationEmails(), /Không ghi được lịch thử lại/);
+  assert.deepEqual(writes, ['pending']);
+});
+
+test('Một lượt worker gửi tối đa mười email để nhường lượt xử lý tiếp theo', async t => {
+  t.mock.method(ViolationEmail, 'updateMany', async () => {});
+  t.mock.method(ViolationEmail, 'findOneAndUpdate', async () => ({
+    _id: new mongoose.Types.ObjectId(), violationId: new mongoose.Types.ObjectId(), to: 'khach@example.test', attempts: 1,
+  }));
+  t.mock.method(ViolationEmail, 'updateOne', async () => {});
+  const send = t.mock.method(mail, 'sendNotificationEmail', async () => {});
+  await processViolationEmails();
+  assert.equal(send.mock.callCount(), 10);
+});
+
+test('Monitor không chạy chồng lượt, dừng chờ công việc đang gửi và có thể khởi động lại', async t => {
+  const { startViolationEmailMonitor, stopViolationEmailMonitor } = require('../src/services/violationEmail.service');
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  t.mock.method(ViolationEmail, 'init', async () => {});
+  let claims = 0;
+  let release;
+  let announceSending;
+  const sending = new Promise(resolve => { announceSending = resolve; });
+  const pending = new Promise(resolve => { release = resolve; });
+  t.mock.method(ViolationEmail, 'updateMany', async () => {});
+  const claim = t.mock.method(ViolationEmail, 'findOneAndUpdate', async () => {
+    if (claims++ > 0) return null;
+    return { _id: new mongoose.Types.ObjectId(), violationId: new mongoose.Types.ObjectId(), attempts: 1, to: 'khach@example.test' };
+  });
+  t.mock.method(ViolationEmail, 'updateOne', async () => {});
+  t.mock.method(mail, 'sendNotificationEmail', async () => { announceSending(); await pending; });
+  t.after(async () => { release(); await stopViolationEmailMonitor(); });
+  await startViolationEmailMonitor();
+  await sending;
+  await startViolationEmailMonitor();
+  t.mock.timers.tick(45000);
+  assert.equal(claim.mock.callCount(), 1);
+  let stopped = false;
+  const stopping = stopViolationEmailMonitor().then(() => { stopped = true; });
+  await Promise.resolve();
+  assert.equal(stopped, false);
+  release();
+  await stopping;
+  assert.equal(stopped, true);
+  const calls = claim.mock.callCount();
+  t.mock.timers.tick(45000);
+  assert.equal(claim.mock.callCount(), calls);
+  await startViolationEmailMonitor();
+  await stopViolationEmailMonitor();
+  assert.ok(claim.mock.callCount() > calls);
+});
+
+test('Monitor lỗi một lượt vẫn xử lý lượt kế tiếp và không ghi lỗi database thô', async t => {
+  const { startViolationEmailMonitor, stopViolationEmailMonitor } = require('../src/services/violationEmail.service');
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const logs = [];
+  t.mock.method(console, 'error', (...args) => logs.push(args.join(' ')));
+  t.mock.method(ViolationEmail, 'init', async () => {});
+  let runs = 0;
+  t.mock.method(ViolationEmail, 'updateMany', async () => {
+    if (++runs === 1) throw new Error('dia-chi-database-noi-bo');
+  });
+  t.mock.method(ViolationEmail, 'findOneAndUpdate', async () => null);
+  t.after(stopViolationEmailMonitor);
+  await startViolationEmailMonitor();
+  for (let index = 0; index < 6; index++) await Promise.resolve();
+  t.mock.timers.tick(15000);
+  await stopViolationEmailMonitor();
+  assert.equal(runs, 2);
+  assert.equal(logs.length, 1);
+  assert.ok(!logs[0].includes('dia-chi-database-noi-bo'));
+});

@@ -10,11 +10,23 @@ class OrderSummary {
     this.addressLabel,
     this.serviceImage,
     this.providerName,
+    this.providerId,
     this.providerAvatar,
     this.providerGender,
     this.customerName,
+    this.customerId,
     this.customerAvatar,
+    this.serviceType,
+    this.addressLatitude,
+    this.addressLongitude,
     this.totalAmount,
+    this.providerAmount,
+    this.inspectionRequired = false,
+    this.createdAt,
+    this.expectedStartAt,
+    this.expectedEndAt,
+    this.durationMinutes,
+    this.problemDescription,
     this.paymentStatus,
     this.bookingStatus,
     this.readyForMatching = false,
@@ -28,6 +40,8 @@ class OrderSummary {
         ? provider['userId']
         : null;
     final pricing = json['pricing'];
+    final schedule = json['schedule'];
+    final address = json['addressSnapshot'] ?? json['addressId'];
     return OrderSummary(
       id: (json['_id'] ?? json['id']) as String,
       code: json['orderCode'] as String? ?? '',
@@ -41,8 +55,19 @@ class OrderSummary {
       hasPendingAssignment: json['hasPendingAssignment'] == true,
       depositPaidAt: _date(json['depositPaidAt']),
       scheduledAt: _date(json['scheduledAt']),
-      addressLabel: json['addressId'] is Map<String, dynamic>
-          ? formatAddressData(json['addressId'] as Map<String, dynamic>)
+      createdAt: _date(json['createdAt']),
+      expectedStartAt: schedule is Map<String, dynamic>
+          ? _date(schedule['expectedStartAt'])
+          : null,
+      expectedEndAt: schedule is Map<String, dynamic>
+          ? _date(schedule['expectedEndAt'])
+          : null,
+      durationMinutes: schedule is Map<String, dynamic>
+          ? (schedule['durationMinutes'] as num?)?.toInt()
+          : null,
+      problemDescription: json['problemDescription'] as String?,
+      addressLabel: address is Map<String, dynamic>
+          ? formatAddressData(address)
           : null,
       serviceImage: service is Map<String, dynamic>
           ? (service.containsKey('coverImage')
@@ -53,6 +78,9 @@ class OrderSummary {
       providerName: providerUser is Map<String, dynamic>
           ? providerUser['fullName'] as String?
           : null,
+      providerId: provider is Map<String, dynamic>
+          ? _stringValue(provider['_id'] ?? provider['id'])
+          : _stringValue(provider),
       providerAvatar: providerUser is Map<String, dynamic>
           ? providerUser['avatar'] as String?
           : null,
@@ -68,14 +96,31 @@ class OrderSummary {
       customerName: json['customerId'] is Map<String, dynamic>
           ? (json['customerId'] as Map<String, dynamic>)['fullName'] as String?
           : null,
+      customerId: json['customerId'] is Map<String, dynamic>
+          ? _stringValue(
+              (json['customerId'] as Map<String, dynamic>)['_id'] ??
+                  (json['customerId'] as Map<String, dynamic>)['id'],
+            )
+          : _stringValue(json['customerId']),
       customerAvatar: json['customerId'] is Map<String, dynamic>
           ? (json['customerId'] as Map<String, dynamic>)['avatar'] as String?
+          : null,
+      serviceType: service is Map ? service['serviceType'] as String? : null,
+      addressLatitude: address is Map
+          ? (address['latitude'] as num?)?.toDouble()
+          : null,
+      addressLongitude: address is Map
+          ? (address['longitude'] as num?)?.toDouble()
           : null,
       totalAmount: pricing is Map<String, dynamic>
           ? ((json['quotationFinalAmount'] ?? pricing['totalPaidAmount'])
                     as num?)
                 ?.toDouble()
           : null,
+      providerAmount: pricing is Map<String, dynamic>
+          ? _providerOrderAmount(json, pricing)
+          : null,
+      inspectionRequired: json['inspectionRequired'] == true,
     );
   }
   final String id;
@@ -86,14 +131,27 @@ class OrderSummary {
   final String? addressLabel;
   final String? serviceImage;
   final String? providerName;
+  final String? providerId;
   final String? providerAvatar;
   final String? providerGender;
   final String? customerName;
+  final String? customerId;
   final String? customerAvatar;
+  final String? serviceType;
+  final double? addressLatitude, addressLongitude;
   final double? totalAmount;
+  final double? providerAmount;
+  final bool inspectionRequired;
+  final DateTime? createdAt;
+  final DateTime? expectedStartAt;
+  final DateTime? expectedEndAt;
+  final int? durationMinutes;
+  final String? problemDescription;
   final String? paymentStatus, bookingStatus;
   final bool readyForMatching, hasPendingAssignment;
   final DateTime? depositPaidAt;
+
+  DateTime? get calendarAt => scheduledAt ?? expectedStartAt ?? createdAt;
 
   String get customerDisplayStatus {
     if (status != 'created') return status;
@@ -107,6 +165,29 @@ class OrderSummary {
     }
     return 'awaiting_payment';
   }
+}
+
+double? _providerOrderAmount(
+  Map<String, dynamic> order,
+  Map<String, dynamic> pricing,
+) {
+  if (order['inspectionRequired'] != true) {
+    return (pricing['providerEarningAmount'] as num?)?.toDouble();
+  }
+
+  final quotationAmount = (order['quotationFinalAmount'] as num?)?.toDouble();
+  if (quotationAmount == null) return null;
+
+  final depositPaid = _date(order['depositPaidAt']) != null;
+  final hasPricingSnapshot = pricing['baseAmount'] != null;
+  final appliedDeposit = hasPricingSnapshot
+      ? (depositPaid
+            ? (pricing['totalPaidAmount'] as num?)?.toDouble() ?? 0
+            : 0)
+      : (depositPaid ? (order['depositAmount'] as num?)?.toDouble() ?? 0 : 0);
+  return (quotationAmount - appliedDeposit)
+      .clamp(0, double.infinity)
+      .toDouble();
 }
 
 class OrderDetail {
@@ -160,6 +241,9 @@ class OrderDetail {
     this.cancelledAt,
     this.addressLatitude,
     this.addressLongitude,
+    this.arrivalProviderId,
+    this.arrivedAt,
+    this.customerNoShowStatus,
   }) : _statusHistory = statusHistory;
 
   factory OrderDetail.fromJson(Map<String, dynamic> json) {
@@ -278,6 +362,15 @@ class OrderDetail {
       addressLongitude: location is Map
           ? (location['longitude'] as num?)?.toDouble()
           : null,
+      arrivalProviderId: json['arrival'] is Map
+          ? _stringValue(json['arrival']['providerId'])
+          : null,
+      arrivedAt: json['arrival'] is Map
+          ? _date(json['arrival']['arrivedAt'])
+          : null,
+      customerNoShowStatus: json['customerNoShow'] is Map
+          ? json['customerNoShow']['status'] as String?
+          : null,
     );
   }
 
@@ -318,6 +411,15 @@ class OrderDetail {
   final DateTime? createdAt, updatedAt, cancelledAt;
   final String? cancellationReason;
   final double? addressLatitude, addressLongitude;
+  final String? arrivalProviderId;
+  final DateTime? arrivedAt;
+  final String? customerNoShowStatus;
+  bool get noShowBlocksWork =>
+      customerNoShowStatus == 'pending' || customerNoShowStatus == 'approved';
+  bool get hasArrived =>
+      providerId != null &&
+      arrivalProviderId == providerId &&
+      arrivedAt != null;
   OrderSummary get summary => OrderSummary(
     id: id,
     code: code,
@@ -336,6 +438,7 @@ class OrderDetail {
       providerId != null && ['accepted', 'in_progress'].contains(status);
   bool get canEditQuotation =>
       inspectionRequired &&
+      !noShowBlocksWork &&
       appointmentConfirmed &&
       depositPaidAt != null &&
       ['accepted', 'in_progress'].contains(status);
@@ -346,6 +449,7 @@ class OrderDetail {
       : depositAmount;
   bool canStart(RepairQuotation? quotation) =>
       status == 'accepted' &&
+      !noShowBlocksWork &&
       appointmentConfirmed &&
       (inspectionRequired
           ? depositPaidAt != null &&

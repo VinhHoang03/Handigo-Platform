@@ -8,8 +8,8 @@ import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_states.dart';
-import '../../../shared/widgets/provider_avatar.dart';
 import '../../../shared/widgets/customer_page_header.dart';
+import '../../../shared/utils/media_url.dart';
 import '../data/order_repository.dart';
 import '../domain/order_summary.dart';
 import 'order_payment_panel.dart';
@@ -90,22 +90,12 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     return Scaffold(
       appBar: CustomerPageHeader(
         toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        showBottomBorder: true,
         title: 'Lịch sử đơn hàng',
         centerTitle: false,
-        leading: Center(
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryFixed,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.receipt_long_outlined,
-              color: Theme.of(context).colorScheme.primary,
-              size: 24,
-            ),
-          ),
+        leading: const Center(
+          child: CustomerHeaderIcon(Icons.receipt_long_outlined),
         ),
       ),
       body: Column(
@@ -187,10 +177,12 @@ class OrderSummaryCard extends StatelessWidget {
   const OrderSummaryCard({
     required this.order,
     this.providerView = false,
+    this.providerInfo,
     super.key,
   });
   final bool providerView;
   final OrderSummary order;
+  final Widget? providerInfo;
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -208,6 +200,18 @@ class OrderSummaryCard extends StatelessWidget {
             _ => 'Xem chi tiết',
           }
         : 'Xem chi tiết';
+    final displayedAt = providerView
+        ? order.scheduledAt ?? order.createdAt
+        : order.scheduledAt;
+    final createdAt = order.createdAt;
+    final placedAtLabel = !providerView && createdAt != null
+        ? DateFormat('dd/MM/yyyy, HH:mm').format(
+            createdAt.toUtc().add(const Duration(hours: 7)),
+          )
+        : null;
+    final displayedAmount = providerView
+        ? order.providerAmount
+        : order.totalAmount;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -221,7 +225,8 @@ class OrderSummaryCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Mã đơn ${order.code}',
+                      'Mã đơn ${order.code}'
+                      '${placedAtLabel == null ? '' : ' | $placedAtLabel'}',
                       style: theme.textTheme.labelMedium,
                     ),
                   ),
@@ -243,11 +248,16 @@ class OrderSummaryCard extends StatelessWidget {
                     top: 0,
                     bottom: 0,
                     width: 96,
-                    child: ServiceCoverImage(
-                      url: order.serviceImage,
-                      name: order.serviceName,
-                      fit: BoxFit.cover,
-                    ),
+                    child: providerView
+                        ? _CustomerAvatar(
+                            name: order.customerName,
+                            url: order.customerAvatar,
+                          )
+                        : ServiceCoverImage(
+                            url: order.serviceImage,
+                            name: order.serviceName,
+                            fit: BoxFit.cover,
+                          ),
                   ),
                   Padding(
                     padding: const EdgeInsets.only(left: 106),
@@ -265,14 +275,21 @@ class OrderSummaryCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          if (order.scheduledAt != null)
+                          if (providerView && order.customerName != null)
                             Text(
-                              'Dự kiến: ${DateFormat('HH:mm, dd/MM/yyyy').format(order.scheduledAt!.toLocal())}',
+                              order.customerName!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall,
                             ),
-                          if (providerView && order.scheduledAt == null)
+                          if (displayedAt != null)
                             Text(
-                              'Chưa có lịch hẹn',
+                              '${providerView ? '' : 'Dự kiến thực hiện: '}${DateFormat(providerView ? 'HH:mm, dd/MM/yyyy' : 'dd/MM/yyyy, HH:mm').format(displayedAt.toLocal())}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          if (providerView && displayedAt == null)
+                            Text(
+                              'Chưa chọn thời gian',
                               style: theme.textTheme.bodySmall,
                             ),
                           if (order.addressLabel != null) ...[
@@ -284,10 +301,20 @@ class OrderSummaryCard extends StatelessWidget {
                               style: theme.textTheme.bodySmall,
                             ),
                           ],
-                          if (order.totalAmount != null) ...[
+                          if (displayedAmount != null) ...[
                             const SizedBox(height: 4),
                             Text(
-                              _money(order.totalAmount!),
+                              _money(displayedAmount),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ] else if (providerView &&
+                              order.inspectionRequired) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Chưa báo giá',
                               style: theme.textTheme.titleSmall?.copyWith(
                                 color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.w600,
@@ -300,31 +327,9 @@ class OrderSummaryCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (!providerView && order.providerName != null) ...[
+              if (providerView && providerInfo != null) ...[
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    ProviderAvatar(
-                      url: order.providerAvatar,
-                      gender: order.providerGender,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        order.providerName!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.verified,
-                      size: 16,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ],
-                ),
+                providerInfo!,
               ],
               const SizedBox(height: 10),
               Row(
@@ -352,6 +357,40 @@ class OrderSummaryCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CustomerAvatar extends StatelessWidget {
+  const _CustomerAvatar({required this.name, required this.url});
+
+  final String? name;
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = usableMediaUrl(url);
+    final initial = name?.trim().isNotEmpty == true
+        ? name!.trim().characters.first.toUpperCase()
+        : 'K';
+    final fallback = ColoredBox(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: Center(
+        child: Text(
+          initial,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+    if (imageUrl == null) return fallback;
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      semanticLabel: 'Ảnh đại diện khách hàng',
+      errorBuilder: (context, error, stackTrace) => fallback,
     );
   }
 }

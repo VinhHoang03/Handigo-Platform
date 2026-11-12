@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import logoImg from "../../assets/logo.png";
 import loginImg from "../../assets/login.png";
+import { BrandLogo } from "../common/BrandLogo";
 
 interface AuthLayoutProps {
   eyebrow?: string;
@@ -41,19 +41,7 @@ export function AuthLayout({
         </div>
 
         <div className="relative z-10 mx-auto flex w-full min-w-0 max-w-[520px] flex-col items-center text-center">
-          <Link
-            to="/"
-            className="mb-5 inline-flex items-center gap-3 rounded-full bg-white/10 px-4 py-2 backdrop-blur"
-          >
-            <img
-              src={logoImg}
-              alt=""
-              className="h-9 w-9 object-contain rounded-lg"
-            />
-            <span className="font-headline-md text-xl font-bold text-on-primary">
-              Handigo
-            </span>
-          </Link>
+          <BrandLogo className="mb-5 rounded-xl bg-white shadow-sm" />
           <h1 className="max-w-[520px] font-headline-lg text-3xl font-semibold leading-tight text-on-primary xl:text-4xl">
             {brandTitle}
           </h1>
@@ -76,19 +64,7 @@ export function AuthLayout({
         <div
           className={`flex w-full min-w-0 flex-col items-center lg:min-w-[400px] [@media(max-height:760px)]:scale-[0.94] [@media(max-height:680px)]:scale-[0.88] ${maxWidthClass[maxWidth]}`}
         >
-          <Link
-            to="/"
-            className="mb-4 flex items-center justify-center gap-2 lg:hidden"
-          >
-            <img
-              src={logoImg}
-              alt=""
-              className="h-11 w-11 object-contain rounded-lg"
-            />
-            <span className="font-headline-md text-2xl font-bold text-primary">
-              Handigo
-            </span>
-          </Link>
+          <BrandLogo compact className="mb-4 justify-center lg:hidden" />
 
           <div className="w-full rounded-[28px] border border-outline-variant/50 bg-surface-container-lowest p-5 shadow-[0_12px_40px_-12px_rgba(19,27,46,0.16)] sm:p-7 lg:p-8">
             <header className="mb-4 sm:mb-5">

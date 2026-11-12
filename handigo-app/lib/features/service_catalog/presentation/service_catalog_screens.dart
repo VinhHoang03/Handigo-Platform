@@ -13,6 +13,7 @@ import '../../orders/presentation/order_screens.dart';
 import '../../booking/data/pending_booking_store.dart';
 import '../../booking/presentation/booking_provider_selector.dart';
 import '../../booking/presentation/booking_policy_panel.dart';
+import '../../booking/presentation/booking_payos_panel.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../booking/domain/booking_models.dart';
 import '../../booking/presentation/booking_provider.dart';
@@ -1153,6 +1154,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   bool _policyAccepted = false;
   Map<String, dynamic>? _policies;
   String? _pendingOrderId;
+  String? _payosOrderId;
+  final _scrollController = ScrollController();
   bool _uncertainCreate = false;
   bool _uploading = false;
   bool get _inspection => widget.detail.service.serviceType == 'variable_price';
@@ -1246,6 +1249,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   void dispose() {
     _descriptionController.dispose();
     _voucherController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -1257,7 +1261,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         title: Text(_step == 0 ? 'Đặt dịch vụ' : 'Xác nhận & Thanh toán'),
         leading: IconButton(
           tooltip: 'Quay lại',
-          onPressed: () => _step == 0
+          onPressed: () => _payosOrderId != null
+              ? context.go('/customer/orders/$_payosOrderId')
+              : _step == 0
               ? Navigator.of(context).pop()
               : setState(() => _step = 0),
           icon: const Icon(Icons.arrow_back_rounded),
@@ -1266,6 +1272,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       body: _busy
           ? const AppLoading()
           : ListView(
+              controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 _StepIndicator(step: _step),
@@ -1298,7 +1305,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     onPressed: _loadAddresses,
                     child: const Text('Tải lại sổ địa chỉ'),
                   ),
-                if (_pendingOrderId != null)
+                if (_pendingOrderId != null && _payosOrderId == null)
                   Card(
                     child: ListTile(
                       title: const Text('Bạn có đơn đang cần kiểm tra'),
@@ -1326,7 +1333,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       ),
                     ],
                   ),
-                if (_step == 1) ...[
+                if (_step == 1 && _payosOrderId == null) ...[
                   if (_policies == null)
                     OutlinedButton(
                       onPressed: _reloadPolicies,
@@ -1339,6 +1346,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                         setState(() => _policyAccepted = value),
                   ),
                 ],
+                if (_payosOrderId != null)
+                  BookingPayosPanel(
+                    orderId: _payosOrderId!,
+                    onReady: _scrollToPayment,
+                    onPaid: () {
+                      ref.read(bookingDraftProvider.notifier).reset();
+                      context.go(
+                        '/customer/bookings/success?orderId=$_payosOrderId',
+                      );
+                    },
+                  ),
               ],
             ),
       bottomNavigationBar: SafeArea(
@@ -1347,10 +1365,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           child: FilledButton(
             onPressed: _busy || _uploading
                 ? null
-                : () => _step == 0 ? _loadPreview() : _submitOrder(),
+                : () => _payosOrderId != null
+                      ? context.go('/customer/orders/$_payosOrderId')
+                      : _step == 0
+                      ? _loadPreview()
+                      : _submitOrder(),
             child: Text(
               _busy
                   ? 'Đang xử lý...'
+                  : _payosOrderId != null
+                  ? 'Xem chi tiết đơn hàng'
                   : _step == 0
                   ? 'Tiếp tục'
                   : _inspection
@@ -1363,6 +1387,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         ),
       ),
     );
+  }
+
+  void _scrollToPayment() {
+    if (mounted && _scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   Future<void> _reloadPolicies() async {
@@ -1539,6 +1573,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         expectedAmount: _preview!.discountedAmount,
       );
       if (!mounted) return;
+      if (draft.paymentMethod == PaymentMethod.bank &&
+          payment.status != 'paid') {
+        setState(() => _payosOrderId = created!.id);
+        ref.invalidate(orderListProvider);
+        ref.invalidate(orderPageProvider);
+        ref.invalidate(pendingOrderProvider);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToPayment());
+        return;
+      }
       ref.read(bookingDraftProvider.notifier).reset();
       ref.invalidate(orderListProvider);
       ref.invalidate(orderPageProvider);
@@ -1833,37 +1876,58 @@ class _BookingReview extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Card(
-        child: ListTile(
-          leading: const Icon(Icons.home_repair_service_outlined),
-          title: Text(
-            detail.service.name,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            '${_bookingTypeLabel(draft.type)} · ${_paymentLabel(draft.paymentMethod)}',
-          ),
-        ),
-      ),
-      const SizedBox(height: 12),
-      Card(
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: BookingDetailsSummary(
-            address: address?.displayAddress ?? 'Chưa có thông tin địa chỉ',
-            contact: address == null
-                ? null
-                : '${address!.recipientName} · ${address!.recipientPhone}',
-            scheduledAt: draft.scheduledAt,
-            placedAt: reviewedAt,
-            isPreview: true,
-            providerName: providerName,
-            options: [
-              for (final option in detail.options.where(
-                (item) => draft.selectedOptionIds.contains(item.id),
-              ))
-                (name: option.name, quantity: draft.quantities[option.id] ?? 1),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.receipt_long_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Chi tiết dịch vụ',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${_bookingTypeLabel(draft.type)} · ${_paymentLabel(draft.paymentMethod)}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const Divider(height: 24),
+              BookingDetailsSummary(
+                serviceName: detail.service.name,
+                address: address?.displayAddress ?? 'Chưa có thông tin địa chỉ',
+                contact: address == null
+                    ? null
+                    : '${address!.recipientName} · ${address!.recipientPhone}',
+                scheduledAt: draft.scheduledAt,
+                placedAt: reviewedAt,
+                isPreview: true,
+                providerName: providerName,
+                options: [
+                  for (final option in detail.options.where(
+                    (item) => draft.selectedOptionIds.contains(item.id),
+                  ))
+                    (
+                      name: option.name,
+                      quantity: draft.quantities[option.id] ?? 1,
+                    ),
+                ],
+                quantity: draft.selectedOptionIds.isEmpty ? quantity : null,
+              ),
             ],
-            quantity: draft.selectedOptionIds.isEmpty ? quantity : null,
           ),
         ),
       ),
@@ -1918,8 +1982,21 @@ class _BookingReview extends StatelessWidget {
           ),
         ),
       const SizedBox(height: 8),
-      const Text(
-        'Vui lòng kiểm tra thông tin và số tiền trước khi xác nhận đặt dịch vụ.',
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 20,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Vui lòng kiểm tra thông tin đơn hàng trước khi thanh toán.',
+            ),
+          ),
+        ],
       ),
     ],
   );
@@ -1990,45 +2067,78 @@ class _StepIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final labels = ['Chọn gói & lịch', 'Thanh toán'];
+    final labels = ['Chọn gói & lịch', 'Xác nhận & thanh toán'];
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var index = 0; index < labels.length; index++) ...[
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: index <= step
-                ? theme.colorScheme.primary
-                : theme.colorScheme.surfaceContainerHighest,
-            foregroundColor: index <= step
-                ? theme.colorScheme.onPrimary
-                : theme.colorScheme.onSurfaceVariant,
-            child: index < step
-                ? const Icon(Icons.check, size: 16)
-                : Text('${index + 1}'),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            flex: index == 0 ? 3 : 2,
-            child: Text(
-              labels[index],
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: index == step ? FontWeight.w600 : FontWeight.w500,
+        for (var index = 0; index < labels.length; index++)
+          Expanded(
+            child: Semantics(
+              selected: index == step,
+              label: 'Bước ${index + 1} trên ${labels.length}',
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Divider(
+                          color: index == 0
+                              ? Colors.transparent
+                              : index <= step
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outlineVariant,
+                          thickness: 2,
+                        ),
+                      ),
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: index <= step
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.surfaceContainerHighest,
+                        foregroundColor: index <= step
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.onSurfaceVariant,
+                        child: index < step
+                            ? const Icon(Icons.check_rounded, size: 18)
+                            : Text(
+                                '${index + 1}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                          color: index == labels.length - 1
+                              ? Colors.transparent
+                              : index < step
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outlineVariant,
+                          thickness: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      labels[index],
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: index <= step
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                        fontWeight: index == step
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          if (index < labels.length - 1)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Divider(
-                  color: index < step
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.outlineVariant,
-                  thickness: 2,
-                ),
-              ),
-            ),
-        ],
       ],
     );
   }

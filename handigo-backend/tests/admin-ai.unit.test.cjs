@@ -39,7 +39,11 @@ test('Phương án có người phụ trách, kết quả cần đạt; không c
   for (const id of ['report:abc', 'message:abc', 'image:1', 'order:khong-ton-tai']) {
     const value = resolutionOutput();
     value.complaintResolution.workflow = workflow({ facts: [{ statement: 'Nguồn chưa được xác minh.', sourceIds: [id] }] });
-    assert.throws(() => provider.prepareComplaintResolution(value, resolutionSources), error => error.statusCode === 502);
+    const result = provider.prepareComplaintResolution(value, resolutionSources);
+    assert.equal(result.complaintResolution.workflow.facts.length, 0);
+    assert.equal(result.complaintResolution.evidenceStatus, 'insufficient');
+    assert.equal(result.complaintResolution.workflow.proposedStatus, 'under_review');
+    assert.ok(result.missingData.length > 0);
   }
   const value = resolutionOutput(); value.evidence = [{ sourceId: 'order:abc', quote: 'Đơn hàng' }];
   value.complaintResolution.workflow = workflow();
@@ -98,7 +102,9 @@ test('Bắt buộc chuyển Admin khi tranh chấp, thiếu bằng chứng hoặ
 test('Không lấy lời khiếu nại làm chính sách, không chấp nhận trích dẫn chính sách bịa', () => {
   for (const finding of [{ sourceId: sources[0].id, quote: 'sửa điện' }, { sourceId: 'policy:0', quote: 'Hoàn 100% mọi khiếu nại' }]) {
     const value = resolutionOutput(); Object.assign(value.complaintResolution.policyFindings[0], finding);
-    assert.throws(() => provider.prepareComplaintResolution(value, resolutionSources), error => error.statusCode === 502);
+    const result = provider.prepareComplaintResolution(value, resolutionSources);
+    assert.equal(result.complaintResolution.policyFindings.length, 0);
+    assert.equal(result.complaintResolution.requiresAdminApproval, true);
   }
   const value = resolutionOutput(); value.complaintResolution = null;
   assert.throws(() => provider.prepareComplaintResolution(value, resolutionSources), error => error.statusCode === 502);
@@ -157,7 +163,7 @@ test('Giới hạn tám ảnh mỗi lượt, không cho AI báo đã đọc ản
   assert.equal(images.imagesNeedReview(value), true);
 });
 
-test('Gửi ảnh thật bằng inlineData cùng văn bản và kiểm tra đủ kết quả từng ảnh', async t => {
+test('Khiếu nại gửi ảnh bằng inlineData và kiểm tra đủ kết quả từng ảnh', async t => {
   const previousCloud = process.env.CLOUDINARY_NAME, previousKey = process.env.ADMIN_AI_API_KEY;
   process.env.CLOUDINARY_NAME = 'handigo-kiem-thu'; process.env.ADMIN_AI_API_KEY = 'khoa-gia-lap-khong-goi-ai';
   t.after(() => {
@@ -170,10 +176,12 @@ test('Gửi ảnh thật bằng inlineData cùng văn bản và kiểm tra đủ
     const body = JSON.parse(request.body);
     seenImage = body.contents[0].parts.some(part => part.inlineData?.mimeType === 'image/png');
     assert(!body.contents[0].parts[0].text.includes('res.cloudinary.com'));
-    const value = { ...output(), imageAnalyses: [{ sourceId: 'image:1', status: 'analyzed', relevant: true, consistent: true, observations: ['Chứng chỉ có nội dung đọc rõ.'], uncertainties: [] }] };
+    const value = resolutionOutput();
+    value.complaintResolution.workflow = workflow();
+    value.imageAnalyses = [{ sourceId: 'image:1', status: 'analyzed', relevant: true, consistent: true, observations: ['Chứng từ có nội dung đọc rõ.'], uncertainties: [] }];
     return new Response(JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }] }));
   });
-  const result = await provider.generateAdminAI('provider_application', policy, [...sources, { id: 'image:1', text: 'Ảnh chứng chỉ.', imageUrl: 'https://res.cloudinary.com/handigo-kiem-thu/image/upload/v1/handigo/provider-applications/anh.png' }]);
+  const result = await provider.generateAdminAI('complaint_summary', policySchema.parse({}), [...resolutionSources, { id: 'image:1', text: 'Ảnh chứng từ.', imageUrl: 'https://res.cloudinary.com/handigo-kiem-thu/image/upload/v1/handigo/order-attachments/anh.png' }]);
   assert(seenImage); assert.equal(result.output.imageAnalyses.length, 1);
 });
 test('Ký tự biên, thiếu mô tả, kinh nghiệm và hạn giấy tờ', () => {

@@ -111,13 +111,17 @@ const servicePopulate = {
   },
 };
 
-const assertServicesActive = async (serviceIds: string[]) => {
+const assertServicesActive = async (serviceIds: string[], session?: mongoose.ClientSession) => {
   const uniqueIds = [...new Set(serviceIds)];
-  const count = await Service.countDocuments({
+  const filter = {
     _id: { $in: uniqueIds },
     isActive: true,
     isDeleted: false,
-  });
+  };
+  // Ghi phiên bản trong transaction để phát hiện dịch vụ bị ngừng/xóa đồng thời khi duyệt.
+  const count = session
+    ? (await Service.updateMany(filter, { $inc: { __v: 1 } }, { session, runValidators: true, timestamps: false })).matchedCount
+    : await Service.countDocuments(filter);
 
   if (count !== uniqueIds.length) {
     throw new AppError("Một hoặc nhiều dịch vụ không hợp lệ", 400);
@@ -825,6 +829,9 @@ export const reviewApplication = async (
       if (automation) await automation.beforeWrite(session);
       if (!["pending", "resubmitted"].includes(application.status)) {
         throw new AppError("Chỉ hồ sơ đang chờ duyệt mới có thể xét duyệt", 400);
+      }
+      if (payload.status === "approved") {
+        await assertServicesActive(application.serviceIds.map(String), session);
       }
 
       const reviewedAt = new Date();

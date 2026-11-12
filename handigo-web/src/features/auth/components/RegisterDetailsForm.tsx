@@ -57,10 +57,11 @@ export function RegisterDetailsForm({
         />
         <FloatingInput
           id="register-phone"
-          label="Số điện thoại (tùy chọn)"
+          label="Số điện thoại"
           type="tel"
           value={phone}
           autoComplete="tel"
+          required
           onValueChange={onPhoneChange}
         />
       </div>

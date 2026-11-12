@@ -39,7 +39,7 @@ export function ComplaintReviewPanel({ reportId, active, onUpdated, reviewBusy, 
   return <section className={`grid items-start gap-5 ${reviewable ? "lg:grid-cols-[minmax(0,1fr)_320px]" : ""}`} aria-label="Hỗ trợ xử lý khiếu nại bằng AI">
     <div className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">Phân tích và phương án xử lý</h3>
-      {active && autoEnabled === false && <button type="button" disabled={busy || Boolean(waiting)} onClick={() => void run()} className="min-h-11 rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50">{busy ? "Đang gửi…" : item ? "Phân tích lại" : "Phân tích thử"}</button>}
+      {active && (autoEnabled === false || (autoEnabled === true && item && ["error", "stale"].includes(item.status))) && <button type="button" disabled={busy || Boolean(waiting)} onClick={() => void run()} className="min-h-11 rounded-xl border border-outline-variant px-4 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50">{busy ? "Đang gửi…" : item ? "Phân tích lại" : "Phân tích thử"}</button>}
     </div>
     {loading && <p role="status">Đang tải phân tích…</p>}
     {error && <div role="alert" className="text-sm text-error"><p>{error}</p><button type="button" className="min-h-11 font-semibold underline" onClick={() => setRevision(value => value + 1)}>Tải lại phân tích</button></div>}

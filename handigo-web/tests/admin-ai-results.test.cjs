@@ -157,7 +157,8 @@ test('Khiếu nại mặc định chỉ hiện tóm tắt, việc cần làm và
 test('Ẩn nút phân tích khi tự động bật; khi tắt giữ nút chạy thử cho riêng khiếu nại', () => {
   const file = path.resolve(__dirname, '../src/features/admin/ai/ComplaintReviewPanel.tsx');
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
-  for (const [enabled, current, label] of [[true, item, null], [false, null, 'Phân tích thử'], [false, item, 'Phân tích lại']]) {
+  for (const [enabled, current, label] of [[true, item, null], [false, null, 'Phân tích thử'], [false, item, 'Phân tích lại'],
+    [true, { ...item, status: 'error' }, 'Phân tích lại'], [true, { ...item, status: 'stale' }, 'Phân tích lại']]) {
     let index = 0;
     const states = [current, false, false, '', 0, enabled];
     const exports = {};

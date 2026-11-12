@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/providers/app_providers.dart';
+import '../../auth/domain/app_user.dart';
 import '../../service_catalog/presentation/service_catalog_provider.dart';
 import '../data/provider_application_repository.dart';
 import '../domain/provider_application_models.dart';
@@ -1603,7 +1604,10 @@ class _ProviderOnboardingScreenState
     final approved = item.status == 'approved';
     return Column(
       children: [
-        _topBar(approved ? 'Hồ sơ đối tác' : 'Đăng ký đối tác'),
+        _topBar(
+          approved ? 'Hồ sơ đối tác' : 'Đăng ký đối tác',
+          onBack: _leaveStatusScreen,
+        ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 36, 20, 28),
@@ -1638,9 +1642,22 @@ class _ProviderOnboardingScreenState
         ),
         _ActionBar(
           label: 'Hoàn tất',
-          onPrimary: context.canPop() ? () => context.pop() : null,
+          onPrimary: _leaveStatusScreen,
+          onSecondary: () => ref.read(authControllerProvider).logout(),
+          secondaryLabel: 'Đăng xuất',
         ),
       ],
+    );
+  }
+
+  void _leaveStatusScreen() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    final role = ref.read(authControllerProvider).user?.role;
+    context.go(
+      role == UserRole.provider ? '/provider/account' : '/customer/account',
     );
   }
 
@@ -1816,12 +1833,14 @@ class _ActionBar extends StatelessWidget {
     required this.onPrimary,
     this.onSave,
     this.onSecondary,
+    this.secondaryLabel = 'Quay lại',
     this.saving = false,
   });
   final String label;
   final VoidCallback? onPrimary;
   final VoidCallback? onSave;
   final VoidCallback? onSecondary;
+  final String secondaryLabel;
   final bool saving;
 
   @override
@@ -1868,9 +1887,12 @@ class _ActionBar extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text(
-                    'Quay lại',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  child: Text(
+                    secondaryLabel,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),

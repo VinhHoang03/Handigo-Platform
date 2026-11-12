@@ -18,7 +18,7 @@ export const getCurrentCoordinates = () =>
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => resolve(coords),
       (error) => reject(error),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 30000 },
     );
   });
 
@@ -79,16 +79,22 @@ export function useProviderAvailability(enabled = true) {
   const isUpdating = useProviderAvailabilityStore(
     (state) => state.isUpdating,
   );
+  const isConnected = useProviderAvailabilityStore((state) => state.isConnected);
   const availabilityStatus: ProviderAvailabilityStatus =
     enabled && storedProviderUserId === providerUserId
       ? storedAvailabilityStatus
       : "offline";
   const socketRef = useRef<ReturnType<typeof createAuthenticatedSocket>["socket"] | null>(null);
   const requestVersion = useRef(0);
+  const pendingSynchronization = useRef(false);
   const invalidateRequests = useCallback(() => { requestVersion.current++; }, []);
 
   const synchronizeAvailability = useCallback(async () => {
-    if (!enabled || !providerUserId || useProviderAvailabilityStore.getState().isUpdating) return;
+    if (!enabled || !providerUserId) return;
+    if (useProviderAvailabilityStore.getState().isUpdating) {
+      pendingSynchronization.current = true;
+      return;
+    }
     const version = ++requestVersion.current;
     try {
       const overview = await providerDashboardApi.overview();
@@ -118,28 +124,88 @@ export function useProviderAvailability(enabled = true) {
     const { socket, dispose } = createAuthenticatedSocket();
     socketRef.current = socket;
     const synchronize = () => { void synchronizeAvailability(); };
-    socket.on("connect", synchronize);
+    const connected = () => {
+      useProviderAvailabilityStore.getState().setIsConnected(true);
+      synchronize();
+    };
+    const disconnected = () => useProviderAvailabilityStore.getState().setIsConnected(false);
+    const synchronizeVisible = () => { if (document.visibilityState === "visible") synchronize(); };
+    socket.on("connect", connected);
+    socket.on("disconnect", disconnected);
+    useProviderAvailabilityStore.getState().setIsConnected(socket.connected);
     socket.on("provider:availability", synchronize);
+    socket.on("order:updated", synchronize);
     window.addEventListener("online", synchronize);
+    window.addEventListener("focus", synchronize);
+    document.addEventListener("visibilitychange", synchronizeVisible);
+    const poll = window.setInterval(synchronizeVisible, 30000);
 
     return () => {
       invalidateRequests();
       socketRef.current = null;
-      socket.off("connect", synchronize);
+      socket.off("connect", connected);
+      socket.off("disconnect", disconnected);
       socket.off("provider:availability", synchronize);
+      socket.off("order:updated", synchronize);
       window.removeEventListener("online", synchronize);
+      window.removeEventListener("focus", synchronize);
+      document.removeEventListener("visibilitychange", synchronizeVisible);
+      window.clearInterval(poll);
       dispose();
+      useProviderAvailabilityStore.getState().setIsConnected(false);
     };
   }, [enabled, providerUserId, synchronizeAvailability, invalidateRequests]);
 
+  useEffect(() => {
+    if (!enabled || !providerUserId || availabilityStatus !== "online") return;
+    let active = true;
+    let running = false;
+    let warned = false;
+    const canUpload = () => {
+      const state = useProviderAvailabilityStore.getState();
+      return active && state.providerUserId === providerUserId &&
+        state.availabilityStatus === "online" && !state.isUpdating &&
+        socketRef.current?.connected === true;
+    };
+    const refreshLocation = async () => {
+      if (running || !canUpload()) return;
+      running = true;
+      try {
+        const coordinates = await getCurrentCoordinates();
+        if (!canUpload()) return;
+        await providerDashboardApi.updateCurrentLocation(coordinates.latitude, coordinates.longitude);
+        warned = false;
+      } catch {
+        if (canUpload() && !warned) {
+          warned = true;
+          addToast("Chưa cập nhật được vị trí. Hệ thống sẽ thử lại để tiếp tục tìm đơn gần bạn.", "error");
+        }
+      } finally {
+        running = false;
+      }
+    };
+    const timer = window.setInterval(() => { void refreshLocation(); }, 30000);
+    const visible = () => { if (document.visibilityState === "visible") void refreshLocation(); };
+    document.addEventListener("visibilitychange", visible);
+    window.addEventListener("focus", visible);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", visible);
+      window.removeEventListener("focus", visible);
+    };
+  }, [enabled, providerUserId, availabilityStatus, addToast]);
+
   const toggleAvailability = useCallback(async () => {
     const store = useProviderAvailabilityStore.getState();
-    if (!enabled || store.providerUserId !== providerUserId || store.isUpdating) return;
+    if (!enabled || store.providerUserId !== providerUserId || store.isUpdating || store.availabilityStatus === "busy") return;
 
     const previousStatus = store.availabilityStatus;
     const nextStatus = previousStatus === "online" ? "offline" : "online";
     requestVersion.current++;
     store.setIsUpdating(true);
+    store.setAvailabilityStatus(nextStatus);
+    let committed = false;
 
     try {
       if (nextStatus === "online") {
@@ -151,7 +217,6 @@ export function useProviderAvailability(enabled = true) {
         try {
           coordinates = await getCurrentCoordinates();
         } catch (error) {
-          await providerDashboardApi.deactivateCurrentLocation().catch(() => undefined);
           addToast(
             `${await getLocationErrorMessage(error)} Chưa thể bật nhận việc khi chưa cập nhật được vị trí.`,
             "error",
@@ -177,8 +242,10 @@ export function useProviderAvailability(enabled = true) {
       useProviderAvailabilityStore
         .getState()
         .setAvailabilityStatus(result.availabilityStatus);
+      committed = true;
       addToast(result.availabilityStatus === "online" ? "Đã bật trạng thái nhận việc." : "Đã tắt trạng thái nhận việc.", "success");
     } catch {
+      pendingSynchronization.current = true;
       if (useProviderAvailabilityStore.getState().providerUserId !== providerUserId) return;
       useProviderAvailabilityStore
         .getState()
@@ -190,14 +257,23 @@ export function useProviderAvailability(enabled = true) {
         "error",
       );
     } finally {
-      if (useProviderAvailabilityStore.getState().providerUserId === providerUserId) useProviderAvailabilityStore.getState().setIsUpdating(false);
+      const current = useProviderAvailabilityStore.getState();
+      if (current.providerUserId === providerUserId) {
+        if (!committed) current.setAvailabilityStatus(previousStatus);
+        current.setIsUpdating(false);
+        if (pendingSynchronization.current) {
+          pendingSynchronization.current = false;
+          void synchronizeAvailability();
+        }
+      }
     }
-  }, [enabled, addToast, providerUserId]);
+  }, [enabled, addToast, providerUserId, synchronizeAvailability]);
 
   return {
     availabilityStatus,
     isOnline: availabilityStatus === "online",
     isUpdating,
+    isConnected,
     toggleAvailability,
   };
 }

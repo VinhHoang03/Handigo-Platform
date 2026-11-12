@@ -36,8 +36,14 @@ const ProviderHomePage = () => {
             <ProviderRevenueChart
               revenuePeriod={data.revenuePeriod}
               onPeriodChange={data.setRevenuePeriod}
-              revenueAnchor={data.revenueAnchor}
-              onAnchorChange={data.setRevenueAnchor}
+              revenueWeek={data.revenueWeek}
+              onWeekChange={data.setRevenueWeek}
+              revenueMonth={data.revenueMonth}
+              onMonthChange={data.setRevenueMonth}
+              revenueYear={data.revenueYear}
+              onYearChange={data.setRevenueYear}
+              customRevenueRange={data.customRevenueRange}
+              onCustomRangeApply={data.applyCustomRevenueRange}
               isLoadingEarnings={data.isLoadingEarnings}
               earningsError={data.earningsError}
               revenueChart={data.revenueChart}

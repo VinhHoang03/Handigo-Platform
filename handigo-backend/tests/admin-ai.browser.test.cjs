@@ -25,8 +25,9 @@ test('Tự động hóa tại từng trang: cấu hình, chạy thử, tự duy�
   const previousKey = process.env.ADMIN_AI_API_KEY, previousSecret = process.env.ACCESS_TOKEN_SECRET;
   process.env.ADMIN_AI_API_KEY = 'khoa-kiem-thu-giao-dien'; process.env.ACCESS_TOKEN_SECRET = 'khoa-jwt-kiem-thu-giao-dien-cuc-bo';
   const replica = await MongoMemoryReplSet.create({ replSet: { count: 1 }, binary: { version: '7.0.24' } });
-  let server, browser;
+  let server, browser, page;
   t.after(async () => {
+    await page?.unrouteAll({ behavior: 'wait' });
     await browser?.close(); if (server) await new Promise(resolve => server.close(resolve)); await mongoose.disconnect(); await replica.stop();
     if (previousKey === undefined) delete process.env.ADMIN_AI_API_KEY; else process.env.ADMIN_AI_API_KEY = previousKey;
     if (previousSecret === undefined) delete process.env.ACCESS_TOKEN_SECRET; else process.env.ACCESS_TOKEN_SECRET = previousSecret;
@@ -58,21 +59,34 @@ test('Tự động hóa tại từng trang: cấu hình, chạy thử, tự duy�
     return { model: 'mo-hinh-kiem-thu', usage: { inputTokens: 10, outputTokens: 10 }, output };
   });
   const app = express(); app.use(express.json()); app.use('/ai/admin', require('../src/ai/admin/admin-ai.routes').default);
+  app.patch('/admin/reports/:id/review', require('../src/middlewares/auth.middleware').authMiddleware,
+    require('../src/middlewares/role.middleware').roleMiddleware('ADMIN'),
+    require('../src/middlewares/validate.middleware').validate(require('../src/validations/report.validator').reportIdSchema, 'params'),
+    require('../src/middlewares/validate.middleware').validate(require('../src/validations/report.validator').reviewReportSchema),
+    require('../src/controllers/report.controller').reviewReport);
   app.use((error, _req, res, _next) => res.status(error.statusCode || 400).json({ success: false, message: error.message }));
   const dist = path.resolve(__dirname, '../../handigo-web/dist'); app.use(express.static(dist)); app.get(/.*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
   server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   const user = { id: String(admin._id), _id: String(admin._id), fullName: admin.fullName, email: admin.email, role: 'ADMIN' };
   const token = jwt.sign({ id: String(admin._id), tokenVersion: 0 }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
   await page.addInitScript(({ user, token }) => { localStorage.setItem('handigo:user', JSON.stringify(user)); sessionStorage.setItem('handigo:external-redirect-token', token); }, { user, token });
+  let failConfig = false;
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     const index = url.pathname.indexOf('/ai/admin/');
-    if (index >= 0) { const response = await route.fetch({ url: `${base}${url.pathname.slice(index)}${url.search}` }); return route.fulfill({ response }); }
+    if (index >= 0) {
+      if (failConfig && url.pathname.endsWith('/ai/admin/configs')) {
+        failConfig = false;
+        return route.fulfill({ status: 500, json: { success: false, message: 'Không thể tải cấu hình kiểm thử.' } });
+      }
+      const response = await route.fetch({ url: `${base}${url.pathname.slice(index)}${url.search}` });
+      return route.fulfill({ response });
+    }
     if (url.pathname.endsWith('/auth/me')) return route.fulfill({ json: { user } });
     if (['xhr', 'fetch'].includes(request.resourceType()) && /\/admin\/reports(?:\/|$)/.test(url.pathname)) {
       const reports = require('../src/services/report.service');
@@ -95,11 +109,8 @@ test('Tự động hóa tại từng trang: cấu hình, chạy thử, tự duy�
   assert(reviewBounds.x < refreshBounds.x);
   await reviewButton.click();
   let dialog = page.getByRole('dialog');
-  await expect(dialog.getByText('Danh tính được xác minh từ nguồn độc lập phía server', { exact: true }).first()).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Bật kiểm duyệt', exact: true })).toBeDisabled();
-  const identityRule = dialog.locator('details').filter({ has: page.getByText('Danh tính được xác minh từ nguồn độc lập phía server', { exact: true }) });
-  await identityRule.locator(':scope > summary').click();
-  await identityRule.getByRole('button', { name: 'Xóa tiêu chí', exact: true }).click();
+  await expect(dialog.getByText('Có đủ ảnh giấy tờ theo loại đăng ký', { exact: true }).first()).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Bật kiểm duyệt', exact: true })).toBeEnabled();
   await dialog.getByLabel('Hướng dẫn nghiệp vụ cho AI').fill('Đối chiếu mô tả với dịch vụ đăng ký, thiếu dữ liệu chuyển Admin.');
   await dialog.getByRole('button', { name: 'Lưu và bật kiểm duyệt', exact: true }).click();
   await expect(dialog.getByText('Tự động hóa đang bật', { exact: true })).toBeVisible();
@@ -173,12 +184,7 @@ test('Tự động hóa tại từng trang: cấu hình, chạy thử, tự duy�
   await expect(dialog.getByLabel('Hướng dẫn nghiệp vụ cho AI')).toBeVisible();
   await page.screenshot({ path: path.join(output, 'application-mobile.png'), fullPage: true });
   await dialog.getByRole('button', { name: 'Đóng', exact: true }).last().click();
-  let failConfig = true;
-  const configFailure = async route => {
-    if (failConfig) { failConfig = false; return route.fulfill({ status: 500, json: { success: false, message: 'Không thể tải cấu hình kiểm thử.' } }); }
-    return route.fallback();
-  };
-  await page.route(/\/ai\/admin\/configs$/, configFailure);
+  failConfig = true;
   await page.getByRole('button', { name: 'Kiểm duyệt tự động', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Không thể tải cấu hình kiểm thử.');
   await dialog.getByRole('button', { name: 'Tải lại cấu hình', exact: true }).click();
@@ -191,35 +197,35 @@ test('Tự động hóa tại từng trang: cấu hình, chạy thử, tự duy�
   await Order.collection.insertOne({ _id: orderId, customerId: reporter._id, orderCode: 'HD-UI-KHIEU-NAI', status: 'completed', paymentStatus: 'paid', isDeleted: false });
   for (const missing of [true, false]) {
     const report = await Report.create({ reporterId: reporter._id, reporterRole: 'CUSTOMER', orderId, targetType: 'order', reportType: 'service_quality', title: missing ? 'Cần ảnh hiện trạng' : 'Kiểm tra kết quả khắc phục', description: 'Người gửi phản ánh công việc cần được kiểm tra lại.', evidenceFiles: !missing ? [{ fileType: 'file', url: 'https://example.test/chung-tu.pdf', fileName: 'chung-tu.pdf' }, { fileType: 'video', url: 'https://example.test/hien-trang.mp4', fileName: 'hien-trang.mp4' }] : [] });
+    await service.scanAutomaticSources();
+    await service.processNextAssessment();
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(`${base}/admin/cases?tab=reports&reportId=${report._id}`);
     dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: 'Phân tích và phương án xử lý', exact: true })).toBeVisible();
-    queuedResponse = page.waitForResponse(response => response.url().endsWith('/ai/admin/assessments') && response.request().method() === 'POST');
-    await dialog.getByRole('button', { name: 'Phân tích khiếu nại', exact: true }).click();
-    assert.equal((await queuedResponse).status(), 202);
-    await service.processNextAssessment();
-    await page.goto(`${base}/admin/cases?tab=reports&reportId=${report._id}`);
     const uiAssessment = await require('../src/ai/admin/admin-ai.models').AdminAIAssessment.findOne({ sourceId: String(report._id) }).lean();
     assert.equal(uiAssessment.preview, false); assert.equal(uiAssessment.status, 'manual', uiAssessment.error);
-    await expect(dialog.getByRole('heading', { name: 'Công việc và điều kiện hoàn tất', exact: true })).toBeVisible();
-    await expect(dialog.getByRole('heading', { name: 'Lời phản ánh chưa xác minh', exact: true })).toBeVisible();
-    const workflowPanel = dialog.getByRole('region', { name: 'Phương án nghiệp vụ khiếu nại' });
+    const bypass = await page.request.patch(`${base}/admin/reports/${report._id}/review`, {
+      headers: { Authorization: `Bearer ${token}` }, data: { status: 'resolved', resolutionNote: 'Thử đi vòng xác nhận công việc.' },
+    });
+    assert.equal(bypass.status(), 409);
+    const workflowPanel = dialog.getByRole('form', { name: 'Xử lý báo cáo' });
+    await expect(workflowPanel).toBeVisible();
     await page.screenshot({ path: path.join(output, 'workflow-before-decision.png'), fullPage: true });
-    await workflowPanel.getByLabel('Quyết định', { exact: true }).selectOption('resolved');
-    await workflowPanel.getByLabel('Căn cứ quyết định và kết quả xử lý', { exact: true }).fill('Đã làm việc với các bên và kiểm tra kết quả thực hiện.');
-    await expect(workflowPanel.getByRole('button', { name: 'Xác nhận quyết định', exact: true })).toBeDisabled();
+    await workflowPanel.getByLabel('Trạng thái', { exact: true }).selectOption('resolved');
+    await workflowPanel.locator('textarea[name="decisionNote"]').fill('Đã làm việc với các bên và kiểm tra kết quả thực hiện.');
+    await expect(workflowPanel.getByRole('button', { name: 'Xác nhận xử lý', exact: true })).toBeDisabled();
     if (missing) {
       assert.equal((await Report.findById(report._id)).status, 'evidence_requested');
       await expect(workflowPanel.getByText('Còn thiếu bằng chứng.', { exact: false })).toBeVisible();
       await workflowPanel.getByLabel(/Kết quả xác minh việc 1:/).fill('Đã đọc bằng chứng nhưng vẫn cần người gửi bổ sung.');
-      await expect(workflowPanel.getByRole('button', { name: 'Xác nhận quyết định', exact: true })).toBeDisabled();
+      await expect(workflowPanel.getByRole('button', { name: 'Xác nhận xử lý', exact: true })).toBeDisabled();
     } else {
       await expect(dialog.getByRole('link', { name: 'chung-tu.pdf Mở tài liệu gốc' })).toBeVisible();
       await expect(dialog.getByRole('link', { name: 'hien-trang.mp4 Mở video gốc' })).toBeVisible();
       assert.equal((await Report.findById(report._id)).status, 'under_review');
       await workflowPanel.getByLabel(/Kết quả xác minh việc 1:/).fill('Thợ đã khắc phục, Admin đã kiểm tra lại và ghi nhận phản hồi khách.');
-      await expect(workflowPanel.getByRole('button', { name: 'Xác nhận quyết định', exact: true })).toBeEnabled();
+      await expect(workflowPanel.getByRole('button', { name: 'Xác nhận xử lý', exact: true })).toBeEnabled();
     }
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 });
@@ -228,9 +234,9 @@ test('Tự động hóa tại từng trang: cấu hình, chạy thử, tự duy�
     }
     if (!missing) {
       const decisionResponse = page.waitForResponse(response => response.url().includes('/complaint-decision') && response.request().method() === 'POST');
-      await workflowPanel.getByRole('button', { name: 'Xác nhận quyết định', exact: true }).click();
+      await workflowPanel.getByRole('button', { name: 'Xác nhận xử lý', exact: true }).click();
       assert.equal((await decisionResponse).status(), 200);
-      await expect(dialog.getByText('Admin đã áp dụng:', { exact: false })).toBeVisible();
+      await expect(dialog.getByText('Đã cập nhật báo cáo.', { exact: true })).toBeVisible();
       const finalReport = await Report.findById(report._id);
       assert.equal(finalReport.status, 'resolved'); assert.equal(String(finalReport.handledBy), String(admin._id));
     }

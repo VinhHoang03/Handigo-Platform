@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 
-const getTransporter = (notification = false) => {
+const getTransporter = () => {
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASSWORD;
 
@@ -10,7 +10,9 @@ const getTransporter = (notification = false) => {
 
   return nodemailer.createTransport({
     service: "gmail",
-    ...(notification ? { connectionTimeout: 15_000, greetingTimeout: 15_000, socketTimeout: 30_000 } : {}),
+    connectionTimeout: 30_000,
+    greetingTimeout: 30_000,
+    socketTimeout: 60_000,
     auth: {
       user,
       pass,
@@ -19,15 +21,13 @@ const getTransporter = (notification = false) => {
 };
 
 export const sendNotificationEmail = async (message: {
-  to: string; subject: string; text: string; html: string; messageId: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  messageId: string;
 }): Promise<void> => {
-  const result = await getTransporter(true).sendMail({
-    ...message,
-    from: { name: "Handigo", address: process.env.EMAIL_USER! },
-  });
-  if (!result.accepted?.length || result.rejected?.length) {
-    throw new Error("Máy chủ email chưa chấp nhận thông báo vi phạm.");
-  }
+  await getTransporter().sendMail({ ...message, from: process.env.EMAIL_USER });
 };
 
 export const sendOtpEmail = async (

@@ -20,6 +20,68 @@ class CustomerHomeData {
   final List<HomeNewsArticle> news;
 }
 
+class HomeRewards {
+  const HomeRewards({
+    required this.balance,
+    required this.offers,
+    this.validityDays,
+  });
+
+  factory HomeRewards.fromJson(Map<String, dynamic> json) {
+    final policy = json['policy'] as Map<String, dynamic>;
+    final offers = policy['offers'] as List<dynamic>;
+    return HomeRewards(
+      validityDays: (policy['validityDays'] as num?)?.toInt(),
+      balance: (json['balance'] as num).toInt(),
+      offers: offers
+          .cast<Map<String, dynamic>>()
+          .map(HomeRewardOffer.fromJson)
+          .toList(),
+    );
+  }
+
+  final int balance;
+  final int? validityDays;
+  final List<HomeRewardOffer> offers;
+}
+
+class HomeRewardOffer {
+  const HomeRewardOffer({
+    required this.id,
+    required this.termsVersion,
+    required this.name,
+    required this.points,
+    required this.discountType,
+    required this.discountValue,
+    this.minOrderAmount = 0,
+    this.maxDiscountAmount,
+    this.applicableOrderType,
+  });
+
+  factory HomeRewardOffer.fromJson(Map<String, dynamic> json) =>
+      HomeRewardOffer(
+        id: json['id'] as String,
+        termsVersion: json['termsVersion'] as String,
+        name: json['name'] as String? ?? '',
+        points: (json['points'] as num).toInt(),
+        discountType: json['discountType'] as String? ?? 'AMOUNT',
+        discountValue: (json['discountValue'] as num).toDouble(),
+        minOrderAmount: (json['minOrderAmount'] as num?)?.toDouble() ?? 0,
+        maxDiscountAmount: (json['maxDiscountAmount'] as num?)?.toDouble(),
+        applicableOrderType: json['applicableOrderType'] as String?,
+      );
+
+  final String id;
+  final String termsVersion;
+  final String name;
+  final int points;
+  final String discountType;
+  final double discountValue;
+  final double minOrderAmount;
+  final double? maxDiscountAmount;
+  final String? applicableOrderType;
+}
+
 class HomeVoucher {
   const HomeVoucher({
     required this.code,
@@ -69,7 +131,7 @@ class HomeNewsArticle {
       excerpt: '${json['excerpt'] ?? ''}',
       category: '${json['category'] ?? 'Tin tức'}',
       coverImage: '${json['coverImage'] ?? ''}',
-      publishedAt: json['publishedAt'] as String?,
+      publishedAt: (json['publishedAt'] ?? json['createdAt']) as String?,
       content: rawContent
           .whereType<Map<String, dynamic>>()
           .map(HomeNewsBlock.fromJson)
@@ -84,6 +146,19 @@ class HomeNewsArticle {
   final String coverImage;
   final String? publishedAt;
   final List<HomeNewsBlock> content;
+
+  String get previewText {
+    final summary = excerpt.trim();
+    if (summary.isNotEmpty) return summary;
+
+    for (final block in content) {
+      final text = block.type == 'list'
+          ? block.items.join(' ').trim()
+          : block.text?.trim() ?? '';
+      if (text.isNotEmpty) return text;
+    }
+    return '';
+  }
 }
 
 class HomeNewsBlock {

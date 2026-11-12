@@ -43,3 +43,7 @@ export const emitToConversation = (conversationId: string, event: string, payloa
 export const disconnectUserSockets = (userId: string) => {
   socketServer?.in(`user:${userId}`).disconnectSockets(true);
 };
+
+export const disconnectSessionSockets = (sessionId: string) => {
+  socketServer?.in(`session:${sessionId}`).disconnectSockets(true);
+};

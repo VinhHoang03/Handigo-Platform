@@ -13,8 +13,15 @@ export interface ProviderEarningPoint {
   count?: number;
 }
 
+export interface ProviderMonthlyEarningPoint {
+  month: string;
+  amount: number;
+  count?: number;
+}
+
 export interface ProviderEarnings {
   earningsByDay: ProviderEarningPoint[];
+  earningsByMonth: ProviderMonthlyEarningPoint[];
 }
 
 const data = <T>(response: { data: { data: T } }) => response.data.data;

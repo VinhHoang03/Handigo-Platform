@@ -9,6 +9,7 @@ import '../domain/order_summary.dart';
 import 'order_screens.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../booking/data/pending_booking_store.dart';
+import '../../booking/presentation/booking_payos_panel.dart';
 
 final orderPaymentsProvider = FutureProvider.autoDispose
     .family<List<Map<String, dynamic>>, String>(
@@ -133,7 +134,9 @@ class _OrderPaymentPanelState extends ConsumerState<OrderPaymentPanel>
         expectedAmount: widget.order.totalAmount,
       );
       refresh();
-      if (result.checkoutUrl != null && result.status != 'paid') {
+      if (method != PaymentMethod.bank &&
+          result.checkoutUrl != null &&
+          result.status != 'paid') {
         final uri = Uri.parse(result.checkoutUrl!);
         if (!['https', 'http'].contains(uri.scheme) ||
             !await launchUrl(uri, mode: LaunchMode.externalApplication))
@@ -281,11 +284,13 @@ class _OrderPaymentPanelState extends ConsumerState<OrderPaymentPanel>
               ),
             ],
             if (order.paymentMethod == 'bank' &&
-                order.paymentStatus == 'unpaid') ...[
+                order.paymentStatus == 'unpaid' &&
+                order.status != 'cancelled') ...[
               const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: busy ? null : checkPayment,
-                child: const Text('Kiểm tra thanh toán PayOS'),
+              BookingPayosPanel(
+                key: ValueKey(order.id),
+                orderId: order.id,
+                onPaid: refresh,
               ),
             ],
             if (order.status == 'created' && order.paymentStatus == 'unpaid')

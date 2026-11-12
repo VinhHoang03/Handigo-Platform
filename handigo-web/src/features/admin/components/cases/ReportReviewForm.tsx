@@ -19,12 +19,14 @@ export function ReportReviewForm({ reportId, assessment, customerNoShow = false,
   const [message, setMessage] = useState("");
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const decisionId = useId();
-  const ai = !customerNoShow && assessment?.sourceId === reportId && !assessment.preview && !assessment.adminDecision
+  const hasAI = !customerNoShow && assessment?.sourceId === reportId && assessment.sourceType === "report" && !assessment.preview;
+  const ai = hasAI && (!assessment.adminDecision || ["under_review", "evidence_requested"].includes(assessment.adminDecision.status))
     && assessment.sourceType === "report" && ["manual", "completed"].includes(assessment.status)
     && assessment.output?.complaintResolution?.workflow ? assessment : null;
   const resolution = ai?.output?.complaintResolution;
+  const analysisVersion = `${ai?._id}:${ai?.updatedAt || ""}`;
   const workflow = resolution?.workflow;
-  const suggestion = ai && ai._id !== submittedId ? resolution : null;
+  const suggestion = ai && !ai.adminDecision && ai._id !== submittedId ? resolution : null;
   const status = statusInput ?? suggestion?.workflow?.proposedStatus ?? "";
   const reporterEvidence = suggestion?.workflow?.missingEvidence.filter(entry => entry.owner === "reporter") || [];
   const suggestedNote = status === "evidence_requested"
@@ -35,11 +37,12 @@ export function ReportReviewForm({ reportId, assessment, customerNoShow = false,
   const terminal = ["confirmed", "rejected", "resolved"].includes(status);
   const missing = Boolean(ai && (workflow?.missingEvidence.length || ai.output?.missingData.length || resolution?.evidenceStatus !== "sufficient"
     || (["confirmed", "rejected"].includes(status) && !workflow?.facts.length)));
-  const completedTasks = workflow?.tasks.map((_, index) => ({ index, evidence: (completed[`${ai?._id}:${index}`] || "").trim() })) || [];
+  const completedTasks = workflow?.tasks.map((_, index) => ({ index, evidence: (completed[`${analysisVersion}:${index}`] || "").trim() })) || [];
   const unfinished = status === "resolved" && completedTasks.some(task => task.evidence.length < 10);
   const minLength = ai ? 10 : status === "evidence_requested" ? 5 : 0;
   const disabled = busy || saving;
-  const canSubmit = Boolean(status) && note.trim().length >= minLength && !(terminal && missing) && !unfinished;
+  const needsAnalysis = Boolean(hasAI && assessment.output?.complaintResolution?.workflow && !ai && terminal);
+  const canSubmit = Boolean(status) && note.trim().length >= minLength && !(terminal && missing) && !unfinished && !needsAnalysis;
   const submit = async () => {
     if (disabled || !canSubmit || !status) return;
     setSaving(true); onBusyChange?.(true); setError(""); setMessage("");
@@ -65,8 +68,9 @@ export function ReportReviewForm({ reportId, assessment, customerNoShow = false,
       </select></div>
     {status && <>
     <label className="block space-y-1.5 text-sm font-medium">{status === "evidence_requested" ? "Yêu cầu bổ sung" : "Ghi chú xử lý"}<textarea name="decisionNote" autoComplete="off" required={minLength > 0} minLength={minLength || undefined} maxLength={3000} rows={6} placeholder={status === "evidence_requested" ? "Nội dung cần người phản ánh bổ sung…" : "Nhập ghi chú hoặc kết quả xử lý…"} className={`${fieldClass} block min-h-36 resize-y font-normal`} disabled={disabled} value={note} onChange={event => setNote(event.target.value)} /></label>
-    {status === "resolved" && workflow?.tasks.map((task, index) => <label key={`${ai?._id}:${index}`} className="block space-y-1.5 text-sm">Kết quả xác minh việc {index + 1}: {readableText(task.instruction)}<textarea name={`task-${index}`} autoComplete="off" required minLength={10} maxLength={1000} rows={2} className={`${fieldClass} block resize-y`} disabled={disabled} value={completed[`${ai?._id}:${index}`] || ""} onChange={event => setCompleted(previous => ({ ...previous, [`${ai?._id}:${index}`]: event.target.value }))} /></label>)}
+    {status === "resolved" && workflow?.tasks.map((task, index) => <label key={`${analysisVersion}:${index}`} className="block space-y-1.5 text-sm">Kết quả xác minh việc {index + 1}: {readableText(task.instruction)}<textarea name={`task-${index}`} autoComplete="off" required minLength={10} maxLength={1000} rows={2} className={`${fieldClass} block resize-y`} disabled={disabled} value={completed[`${analysisVersion}:${index}`] || ""} onChange={event => setCompleted(previous => ({ ...previous, [`${analysisVersion}:${index}`]: event.target.value }))} /></label>)}
     {terminal && missing && <p className="text-sm text-error">Còn thiếu bằng chứng. Bổ sung và phân tích lại trước khi xác nhận, từ chối hoặc kết thúc.</p>}
+    {needsAnalysis && <p className="text-sm text-error">Cần phương án AI còn hiệu lực để xác nhận hoặc kết thúc. Vui lòng tải lại hoặc phân tích lại hồ sơ.</p>}
     <div className="flex justify-end"><button type="submit" disabled={disabled || !canSubmit} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Đang cập nhật…" : "Xác nhận xử lý"}</button></div>
     </>}
     {error && <p role="alert" className="text-sm text-error">{error}</p>}

@@ -1,11 +1,14 @@
 import '../../../shared/widgets/app_search_field.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 import '../../../shared/widgets/service_images.dart';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart' as speech;
 import '../../../app/theme/app_theme.dart';
 import '../../../core/config/app_config.dart';
@@ -14,6 +17,7 @@ import '../../../shared/utils/category_color.dart';
 import '../../ai_chat/presentation/ai_chat_sheet.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/customer_page_header.dart';
 import '../../services/domain/service.dart';
 import '../../services/domain/service_category.dart';
 import '../../orders/presentation/order_screens.dart';
@@ -21,6 +25,7 @@ import '../../chat/presentation/chat_screens.dart';
 import '../../account/presentation/account_screens.dart';
 import '../domain/customer_home_data.dart';
 import 'customer_home_provider.dart';
+import 'reward_redemption.dart';
 import 'device_location_provider.dart';
 
 class CustomerShell extends StatefulWidget {
@@ -50,13 +55,13 @@ class _CustomerShellState extends State<CustomerShell> {
           widget.navigationShell ??
           IndexedStack(index: _index, children: _pages),
       floatingActionButton:
-          (widget.navigationShell == null ||
-              const [
-                '/customer',
-                '/customer/orders',
-                '/customer/chat',
-                '/customer/account',
-              ].contains(GoRouterState.of(context).uri.path))
+          (widget.navigationShell == null
+              ? activeIndex != 2
+              : const [
+                  '/customer',
+                  '/customer/orders',
+                  '/customer/account',
+                ].contains(GoRouterState.of(context).uri.path))
           ? FloatingActionButton(
               heroTag: 'handigo-ai-chat',
               tooltip: 'Trò chuyện với trợ lý AI Handigo',
@@ -157,7 +162,10 @@ class CustomerHomeScreen extends ConsumerWidget {
         onReloadLocation: () => ref.invalidate(deviceLocationProvider),
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(customerHomeProvider.future),
+        onRefresh: () {
+          ref.invalidate(customerHomeRewardsProvider);
+          return ref.refresh(customerHomeProvider.future);
+        },
         child: home.when(
           skipLoadingOnRefresh: true,
           loading: () => const AppLoading(),
@@ -202,9 +210,7 @@ class CustomerAppBar extends StatelessWidget implements PreferredSizeWidget {
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
       backgroundColor: scheme.surfaceContainerLowest,
-      shape: Border(
-        bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-      ),
+      shape: customerHeaderBorder(scheme),
       title: Row(
         children: [
           Expanded(
@@ -218,11 +224,7 @@ class CustomerAppBar extends StatelessWidget implements PreferredSizeWidget {
                   padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 27,
-                        color: scheme.primary,
-                      ),
+                      const CustomerHeaderIcon(Icons.location_on_outlined),
                       const SizedBox(width: 9),
                       Expanded(
                         child: Column(
@@ -277,10 +279,7 @@ class CustomerAppBar extends StatelessWidget implements PreferredSizeWidget {
             smallSize: 8,
             alignment: Alignment.topRight,
             offset: const Offset(1, -2),
-            child: Icon(
-              Icons.notifications_none,
-              color: scheme.onSurfaceVariant,
-            ),
+            child: const CustomerHeaderIcon(Icons.notifications_none),
           ),
         ),
         const SizedBox(width: 4),
@@ -400,7 +399,13 @@ class _CustomerHomeContentState extends ConsumerState<CustomerHomeContent> {
           onAction: () => context.push('/customer/vouchers'),
         ),
         const SizedBox(height: 10),
-        _VoucherHorizontalList(vouchers: widget.data.vouchers),
+        const _HomeRewardsSection(),
+        if (widget.data.vouchers.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const _HomeSectionHeader(title: 'Voucher hiện có'),
+          const SizedBox(height: 10),
+          _VoucherHorizontalList(vouchers: widget.data.vouchers),
+        ],
         const SizedBox(height: 20),
         const _HomeSectionHeader(title: 'Tin tức'),
         const SizedBox(height: 10),
@@ -1127,15 +1132,242 @@ class _ServiceHorizontalList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (services.isEmpty)
+    if (services.isEmpty) {
       return const _HomeEmpty(message: 'Chưa có dịch vụ nổi bật.');
-    return SizedBox(
-      height: 130 + MediaQuery.textScalerOf(context).scale(100),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: services.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) => _ServiceCard(service: services[index]),
+    }
+    final scrollBehavior = ScrollConfiguration.of(context);
+    return ScrollConfiguration(
+      behavior: scrollBehavior.copyWith(
+        dragDevices: {...scrollBehavior.dragDevices, PointerDeviceKind.mouse},
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var index = 0; index < services.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 12),
+                  SizedBox(
+                    width: math.min(224.0, constraints.maxWidth * .45),
+                    child: _ServiceCard(service: services[index]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeRewardsSection extends ConsumerWidget {
+  const _HomeRewardsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final numbers = NumberFormat.decimalPattern('vi');
+    final scheme = theme.colorScheme;
+    final scrollBehavior = ScrollConfiguration.of(context);
+    return ref
+        .watch(customerHomeRewardsProvider)
+        .when(
+          loading: () =>
+              const Padding(padding: EdgeInsets.all(16), child: AppLoading()),
+          error: (_, _) => AppMessage(
+            message: 'Không thể tải điểm tích lũy và voucher đổi điểm.',
+            onRetry: () => ref.invalidate(customerHomeRewardsProvider),
+          ),
+          data: (rewards) {
+            final nextOffer = rewards.offers
+                .where((offer) => offer.points > rewards.balance)
+                .firstOrNull;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  tileColor: Colors.white,
+                  iconColor: scheme.primary,
+                  textColor: scheme.onSurface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: scheme.outlineVariant),
+                  ),
+                  leading: const Icon(Icons.stars_outlined),
+                  title: const Text('Điểm tích lũy hiện có'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (nextOffer == null)
+                        Text(
+                          '${numbers.format(rewards.balance)} điểm',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      if (nextOffer != null) ...[
+                        const SizedBox(height: 6),
+                        LinearProgressIndicator(
+                          value: (rewards.balance / nextOffer.points).clamp(
+                            0.0,
+                            1.0,
+                          ),
+                          minHeight: 8,
+                          borderRadius: BorderRadius.circular(999),
+                          backgroundColor: scheme.outlineVariant.withValues(
+                            alpha: .4,
+                          ),
+                          color: scheme.primary,
+                          semanticsLabel:
+                              'Tiến độ đổi voucher ${nextOffer.name}',
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${numbers.format(rewards.balance)} / '
+                          '${numbers.format(nextOffer.points)} điểm',
+                          textAlign: TextAlign.end,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (rewards.offers.isEmpty)
+                  const _HomeEmpty(message: 'Hiện chưa có voucher đổi điểm.')
+                else
+                  ScrollConfiguration(
+                    behavior: scrollBehavior.copyWith(
+                      dragDevices: {
+                        ...scrollBehavior.dragDevices,
+                        PointerDeviceKind.mouse,
+                      },
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          spacing: 12,
+                          children: [
+                            for (final offer in rewards.offers)
+                              _HomeRewardCard(
+                                offer: offer,
+                                onTap: () => _confirmRedeem(
+                                  context,
+                                  ref,
+                                  offer,
+                                  rewards.balance,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+  }
+
+  Future<void> _confirmRedeem(
+    BuildContext context,
+    WidgetRef ref,
+    HomeRewardOffer offer,
+    int balance,
+  ) async {
+    if (await confirmRewardRedemption(context, ref, offer, balance)) {
+      ref.invalidate(accountVouchersProvider);
+    }
+  }
+}
+
+class _HomeRewardCard extends StatelessWidget {
+  const _HomeRewardCard({required this.offer, required this.onTap});
+
+  final HomeRewardOffer offer;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final numbers = NumberFormat.decimalPattern('vi');
+
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Container(
+              width: 170,
+              constraints: const BoxConstraints(minHeight: 170),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 48),
+              decoration: BoxDecoration(
+                color: rewardSurface(context),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.confirmation_num_outlined,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${numbers.format(offer.points)} điểm',
+                          textAlign: TextAlign.right,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    rewardOfferName(offer, numbers),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    rewardOfferConditions(offer, numbers),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: CircleAvatar(
+                radius: 15,
+                backgroundColor: scheme.primary.withValues(alpha: .10),
+                foregroundColor: scheme.primary,
+                child: const Icon(Icons.add, size: 20),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1149,7 +1381,7 @@ class _VoucherHorizontalList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (vouchers.isEmpty) {
-      return const _HomeEmpty(message: 'Hiện chưa có voucher khả dụng.');
+      return const _HomeEmpty(message: 'Hiện chưa có voucher.');
     }
     return SizedBox(
       height: 154,
@@ -1294,19 +1526,21 @@ class _NewsGrid extends StatelessWidget {
     if (articles.isEmpty) {
       return const _HomeEmpty(message: 'Chưa có tin tức mới.');
     }
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: articles.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: .78,
-      ),
-      itemBuilder: (context, index) => _HomeNewsCard(
-        article: articles[index],
-        onTap: () => _showNewsArticle(context, articles[index]),
+    const spacing = 10.0;
+    return LayoutBuilder(
+      builder: (context, constraints) => Wrap(
+        spacing: spacing,
+        runSpacing: spacing,
+        children: [
+          for (final article in articles.take(4))
+            SizedBox(
+              width: (constraints.maxWidth - spacing) / 2,
+              child: _HomeNewsCard(
+                article: article,
+                onTap: () => _showNewsArticle(context, article),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1320,13 +1554,16 @@ class _HomeNewsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final date = _shortDate(article.publishedAt);
+    final summary = article.previewText;
     return Card(
       margin: EdgeInsets.zero,
       color: scheme.surfaceContainerLowest,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .55)),
       ),
       child: InkWell(
@@ -1339,51 +1576,68 @@ class _HomeNewsCard extends StatelessWidget {
               name: article.title,
               fit: BoxFit.cover,
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(9, 7, 9, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.primary.withValues(alpha: .14),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: scheme.primary.withValues(alpha: .22),
+                      ),
+                    ),
+                    child: Text(
                       article.category,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      style: theme.textTheme.labelSmall?.copyWith(
                         color: scheme.primary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Expanded(
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    article.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
+                  ),
+                  if (summary.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      summary,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  if (date != null) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
                       child: Text(
-                        article.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
+                        date,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
                         ),
                       ),
                     ),
-                    if (_shortDate(article.publishedAt) case final date?)
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.schedule_rounded,
-                            size: 13,
-                            color: scheme.outline,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            date,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(color: scheme.outline),
-                          ),
-                        ],
-                      ),
                   ],
-                ),
+                ],
               ),
             ),
           ],
@@ -1506,111 +1760,105 @@ class _ServiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 208,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => context.push('/customer/services/${service.id}'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final category = service.categoryName?.trim();
+    final deposit = service.depositAmount ?? 0;
+    final hasDeposit = service.serviceType == 'variable_price' && deposit > 0;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      color: scheme.surfaceContainerLowest,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .45)),
+      ),
+      child: InkWell(
+        onTap: () => context.push('/customer/services/${service.id}'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ServiceCoverImage(
+              url: service.coverImage,
+              name: service.name,
+              fit: BoxFit.cover,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ServiceCoverImage(
-                    url: service.coverImage,
-                    name: service.name,
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerLowest
-                            .withValues(alpha: .94),
-                        borderRadius: BorderRadius.circular(999),
+                  if (category != null && category.isNotEmpty) ...[
+                    Text(
+                      category.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.secondary,
+                        fontWeight: FontWeight.w700,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  Text(
+                    service.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                  Divider(height: 16, color: scheme.outlineVariant),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.star_rounded,
-                              size: 14,
-                              color: AppTheme.starGold,
-                            ),
-                            const SizedBox(width: 3),
                             Text(
-                              service.totalFeedbacks > 0
-                                  ? service.averageRating.toStringAsFixed(1)
-                                  : 'Mới',
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
+                              _servicePrice(service),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: scheme.primary,
+                              ),
                             ),
+                            if (hasDeposit)
+                              Text(
+                                'Đặt cọc ${_serviceMoney(deposit)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      ExcludeSemantics(
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: scheme.primary.withValues(
+                            alpha: .10,
+                          ),
+                          foregroundColor: scheme.primary,
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 19,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(9, 4, 8, 2),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            service.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _servicePrice(service),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    SizedBox(
-                      height: 32,
-                      child: FilledButton(
-                        onPressed: () => context.push(
-                          '/customer/bookings/new/${service.id}',
-                        ),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 32),
-                          padding: const EdgeInsets.symmetric(horizontal: 9),
-                          textStyle: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        child: const Text('Đặt ngay'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1748,8 +1996,14 @@ IconData _categoryIcon(String? icon, String name) {
   };
 }
 
+String _serviceMoney(double amount) =>
+    '${NumberFormat.decimalPattern('vi').format(amount)} đ';
+
 String _servicePrice(Service service) {
-  final price = service.fixedPrice ?? service.minOptionPrice;
-  if (price == null) return 'Liên hệ để biết giá';
-  return 'Chỉ từ\n${price.toStringAsFixed(0)}đ';
+  if (service.serviceType == 'variable_price') return 'Báo giá sau khảo sát';
+  final minimum = service.minOptionPrice;
+  if (minimum != null && minimum > 0) return 'Từ ${_serviceMoney(minimum)}';
+  final fixed = service.fixedPrice;
+  if (fixed != null && fixed > 0) return _serviceMoney(fixed);
+  return 'Liên hệ báo giá';
 }

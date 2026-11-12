@@ -566,7 +566,8 @@ export const getAvailableVouchers = async (user: RequestUser, query: AvailableVo
 
   const promotions = await listStoredVouchers({
     $and: [
-      { $or: [{ ownerId: null }, { ownerId: new Types.ObjectId(user.id) }] },
+      query.source === "public" ? { ownerId: null }
+        : { $or: [{ ownerId: null }, { ownerId: new Types.ObjectId(user.id) }] },
       { $or: [{ neverExpires: true }, { endAt: { $gte: now } }] },
     ],
     isDeleted: false,
@@ -622,6 +623,28 @@ export const getAvailableVouchers = async (user: RequestUser, query: AvailableVo
           : Math.max(amountBeforeVoucher - discountAmount, 0),
     };
   });
+};
+
+export const getVoucherUsageHistory = async (user: RequestUser, page: number) => {
+  const limit = 12;
+  const filter = { userId: new Types.ObjectId(user.id), isDeleted: false,
+    status: { $in: ["used", "cancelled_not_restored"] as const } };
+  const [usages, total] = await Promise.all([
+    VoucherUsage.find(filter).sort({ usedAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit)
+      .populate<{ orderId: Pick<IOrder, "_id" | "orderCode" | "voucherSnapshot"> | null }>({
+        path: "orderId", match: { customerId: user.id }, select: "orderCode voucherSnapshot",
+      }).lean(),
+    VoucherUsage.countDocuments(filter),
+  ]);
+  return {
+    items: usages.map((usage) => ({
+      id: usage._id, orderId: usage.orderId?._id ?? null, orderCode: usage.orderId?.orderCode ?? null,
+      name: usage.orderId?.voucherSnapshot?.name ?? "Voucher đã sử dụng",
+      code: usage.orderId?.voucherSnapshot?.code ?? "",
+      discountAmount: usage.discountAmount, usedAt: usage.usedAt, status: usage.status,
+    })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 };
 
 export const createAdminVoucher = async (user: RequestUser, input: CreateAdminVoucherInput) => {

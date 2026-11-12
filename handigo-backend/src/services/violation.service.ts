@@ -3,6 +3,8 @@ import { AppError } from "../utils/appError";
 import { Report } from "../models/report.model";
 import { Session } from "../models/session.model";
 import { SupportTicket } from "../models/supportTicket.model";
+import { Order } from "../models/order.model";
+import { Provider } from "../models/provider.model";
 import { PenaltyType, Violation } from "../models/violation.model";
 import User from "../models/user.model";
 import { disconnectUserSockets } from "../sockets/socketServer";
@@ -58,6 +60,8 @@ const populateViolation = () => [
 
 const resolveSource = async (payload: CreateViolationPayload, session: ClientSession) => {
   assertObjectId(payload.sourceId, "Source id");
+  if (payload.userId) assertObjectId(payload.userId, "Người dùng vi phạm");
+  if (payload.orderId) assertObjectId(payload.orderId, "Đơn dịch vụ");
 
   if (payload.sourceType === "REPORT") {
     const report = await Report.findOneAndUpdate(
@@ -72,10 +76,19 @@ const resolveSource = async (payload: CreateViolationPayload, session: ClientSes
     if (report.createdViolationId) {
       throw new AppError("Báo cáo đã có bản ghi vi phạm", 400);
     }
+    if (payload.userId && !new Types.ObjectId(payload.userId).equals(report.targetUserId)) {
+      throw new AppError("Người dùng vi phạm không khớp với đối tượng bị báo cáo.", 400);
+    }
+    if (payload.orderId && !new Types.ObjectId(payload.orderId).equals(report.orderId)) {
+      throw new AppError("Đơn dịch vụ không khớp với báo cáo.", 400);
+    }
+    if (report.orderId && !await Order.exists({ _id: report.orderId, isDeleted: false }).session(session)) {
+      throw new AppError("Không tìm thấy đơn dịch vụ của báo cáo.", 404);
+    }
     return {
       source: report,
-      userId: payload.userId ?? report.targetUserId?.toString(),
-      orderId: payload.orderId ?? report.orderId?.toString(),
+      userId: report.targetUserId?.toString(),
+      orderId: report.orderId?.toString(),
       relatedReportId: report._id as Types.ObjectId,
       relatedComplaintId: null,
       relatedSupportTicketId: null,
@@ -84,20 +97,40 @@ const resolveSource = async (payload: CreateViolationPayload, session: ClientSes
 
   const ticket = await SupportTicket.findOne({ _id: payload.sourceId, isDeleted: false }).session(session);
   if (!ticket) throw new AppError("Không tìm thấy yêu cầu hỗ trợ", 404);
+  if (["resolved", "closed", "cancelled"].includes(ticket.status)) {
+    throw new AppError("Yêu cầu hỗ trợ đã kết thúc, không thể tạo vi phạm. Vui lòng mở lại yêu cầu hợp lệ trước khi xử lý.", 400);
+  }
   if (ticket.createdViolationId) {
     throw new AppError("Yêu cầu hỗ trợ đã có bản ghi vi phạm", 400);
+  }
+  if (payload.orderId && !new Types.ObjectId(payload.orderId).equals(ticket.orderId)) {
+    throw new AppError("Đơn dịch vụ không khớp với yêu cầu hỗ trợ.", 400);
+  }
+  const relatedUserIds = new Set([ticket.requesterId.toString()]);
+  if (ticket.orderId) {
+    const order = await Order.findOne({ _id: ticket.orderId, isDeleted: false })
+      .select("customerId providerId").session(session);
+    if (!order) throw new AppError("Không tìm thấy đơn dịch vụ của yêu cầu hỗ trợ.", 404);
+    relatedUserIds.add(order.customerId.toString());
+    if (order.providerId) {
+      const provider = await Provider.findOne({ _id: order.providerId, isDeleted: false }).select("userId").session(session);
+      if (provider) relatedUserIds.add(provider.userId.toString());
+    }
+  }
+  if (payload.userId && !relatedUserIds.has(new Types.ObjectId(payload.userId).toHexString())) {
+    throw new AppError("Người dùng vi phạm không liên quan đến yêu cầu hỗ trợ.", 400);
   }
   return {
     source: ticket,
     userId: payload.userId,
-    orderId: payload.orderId ?? ticket.orderId?.toString(),
+    orderId: ticket.orderId?.toString(),
     relatedReportId: null,
     relatedComplaintId: null,
     relatedSupportTicketId: ticket._id as Types.ObjectId,
   };
 };
 
-export const applyPenalty = async (userId: string, penaltyType: PenaltyType, violationId: Types.ObjectId, session: ClientSession) => {
+const applyPenalty = async (userId: string, penaltyType: PenaltyType, violationId: Types.ObjectId, session: ClientSession) => {
   if (penaltyType === "WARNING") return;
   if (
     penaltyType === "TEMPORARY_SUSPEND" ||
@@ -112,7 +145,9 @@ export const applyPenalty = async (userId: string, penaltyType: PenaltyType, vio
       if (user.status === "active" || user.temporaryLockId) user.temporaryLockId = violationId;
     } else user.set("temporaryLockId", undefined);
     user.status = "locked";
-    await user.save({ session });
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
+    // Chỉ đổi trạng thái khóa; dữ liệu cũ thiếu email không được chặn quyết định xử lý.
+    await user.save({ session, validateModifiedOnly: true });
     await Session.updateMany({ userId, revokedAt: null }, { revokedAt: new Date() }, { session, runValidators: true });
   }
 };

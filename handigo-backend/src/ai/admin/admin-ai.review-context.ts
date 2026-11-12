@@ -10,4 +10,5 @@ export interface AutomatedReviewContext {
 
 export interface AssistedComplaintReview {
   beforeWrite(session: ClientSession): Promise<void>;
+  afterWrite?(session: ClientSession): Promise<void>;
 }

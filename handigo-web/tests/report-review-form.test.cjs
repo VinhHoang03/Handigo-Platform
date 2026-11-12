@@ -125,6 +125,50 @@ test('Xử lý thủ công dùng một nội dung cho ghi chú và kết quả, 
   assert.deepEqual(runtime.calls, [['review', 'bao-cao', 'resolved', 'Đã liên hệ và đối soát xong.', 'Đã liên hệ và đối soát xong.']]);
 });
 
+test('Sau quyết định trung gian vẫn dùng API AI và bắt buộc kết quả từng công việc', async () => {
+  const plan = assessment();
+  const runtime = setup({ assessment: plan });
+  runtime.changeStatus('under_review'); runtime.write('decisionNote', 'Admin tiếp nhận và tiếp tục đối soát.');
+  runtime.submit(); await settle();
+  runtime.input.assessment = { ...plan, adminDecision: { status: 'under_review' } };
+  runtime.changeStatus('resolved'); runtime.write('decisionNote', 'Đã kiểm tra các công việc theo phương án.');
+  assert.equal(runtime.button().props.disabled, true);
+  runtime.submit(); await settle(); assert.equal(runtime.calls.length, 1);
+  runtime.write('task-0', 'Đã đối soát giao dịch và ghi nhận kết quả.');
+  runtime.submit(); await settle();
+  assert.deepEqual(runtime.calls.map(call => call[0]), ['ai', 'ai']);
+  assert.equal(runtime.calls[1][2].completedTasks.length, 1);
+});
+
+for (const status of ['error', 'stale', 'queued', 'running', 'retry']) {
+  test(`Phương án AI đang ${status} không được chuyển sang API thường để kết thúc`, async () => {
+    const plan = { ...assessment(), status };
+    const runtime = setup({ assessment: plan });
+    runtime.changeStatus('resolved'); runtime.write('decisionNote', 'Ghi chú chưa đủ để bỏ qua phương án AI.');
+    assert.equal(runtime.button().props.disabled, true);
+    runtime.submit(); await settle();
+    assert.equal(runtime.calls.length, 0);
+  });
+}
+
+test('AI lỗi trước khi có phương án vẫn cho admin xử lý hoàn toàn thủ công', async () => {
+  const runtime = setup({ assessment: { ...assessment(), status: 'error', output: null } });
+  runtime.changeStatus('resolved'); runtime.write('decisionNote', 'Admin đã trực tiếp xác minh và xử lý xong.');
+  runtime.submit(); await settle();
+  assert.equal(runtime.calls[0][0], 'review');
+});
+
+test('Phân tích chạy lại cùng ID không được dùng kết quả xác minh của phiên bản cũ', () => {
+  const plan = { ...assessment(), updatedAt: '2026-11-09T01:00:00.000Z' };
+  const runtime = setup({ assessment: plan });
+  runtime.changeStatus('resolved'); runtime.write('decisionNote', 'Đã kiểm tra các công việc trong phương án cũ.');
+  runtime.write('task-0', 'Kết quả xác minh chỉ thuộc phương án cũ.');
+  assert.equal(runtime.button().props.disabled, false);
+  runtime.input.assessment = { ...plan, updatedAt: '2026-11-09T02:00:00.000Z' };
+  assert.equal(find(runtime.render(), node => node.props?.name === 'task-0').props.value, '');
+  assert.equal(runtime.button().props.disabled, true);
+});
+
 test('Có phương án AI hợp lệ thì dùng API quyết định AI; kết thúc cần kết quả từng công việc', async () => {
   const runtime = setup({ assessment: assessment() });
   runtime.changeStatus('resolved'); runtime.write('decisionNote', 'Đã đối soát thanh toán và xác minh với hai bên.');

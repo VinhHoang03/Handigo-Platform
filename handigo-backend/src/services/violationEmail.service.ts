@@ -24,7 +24,7 @@ export const enqueueViolationEmail = async (
     violationId: violation._id,
     userId: violation.userId,
     to: user.email.trim(),
-    ...buildViolationEmail(violation, user.fullName || ""),
+    ...buildViolationEmail(violation, user.fullName || "", String(violation._id)),
   }], { session });
 };
 

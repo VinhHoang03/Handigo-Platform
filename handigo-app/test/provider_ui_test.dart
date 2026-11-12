@@ -1,4 +1,7 @@
 import 'package:handigo_app/features/orders/presentation/order_detail_overview.dart';
+import 'package:handigo_app/features/provider/presentation/provider_income_screen.dart';
+import 'package:handigo_app/features/provider/presentation/provider_assignment_customer_info.dart';
+import 'package:handigo_app/features/provider/domain/provider_income.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_directions_sheet.dart';
 import 'dart:async';
 import 'dart:io';
@@ -9,25 +12,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:handigo_app/app/providers/app_providers.dart';
 import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/core/network/api_client.dart';
 import 'package:handigo_app/core/network/api_exception.dart';
 import 'package:handigo_app/core/network/paged_result.dart';
 import 'package:handigo_app/features/account/domain/account_models.dart';
+import 'package:handigo_app/features/account/presentation/account_screens.dart';
 import 'package:handigo_app/features/auth/data/auth_repository.dart';
 import 'package:handigo_app/features/auth/domain/app_user.dart';
 import 'package:handigo_app/features/auth/presentation/auth_controller.dart';
 import 'package:handigo_app/features/orders/domain/order_summary.dart';
 import 'package:handigo_app/features/orders/presentation/order_screens.dart';
 import 'package:handigo_app/features/provider/data/provider_repository.dart';
+import 'package:handigo_app/features/provider/data/provider_location_service.dart';
 import 'package:handigo_app/features/provider/domain/provider_models.dart';
 import 'package:handigo_app/features/provider/presentation/provider_screens.dart';
 import 'package:handigo_app/features/provider/presentation/provider_account_screens.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_detail_screen.dart';
 import 'package:handigo_app/features/provider/presentation/quotation_editor_screen.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_feedback_panel.dart';
+import 'package:handigo_app/features/services/domain/service_category.dart';
 
 final previewKey = GlobalKey();
 const overview = ProviderOverview(
@@ -49,6 +58,9 @@ final orders = [
     scheduledAt: today.add(const Duration(hours: 9)),
     addressLabel: 'Phường Tân Phong, Thành phố Hồ Chí Minh',
     totalAmount: 350000,
+    providerAmount: 297500,
+    durationMinutes: 90,
+    problemDescription: 'Máy lạnh làm lạnh chậm và có mùi.',
   ),
   OrderSummary(
     id: 'progress',
@@ -58,6 +70,9 @@ final orders = [
     scheduledAt: today.add(const Duration(hours: 14)),
     addressLabel: 'Địa chỉ thực hiện dịch vụ cần hiển thị trên màn hình nhỏ',
     totalAmount: 150000,
+    providerAmount: 127500,
+    durationMinutes: 90,
+    problemDescription: 'Đường nước dưới bồn rửa đang bị rò.',
   ),
   OrderSummary(
     id: 'tomorrow',
@@ -65,6 +80,8 @@ final orders = [
     serviceName: 'Bảo dưỡng máy giặt',
     status: 'accepted',
     scheduledAt: today.add(const Duration(days: 1, hours: 10)),
+    providerAmount: 204000,
+    durationMinutes: 90,
   ),
   OrderSummary(
     id: 'cancelled',
@@ -72,6 +89,7 @@ final orders = [
     serviceName: 'Đơn đã hủy',
     status: 'cancelled',
     scheduledAt: today.add(const Duration(hours: 16)),
+    providerAmount: 0,
   ),
 ];
 final assignment = ProviderAssignment(
@@ -89,10 +107,38 @@ class _Repository extends ProviderRepository {
   _Repository(super.api);
   int acceptCount = 0;
   int availabilityCount = 0;
+  Completer<ProviderOverview>? availabilityResponse;
+  DateTime messagesAt = DateTime.now().toUtc();
+  DateTime notificationsAt = DateTime.now().toUtc();
+  int suggestionCount = 0;
+  String? suggestedServiceName;
+  String? suggestedCategoryId;
   @override
-  Future<ProviderOverview> setAvailability(String status) async {
+  Future<String?> workingAddress({double? latitude, double? longitude}) async =>
+      latitude == 10.9 ? 'Địa chỉ GPS mới' : 'Địa chỉ GPS ban đầu';
+  @override
+  Future<({int count, DateTime? latestAt})> notificationBadge(
+    DateTime? openedAt,
+  ) async => (
+    count: openedAt == null || notificationsAt.isAfter(openedAt) ? 3 : 0,
+    latestAt: notificationsAt,
+  );
+  @override
+  Future<({int count, DateTime? latestAt})> messageBadge(
+    String userId,
+    DateTime? openedAt,
+  ) async => (
+    count: openedAt == null || messagesAt.isAfter(openedAt) ? 2 : 0,
+    latestAt: messagesAt,
+  );
+  @override
+  Future<ProviderOverview> setAvailability(
+    String status, {
+    ProviderOverview? current,
+  }) async {
     availabilityCount++;
-    return overview;
+    if (availabilityResponse != null) return availabilityResponse!.future;
+    return ProviderOverview.fromJson({'availabilityStatus': status});
   }
 
   final pending = Completer<void>();
@@ -100,6 +146,56 @@ class _Repository extends ProviderRepository {
   Future<void> acceptAssignment(String id) {
     acceptCount++;
     return pending.future;
+  }
+
+  @override
+  Future<List<ServiceCategory>> suggestionCategories() async => const [
+    ServiceCategory(
+      id: 'category-air-conditioner',
+      name: 'Điều hòa & thông gió',
+      slug: 'dieu-hoa-thong-gio',
+    ),
+  ];
+
+  @override
+  Future<void> createServiceSuggestion({
+    required String serviceName,
+    String? categoryId,
+    String? categoryName,
+    String? description,
+  }) async {
+    suggestionCount++;
+    suggestedServiceName = serviceName;
+    suggestedCategoryId = categoryId;
+  }
+}
+
+class _LocationTracker extends ProviderLocationService {
+  _LocationTracker(super.api);
+  Position? _position;
+  @override
+  Position? get synchronizedPosition => _position;
+
+  void move(double latitude) {
+    _position = Position(
+      longitude: 106.7,
+      latitude: latitude,
+      timestamp: DateTime.now(),
+      accuracy: 5,
+      altitude: 0,
+      altitudeAccuracy: 0,
+      heading: 0,
+      headingAccuracy: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    );
+    error = null;
+    notifyListeners();
+  }
+
+  void loseSignal() {
+    error = const ApiException('GPS tạm thời không đủ chính xác.');
+    notifyListeners();
   }
 }
 
@@ -112,7 +208,11 @@ Future<void> _showScreen(
   bool assignmentError = false,
   String status = 'in_progress',
   _Repository? repository,
+  ProviderLocationService? tracker,
+  bool liveBadges = false,
+  bool liveAddress = false,
   ProviderOverview currentOverview = overview,
+  List<OrderSummary>? currentOrders,
   Future<void> Function()? syncLocation,
 }) async {
   tester.view.devicePixelRatio = 1;
@@ -125,6 +225,10 @@ Future<void> _showScreen(
     routes: [
       GoRoute(path: '/', builder: (_, state) => screen),
       GoRoute(
+        path: '/provider/income',
+        builder: (_, _) => const ProviderIncomeScreen(),
+      ),
+      GoRoute(
         path: '/provider/orders/:id',
         builder: (_, state) =>
             Scaffold(body: Text('Mở đơn ${state.pathParameters['id']}')),
@@ -132,6 +236,10 @@ Future<void> _showScreen(
       GoRoute(
         path: '/provider/wallet',
         builder: (_, state) => const Scaffold(body: Text('Đã mở ví')),
+      ),
+      GoRoute(
+        path: '/provider/chat',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở tin nhắn')),
       ),
       GoRoute(
         path: '/provider/profile',
@@ -145,15 +253,76 @@ Future<void> _showScreen(
         path: '/provider/banks',
         builder: (_, state) => const Scaffold(body: Text('Đã mở ngân hàng')),
       ),
+      GoRoute(
+        path: '/provider/personal-info',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở cá nhân')),
+      ),
+      GoRoute(
+        path: '/provider/addresses',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở địa chỉ')),
+      ),
+      GoRoute(
+        path: '/provider/professional-info',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở nghề nghiệp')),
+      ),
+      GoRoute(
+        path: '/provider/verification',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở xác thực')),
+      ),
+      GoRoute(
+        path: '/provider/support',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở hỗ trợ')),
+      ),
+      GoRoute(
+        path: '/provider/reports',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở báo cáo')),
+      ),
+      GoRoute(
+        path: '/provider/service-suggestions',
+        builder: (_, state) => const ProviderServiceSuggestionScreen(),
+      ),
+      GoRoute(
+        path: '/provider/app-feedback',
+        builder: (_, state) => const Scaffold(body: Text('Đánh giá ứng dụng')),
+      ),
     ],
   );
   addTearDown(router.dispose);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        providerAssignmentPositionProvider.overrideWith(
+          (ref) async =>
+              throw const ApiException('Bật GPS để xem khoảng cách.'),
+        ),
+        providerAssignmentOrdersProvider.overrideWith(
+          (ref) async => currentOrders ?? orders,
+        ),
+        providerIncomeProvider.overrideWith(
+          (ref, range) async => const ProviderIncomeSummary(
+            amount: 0,
+            completedOrders: 0,
+            byDay: {},
+            entries: [],
+          ),
+        ),
+        if (!liveBadges) ...[
+          providerMessageBadgeProvider.overrideWith(
+            (ref) async => (count: 0, latestAt: null),
+          ),
+          providerNotificationBadgeProvider.overrideWith(
+            (ref) async => (count: 0, latestAt: null),
+          ),
+        ],
+        if (tracker != null)
+          providerLocationServiceProvider.overrideWith((ref) => tracker),
         providerCurrentLocationProvider.overrideWith((ref) async {
           await syncLocation?.call();
         }),
+        if (!liveAddress)
+          providerWorkingAddressProvider.overrideWith(
+            (ref) async => 'Phường Tân Phong, Thành phố Hồ Chí Minh',
+          ),
         authControllerProvider.overrideWith(
           (ref) => AuthController(AuthRepository(api), api)
             ..user = const AppUser(
@@ -169,7 +338,11 @@ Future<void> _showScreen(
           providerRepositoryProvider.overrideWithValue(repository),
         providerOverviewProvider.overrideWith((ref) async => currentOverview),
         providerOrdersProvider.overrideWith(
-          (ref) async => PagedResult(items: orders, page: 1, totalPages: 1),
+          (ref) async => PagedResult(
+            items: currentOrders ?? orders,
+            page: 1,
+            totalPages: 1,
+          ),
         ),
         providerOrderPageProvider.overrideWith(
           (ref, query) async => PagedResult(
@@ -191,15 +364,27 @@ Future<void> _showScreen(
           return [assignment];
         }),
         providerWalletProvider.overrideWith(
-          (ref) async =>
-              const WalletInfo(balance: 2450000, pendingBalance: 350000),
+          (ref) async => const WalletInfo(
+            balance: 2450000,
+            pendingBalance: 350000,
+            totalEarnings: 12500000,
+            totalWithdrawn: 1800000,
+          ),
+        ),
+        providerWalletSummaryProvider.overrideWith(
+          (ref) async => const WalletSummary(
+            currentBalance: 2450000,
+            totalEarnings: 12500000,
+            totalWithdrawals: 1800000,
+            totalPlatformFeesPaid: 250000,
+          ),
         ),
         providerWalletTransactionsProvider.overrideWith(
           (ref) async => const PagedResult<WalletTransactionItem>(
             items: [
               WalletTransactionItem(
                 id: 'transaction',
-                type: 'earning',
+                type: 'provider_earning',
                 amount: 250000,
                 direction: 'in',
                 description: 'Thanh toán dịch vụ',
@@ -228,9 +413,107 @@ Future<void> _showScreen(
               'mainServiceText': 'Điện lạnh',
               'services': [
                 {'name': 'Vệ sinh máy lạnh'},
+                {'name': 'Sửa chữa điều hòa'},
+              ],
+              'certificates': [
+                {
+                  'id': 'certificate',
+                  'title': 'Chứng chỉ Kĩ Thuật Việt Hàn',
+                  'issuer': 'Trường Cao đẳng Kỹ thuật Việt Hàn',
+                  'status': 'approved',
+                },
               ],
             },
           },
+        ),
+        providerSuggestionCategoriesProvider.overrideWith(
+          (ref) async => const [
+            ServiceCategory(
+              id: 'category-air-conditioner',
+              name: 'Điều hòa & thông gió',
+              slug: 'dieu-hoa-thong-gio',
+            ),
+          ],
+        ),
+        providerBanksProvider.overrideWith(
+          (ref) async => <Map<String, dynamic>>[
+            {
+              '_id': 'bank',
+              'bankName': 'Ngân hàng Handigo',
+              'bankCode': 'HDG',
+              'accountHolderName': 'DOI TAC KIEM TRA',
+              'accountNumber': '123456789',
+              'isDefault': true,
+            },
+          ],
+        ),
+        providerFeedbacksProvider.overrideWith(
+          (ref) async => const PagedResult<Map<String, dynamic>>(
+            items: [
+              {
+                '_id': 'feedback-pending',
+                'rating': 5,
+                'comment': 'Thợ làm việc đúng giờ và rất cẩn thận.',
+                'customerId': {'fullName': 'Nguyễn Minh Anh'},
+                'serviceId': {'name': 'Vệ sinh máy lạnh'},
+                'images': ['https://example.test/feedback.jpg'],
+                'createdAt': '2026-11-02T09:30:00.000Z',
+              },
+              {
+                '_id': 'feedback-replied',
+                'rating': 4,
+                'comment': 'Dịch vụ tốt, tư vấn rõ ràng.',
+                'customerId': {'fullName': 'Trần Ngọc Linh'},
+                'serviceId': {'name': 'Sửa chữa điều hòa'},
+                'images': <String>[],
+                'providerReply': {
+                  'content': 'Cảm ơn bạn đã tin tưởng Handigo.',
+                  'images': <String>[],
+                  'repliedAt': '2026-11-02T10:30:00.000Z',
+                },
+                'createdAt': '2026-11-01T09:30:00.000Z',
+              },
+            ],
+            page: 1,
+            totalPages: 1,
+          ),
+        ),
+        accountProfileProvider.overrideWith(
+          (ref) async => {
+            '_id': 'test-user',
+            'fullName': 'Đối tác kiểm tra giao diện',
+            'phone': '0901234567',
+            'email': 'doitac@example.test',
+            'birthday': '1995-01-15T00:00:00.000Z',
+            'gender': 'male',
+            'isPhoneVerified': true,
+            'isEmailVerified': true,
+          },
+        ),
+        accountAddressesProvider.overrideWith(
+          (ref) async => const <AddressItem>[],
+        ),
+        accountFeedbackProvider.overrideWith(
+          (ref) async => const <FeedbackItem>[],
+        ),
+        accountTicketsProvider.overrideWith(
+          (ref) async =>
+              const PagedResult<SupportItem>(items: [], page: 1, totalPages: 1),
+        ),
+        accountComplaintsProvider.overrideWith(
+          (ref) async =>
+              const PagedResult<SupportItem>(items: [], page: 1, totalPages: 1),
+        ),
+        accountReportsProvider.overrideWith(
+          (ref) async =>
+              const PagedResult<SupportItem>(items: [], page: 1, totalPages: 1),
+        ),
+        orderListProvider.overrideWith(
+          (ref) async => PagedResult(
+            items: currentOrders ?? orders,
+            page: 1,
+            totalPages: 1,
+          ),
         ),
         orderDetailProvider('detail').overrideWith(
           (ref) async => OrderDetail(
@@ -298,7 +581,205 @@ Future<void> savePreview(WidgetTester tester, String name) async {
   });
 }
 
-void main() {
+Future<void> main() async {
+  await initializeDateFormatting('vi_VN');
+  testWidgets(
+    'GPS đồng bộ vị trí mới tự thay địa chỉ, không hiện dòng cảnh báo đã bỏ',
+    (tester) async {
+      final api = ApiClient(Dio(), CookieJar());
+      addTearDown(api.close);
+      final tracker = _LocationTracker(api)..move(10.8);
+      await _showScreen(
+        tester,
+        const ProviderDashboardScreen(),
+        tracker: tracker,
+        repository: _Repository(api),
+        liveAddress: true,
+      );
+      expect(find.text('Địa chỉ GPS ban đầu'), findsOneWidget);
+      tracker.loseSignal();
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Chưa cập nhật được vị trí mới. Hệ thống sẽ thử lại.'),
+        findsNothing,
+      );
+      tracker.move(10.9);
+      await tester.pumpAndSettle();
+      expect(find.text('Địa chỉ GPS mới'), findsOneWidget);
+      expect(find.textContaining('Địa chỉ GPS ban đầu'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('Badge đỏ ẩn riêng khi bấm và xuất hiện lại khi có tin mới', (
+    tester,
+  ) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final api = ApiClient(Dio(), CookieJar());
+    addTearDown(api.close);
+    final repository = _Repository(api);
+    await _showScreen(
+      tester,
+      const ProviderDashboardScreen(),
+      repository: repository,
+      liveBadges: true,
+    );
+    Badge badge(String tooltip) => tester.widget<Badge>(
+      find.descendant(
+        of: find.byTooltip(tooltip),
+        matching: find.byType(Badge),
+      ),
+    );
+    expect((badge('Tin nhắn').label as Text).data, '2');
+    expect((badge('Thông báo').label as Text).data, '3');
+    expect(badge('Tin nhắn').backgroundColor, AppTheme.error);
+    await tester.tap(find.byTooltip('Tin nhắn'));
+    await tester.pumpAndSettle();
+    GoRouter.of(tester.element(find.text('Đã mở tin nhắn'))).pop();
+    await tester.pumpAndSettle();
+    expect(badge('Tin nhắn').isLabelVisible, isFalse);
+    expect(badge('Thông báo').isLabelVisible, isTrue);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ProviderDashboardScreen)),
+    );
+    repository.messagesAt = DateTime.now().toUtc().add(
+      const Duration(seconds: 1),
+    );
+    container.invalidate(providerMessageBadgeProvider);
+    await tester.pumpAndSettle();
+    expect(badge('Tin nhắn').isLabelVisible, isTrue);
+    await tester.tap(find.byTooltip('Thông báo'));
+    await tester.pumpAndSettle();
+    GoRouter.of(tester.element(find.text('Đã mở thông báo'))).pop();
+    await tester.pumpAndSettle();
+    expect(badge('Thông báo').isLabelVisible, isFalse);
+    expect(badge('Tin nhắn').isLabelVisible, isTrue);
+  });
+  testWidgets('Địa chỉ đã hiển thị vẫn còn khi luồng GPS lỗi tạm thời', (
+    tester,
+  ) async {
+    final api = ApiClient(Dio(), CookieJar());
+    addTearDown(api.close);
+    final tracker = _LocationTracker(api);
+    await _showScreen(
+      tester,
+      const ProviderDashboardScreen(),
+      tracker: tracker,
+    );
+    expect(find.text('Phường Tân Phong, Thành phố Hồ Chí Minh'), findsWidgets);
+    tracker.loseSignal();
+    await tester.pump();
+    expect(
+      find.text('Vị trí gần nhất: Phường Tân Phong, Thành phố Hồ Chí Minh'),
+      findsOneWidget,
+    );
+    expect(find.text('Chưa lấy được vị trí hiện tại.'), findsNothing);
+    expect(
+      find.text('Chưa cập nhật được vị trí mới. Hệ thống sẽ thử lại.'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('Công tắc bật ngay trong lúc còn chờ GPS và API', (tester) async {
+    final api = ApiClient(Dio(), CookieJar());
+    addTearDown(api.close);
+    final repository = _Repository(api);
+    final gps = Completer<void>();
+    final response = Completer<ProviderOverview>();
+    repository.availabilityResponse = response;
+    addTearDown(() {
+      if (!gps.isCompleted) gps.complete();
+    });
+    addTearDown(() {
+      if (!response.isCompleted) response.complete(overview);
+    });
+    await _showScreen(
+      tester,
+      const ProviderDashboardScreen(),
+      repository: repository,
+      currentOverview: ProviderOverview.fromJson({
+        'availabilityStatus': 'offline',
+      }),
+      syncLocation: () => gps.future,
+    );
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    expect(repository.availabilityCount, 0);
+    gps.complete();
+    await tester.pump();
+    expect(repository.availabilityCount, 1);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    expect(repository.availabilityCount, 1);
+    response.complete(overview);
+    await tester.pumpAndSettle();
+    expect(repository.availabilityCount, 1);
+  });
+
+  testWidgets('Công tắc tắt ngay và hoàn tác nếu API từ chối', (tester) async {
+    final api = ApiClient(Dio(), CookieJar());
+    addTearDown(api.close);
+    final repository = _Repository(api);
+    final response = Completer<ProviderOverview>();
+    repository.availabilityResponse = response;
+    addTearDown(() {
+      if (!response.isCompleted) response.complete(overview);
+    });
+    await _showScreen(
+      tester,
+      const ProviderDashboardScreen(),
+      repository: repository,
+    );
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    expect(repository.availabilityCount, 1);
+    response.completeError(
+      const ApiException('Chưa cập nhật được trạng thái.'),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    expect(find.text('Chưa cập nhật được trạng thái.'), findsOneWidget);
+  });
+
+  testWidgets('Trang chủ mở tin nhắn và thẻ thu nhập chuyển đúng tab', (
+    tester,
+  ) async {
+    var incomeOpened = false;
+    await _showScreen(
+      tester,
+      ProviderDashboardScreen(onIncome: () => incomeOpened = true),
+    );
+    expect(find.text('Thu nhập tháng này'), findsOneWidget);
+    expect(find.text('Bạn có 1 đề nghị nhận việc'), findsOneWidget);
+    await tester.ensureVisible(find.text('Thu nhập tháng này'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thu nhập tháng này'));
+    expect(incomeOpened, isTrue);
+    await tester.tap(find.byTooltip('Tin nhắn'));
+    await tester.pumpAndSettle();
+    expect(find.text('Đã mở tin nhắn'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Trang chủ ưu tiên đơn đang làm và mở đúng công việc', (
+    tester,
+  ) async {
+    await _showScreen(tester, const ProviderDashboardScreen());
+    await tester.scrollUntilVisible(
+      find.text('Tiếp tục xử lý'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(find.text('Tiếp tục xử lý'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tiếp tục xử lý'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mở đơn progress'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Tải lại vị trí thất bại hiển thị nguyên nhân cụ thể', (
     tester,
   ) async {
@@ -372,6 +853,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.availabilityCount, 0);
     expect(find.text('Chưa lấy được vị trí thử nghiệm.'), findsOneWidget);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
     failLocation = false;
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
@@ -396,7 +878,7 @@ void main() {
     );
     expect(find.text('Lập báo giá sửa chữa'), findsNothing);
     await tester.scrollUntilVisible(
-      find.text('Thời lượng sửa chữa (phút)'),
+      find.text('Thêm hạng mục báo giá'),
       200,
       scrollable: find
           .descendant(
@@ -405,7 +887,10 @@ void main() {
           )
           .first,
     );
-    expect(find.text('Thời lượng sửa chữa (phút)'), findsOneWidget);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thêm hạng mục báo giá'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tên hạng mục'), findsOneWidget);
     tester.view.viewInsets = const FakeViewPadding(bottom: 260);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle();
@@ -419,31 +904,59 @@ void main() {
 
   testWidgets('Thanh điều hướng chuyển tab và giữ bố cục gọn', (tester) async {
     await _showScreen(tester, const ProviderShell());
-    final selectedTab = find
-        .ancestor(of: find.text('Tổng quan'), matching: find.byType(Material))
-        .first;
-    expect(tester.widget<Material>(selectedTab).color, AppTheme.primary);
-    expect(
-      tester.widget<Text>(find.text('Tổng quan')).style?.color,
-      Colors.white,
-    );
+    expect(find.text('Thu nhập'), findsOneWidget);
     await savePreview(tester, 'home');
     await tester.tap(find.text('Đơn hàng').last);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      find.byKey(const ValueKey('provider-tab-transition')),
+      findsOneWidget,
+    );
     await tester.pumpAndSettle();
     expect(find.text('Mã đơn HDG-001'), findsOneWidget);
+    await tester.tap(find.text('Thu nhập').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(ProviderIncomeScreen), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    final body = tester.getRect(
+      find.byKey(const ValueKey('provider-tab-transition')),
+    );
+    final navigation = tester.getRect(
+      find
+          .ancestor(
+            of: find.text('Tài khoản').last,
+            matching: find.byType(Material),
+          )
+          .first,
+    );
+    expect(body.bottom, lessThanOrEqualTo(navigation.top));
+    expect(find.byType(SegmentedButton<int>), findsOneWidget);
+    expect(find.text('Thời gian thống kê'), findsOneWidget);
+    await tester.tap(find.text('Ví'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ví Handigo'), findsOneWidget);
+    expect(find.byType(ProviderWalletBalanceCard), findsOneWidget);
+    expect(find.text('Tài khoản ngân hàng'), findsOneWidget);
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
+    expect(find.text('Tháng'), findsOneWidget);
+    expect(find.text('Tuần'), findsOneWidget);
     await tester.tap(find.text('Tài khoản').last);
     await tester.pumpAndSettle();
-    expect(find.text('Quản lý công việc'), findsOneWidget);
+    expect(find.text('Hồ sơ đối tác'), findsOneWidget);
+    expect(find.text('Ví và thu nhập'), findsNothing);
+    expect(find.text('Tài khoản ngân hàng'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('Tổng quan hiển thị đơn đã nhận ngoài lịch hôm nay', (
     tester,
   ) async {
-    await _showScreen(tester, const ProviderDashboardScreen());
+    await _showScreen(
+      tester,
+      const ProviderDashboardScreen(),
+      currentOrders: [orders[2], orders[3]],
+    );
     expect(find.text('Handigo'), findsOneWidget);
     expect(find.text('Đối tác Handigo'), findsNothing);
     await tester.scrollUntilVisible(
@@ -456,125 +969,247 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Tài khoản đối tác gom đủ hồ sơ, hỗ trợ và đề xuất dịch vụ', (
+    tester,
+  ) async {
+    await _showScreen(tester, const ProviderAccountScreen());
+    expect(find.text('Thông tin cá nhân'), findsNothing);
+    for (final label in [
+      'Xác thực tài khoản',
+      'Thông tin nghề nghiệp',
+      'Đánh giá khách hàng',
+      'Trung tâm hỗ trợ',
+      'Báo cáo sự cố',
+      'Đề xuất dịch vụ',
+      'Điều khoản & quyền riêng tư',
+      'Đánh giá Handigo',
+      'Thông báo & nhắc lịch',
+      'Ngôn ngữ',
+      'Bảo mật & đăng nhập',
+      'Giao diện',
+    ]) {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Trung tâm hỗ trợ mở form gửi yêu cầu đầy đủ', (tester) async {
+    await _showScreen(tester, const SupportScreen());
+    await tester.tap(find.byTooltip('Tạo mới'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tạo yêu cầu hỗ trợ'), findsOneWidget);
+    expect(find.text('Loại hỗ trợ'), findsOneWidget);
+    expect(find.text('Tiêu đề'), findsOneWidget);
+    expect(find.text('Mô tả cần hỗ trợ'), findsOneWidget);
+    expect(find.textContaining('Thêm ảnh'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Báo cáo sự cố mở form đúng nghiệp vụ report', (tester) async {
+    await _showScreen(
+      tester,
+      const ComplaintScreen(),
+      size: const Size(320, 640),
+      scale: 2,
+    );
+    await tester.tap(find.byTooltip('Tạo mới'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gửi báo cáo sự cố'), findsOneWidget);
+    expect(find.text('Loại báo cáo'), findsOneWidget);
+    expect(find.text('Đối tượng báo cáo'), findsOneWidget);
+    expect(find.text('Đơn dịch vụ'), findsWidgets);
+    expect(find.text('Nội dung chi tiết'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Đăng xuất provider cần xác nhận trước khi rời tài khoản', (
+    tester,
+  ) async {
+    await _showScreen(tester, const ProviderAccountScreen());
+    await tester.scrollUntilVisible(
+      find.text('Đăng xuất'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Đăng xuất'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đăng xuất khỏi Handigo?'), findsOneWidget);
+    expect(find.text('Hủy'), findsOneWidget);
+    expect(find.text('Đăng xuất'), findsNWidgets(2));
+
+    await tester.tap(find.text('Hủy'));
+    await tester.pumpAndSettle();
+    expect(find.text('Đăng xuất khỏi Handigo?'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Đề xuất dịch vụ dùng danh mục và gửi đúng dữ liệu', (
+    tester,
+  ) async {
+    final api = ApiClient(Dio(), CookieJar());
+    addTearDown(api.close);
+    final repository = _Repository(api);
+    await _showScreen(
+      tester,
+      const ProviderServiceSuggestionScreen(),
+      repository: repository,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tên dịch vụ đề xuất'),
+      'Bảo dưỡng điều hòa âm trần',
+    );
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Điều hòa & thông gió').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mô tả đề xuất'),
+      'Khách hàng doanh nghiệp có nhu cầu bảo dưỡng định kỳ.',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Gửi đề xuất'));
+    await tester.pumpAndSettle();
+    expect(repository.suggestionCount, 1);
+    expect(repository.suggestedServiceName, 'Bảo dưỡng điều hòa âm trần');
+    expect(repository.suggestedCategoryId, 'category-air-conditioner');
+    expect(find.textContaining('Đã gửi đề xuất'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Dữ liệu mẫu chỉ xuất hiện sau khi bật và mất khi mở lại trang', (
     tester,
   ) async {
     await _showScreen(tester, const ProviderScheduleScreen());
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
+    expect(find.text('Lịch làm việc'), findsOneWidget);
     setSchedulePreviewForDebug(true);
     await tester.pumpAndSettle();
-    expect(find.text('3 lịch hẹn'), findsOneWidget);
-    expect(find.textContaining('760.000'), findsOneWidget);
+    final previewAmount = find.textContaining('212.500');
+    await tester.scrollUntilVisible(
+      previewAmount,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(previewAmount, findsOneWidget);
     await savePreview(tester, 'schedule-sample');
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
     await _showScreen(tester, const ProviderScheduleScreen());
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
+    expect(find.text('Lịch làm việc'), findsOneWidget);
     expect(find.textContaining('Dữ liệu xem thử •'), findsNothing);
   });
 
-  testWidgets('Vào lại lịch hẹn chọn hôm nay và đưa ô ngày sát trái', (
-    tester,
-  ) async {
+  testWidgets('Vào lại lịch hẹn tự chọn lại hôm nay', (tester) async {
     await _showScreen(tester, const ProviderShell());
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
     final next = DateTime(today.year, today.month, today.day + 1);
-    final nextLabel = find.text('${next.day}/${next.month}');
-    await tester.ensureVisible(nextLabel);
-    await tester.tap(nextLabel);
+    final nextDay = find.byKey(
+      ValueKey(
+        'schedule-day-${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}',
+      ),
+    );
+    await tester.ensureVisible(nextDay);
+    await tester.tap(nextDay);
     await tester.pumpAndSettle();
-    expect(find.text('1 lịch hẹn'), findsOneWidget);
+    expect(find.text('1 công việc'), findsOneWidget);
     await tester.tap(find.text('Tổng quan').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
-    final todayCard = find
-        .ancestor(
-          of: find.text('${today.day}/${today.month}'),
-          matching: find.byType(TextButton),
-        )
-        .first;
-    expect(tester.getTopLeft(todayCard).dx, 16);
+    expect(find.text('3 công việc'), findsOneWidget);
+    expect(
+      find.byKey(
+        ValueKey(
+          'schedule-day-${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}',
+        ),
+      ),
+      findsWidgets,
+    );
     expect(find.byIcon(Icons.science_outlined), findsNothing);
     expect(find.text('Hôm nay'), findsOneWidget);
   });
 
-  testWidgets('Nút tháng mở lịch, hủy giữ ngày và chọn được tháng khác', (
+  testWidgets('Lịch tháng chuyển được sang tháng khác', (tester) async {
+    await _showScreen(tester, const ProviderScheduleScreen());
+    await tester.tap(find.byTooltip('Kỳ sau'));
+    await tester.pumpAndSettle();
+
+    final next = DateTime(today.year, today.month + 1);
+    expect(find.text('Tháng ${next.month}, ${next.year}'), findsWidgets);
+    expect(find.text('0 công việc'), findsOneWidget);
+    expect(find.text('Ngày này chưa có lịch hẹn.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Lịch tuần hiển thị công việc và thu nhập provider', (
     tester,
   ) async {
     await _showScreen(tester, const ProviderScheduleScreen());
-    final month = '${today.month.toString().padLeft(2, '0')}/${today.year}';
-    await tester.tap(find.widgetWithText(OutlinedButton, month));
-    await tester.pumpAndSettle();
-    expect(find.byType(CalendarDatePicker), findsOneWidget);
-    await tester.tap(find.text('Hủy'));
-    await tester.pumpAndSettle();
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(OutlinedButton, month));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Next month'));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(CalendarDatePicker),
-        matching: find.text('15'),
-      ),
-    );
-    await tester.tap(find.text('Chọn'));
+    await tester.tap(find.text('Tuần'));
     await tester.pumpAndSettle();
 
-    final next = DateTime(today.year, today.month + 1, 15);
-    expect(
-      find.widgetWithText(
-        OutlinedButton,
-        '${next.month.toString().padLeft(2, '0')}/${next.year}',
-      ),
-      findsOneWidget,
+    expect(find.byKey(const ValueKey('week-calendar')), findsOneWidget);
+    expect(find.text('+425k'), findsOneWidget);
+    final amount = find.textContaining('297.500');
+    await tester.scrollUntilVisible(
+      amount,
+      300,
+      scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('${next.day}/${next.month}'), findsOneWidget);
-    expect(find.text('0 lịch hẹn'), findsOneWidget);
-    expect(find.text('Không có lịch hẹn trong ngày này.'), findsOneWidget);
+    expect(amount, findsOneWidget);
+    expect(find.textContaining('350.000'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('Lịch chọn đúng ngày và loại đơn hủy', (tester) async {
     await _showScreen(tester, const ProviderScheduleScreen());
-    expect(find.text('2 lịch hẹn'), findsOneWidget);
-    expect(find.text('Đơn đã hủy'), findsNothing);
-    await savePreview(tester, 'schedule');
+    expect(find.text('3 công việc'), findsOneWidget);
+    await savePreview(tester, 'schedule-top');
     final next = today.add(const Duration(days: 1));
     final dot = find.byKey(
       ValueKey(
         'schedule-dot-${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}',
       ),
     );
-    if (next.weekday != 1) {
-      expect(
-        (tester.widget<Container>(dot).decoration as BoxDecoration).color,
-        AppTheme.error,
-      );
-    }
-    final day = find.text('${next.day}/${next.month}');
+    expect(dot, findsOneWidget);
+    final day = find.byKey(
+      ValueKey(
+        'schedule-day-${next.year}-${next.month.toString().padLeft(2, '0')}-${next.day.toString().padLeft(2, '0')}',
+      ),
+    );
     await tester.ensureVisible(day);
     await tester.tap(day);
     await tester.pumpAndSettle();
-    expect(find.text('1 lịch hẹn'), findsOneWidget);
+    expect(find.text('1 công việc'), findsOneWidget);
+    expect(
+      find.text('Lịch ngày ${next.day}/${next.month}').hitTestable(),
+      findsOneWidget,
+    );
     expect(find.text('Bảo dưỡng máy giặt'), findsOneWidget);
     expect(find.text('Vệ sinh máy lạnh'), findsNothing);
-    expect(find.text('Ngày mai'), findsOneWidget);
-    expect(dot, findsNothing);
-    await tester.ensureVisible(find.text('${today.day}/${today.month}'));
-    await tester.tap(find.text('${today.day}/${today.month}'));
+    final todayDay = find.byKey(
+      ValueKey(
+        'schedule-day-${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}',
+      ),
+    );
+    await tester.ensureVisible(todayDay);
+    await tester.tap(todayDay);
     await tester.pumpAndSettle();
-    if (next.weekday != 1) {
-      expect(
-        (tester.widget<Container>(dot).decoration as BoxDecoration).color,
-        AppTheme.outlineVariant,
-      );
-    }
+    expect(find.text('3 công việc'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Đơn đã hủy'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Đơn đã hủy'), findsOneWidget);
+    await savePreview(tester, 'schedule');
   });
 
   testWidgets('Bộ lọc đơn và card chờ phản hồi dùng thao tác rõ ràng', (
@@ -611,6 +1246,7 @@ void main() {
     expect(find.text('Đang xử lý...'), findsOneWidget);
     repository.pending.complete();
     await tester.pumpAndSettle();
+    expect(find.text('Mở đơn incoming'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -622,10 +1258,20 @@ void main() {
       const ProviderDashboardScreen(),
       assignmentError: true,
     );
+    await tester.scrollUntilVisible(
+      find.text('Đơn cần xử lý'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Đơn cần xử lý'), findsOneWidget);
     expect(find.text('Đơn cần phản hồi'), findsNothing);
     expect(find.text('HDG-005'), findsNothing);
-    expect(find.text(orders.first.serviceName), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('Tiếp tục xử lý'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text(orders[1].serviceName), findsWidgets);
   });
 
   testWidgets(
@@ -684,7 +1330,7 @@ void main() {
         status: status,
       );
       expect(
-        find.text('Trượt để bắt đầu xử lý'),
+        find.text('Đã đến nơi'),
         status == 'accepted' ? findsOneWidget : findsNothing,
       );
       expect(
@@ -692,7 +1338,7 @@ void main() {
         status == 'in_progress' ? findsOneWidget : findsNothing,
       );
       expect(find.text('Lập báo giá sửa chữa'), findsNothing);
-      if (['accepted', 'in_progress'].contains(status)) {
+      if (status == 'in_progress') {
         await tester.scrollUntilVisible(
           find.byType(QuotationEditorScreen),
           180,
@@ -707,6 +1353,39 @@ void main() {
     });
   }
 
+  testWidgets('Đánh giá provider tìm kiếm, lọc nhanh và sửa phản hồi', (
+    tester,
+  ) async {
+    await _showScreen(tester, const ProviderFeedbackScreen());
+
+    expect(find.bySemanticsLabel('Xem ảnh đánh giá 1'), findsOneWidget);
+    expect(find.text('Phản hồi'), findsOneWidget);
+    expect(find.text('Phản hồi của bạn'), findsOneWidget);
+    expect(find.text('Chưa phản hồi'), findsOneWidget);
+    expect(find.text('Có ảnh'), findsOneWidget);
+
+    await tester.tap(find.text('Chưa phản hồi'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 kết quả'), findsOneWidget);
+
+    await tester.tap(find.text('Tất cả'));
+    await tester.enterText(find.byType(TextField).first, 'Trần Ngọc Linh');
+    await tester.pumpAndSettle();
+    expect(find.text('1 kết quả'), findsOneWidget);
+    expect(find.text('Dịch vụ tốt, tư vấn rõ ràng.'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Xóa tìm kiếm'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -700));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Sửa phản hồi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sửa phản hồi'), findsOneWidget);
+    expect(find.text('Lưu chỉnh sửa'), findsOneWidget);
+    expect(find.text('Cảm ơn bạn đã tin tưởng Handigo.'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final size in [
     const Size(320, 640),
     const Size(390, 844),
@@ -717,19 +1396,33 @@ void main() {
         tester,
       ) async {
         for (final screen in const <Widget>[
+          ProviderShell(),
           ProviderDashboardScreen(),
           ProviderOrdersScreen(),
+          ProviderIncomeScreen(),
           ProviderScheduleScreen(),
           ProviderAccountScreen(),
+          ProfileScreen(addressRoute: '/provider/addresses'),
           ProviderProfileScreen(),
+          ProviderVerificationScreen(),
+          ProviderServiceSuggestionScreen(),
           ProviderWalletScreen(),
+          ProviderBankAccountsScreen(),
+          ProviderFeedbackScreen(),
+          SupportScreen(),
+          ComplaintScreen(),
+          FeedbackScreen(),
+          ProviderSettingsScreen(),
           ProviderOrderDetailScreen(orderId: 'detail'),
         ]) {
           await _showScreen(tester, screen, size: size, scale: scale);
           if (size.width == 390 && scale == 1) {
             final preview = switch (screen) {
               ProviderAccountScreen() => 'account',
+              ProfileScreen() => 'personal-info',
               ProviderProfileScreen() => 'profile',
+              ProviderVerificationScreen() => 'verification',
+              ProviderFeedbackScreen() => 'feedback',
               ProviderWalletScreen() => 'wallet',
               _ => null,
             };
@@ -742,8 +1435,9 @@ void main() {
             isNull,
             reason: '${screen.runtimeType}',
           );
-          final scroll = find.byType(ListView).first;
-          if (scroll.evaluate().isNotEmpty) {
+          final lists = find.byType(ListView);
+          if (lists.evaluate().isNotEmpty) {
+            final scroll = lists.first;
             await tester.drag(scroll, const Offset(0, -450));
             await tester.pumpAndSettle();
             if (size.width == 390 &&

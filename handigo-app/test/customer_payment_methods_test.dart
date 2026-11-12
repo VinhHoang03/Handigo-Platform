@@ -177,7 +177,7 @@ void main() {
     expect(find.text('Giao diện'), findsNothing);
     await tester.scrollUntilVisible(find.text('Đăng xuất'), 200);
     expect(find.text('Tiện ích trong tầm tay'), findsNothing);
-    expect(find.textContaining('Phiên bản'), findsNothing);
+    expect(find.textContaining('Phiên bản 0.1.0'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

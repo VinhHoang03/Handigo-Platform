@@ -15,6 +15,7 @@ import '../../features/provider_onboarding/presentation/provider_onboarding_scre
 import '../../features/provider/presentation/provider_screens.dart';
 import '../../features/provider/presentation/provider_order_detail_screen.dart';
 import '../../features/provider/presentation/provider_account_screens.dart';
+import '../../features/provider/presentation/provider_income_screen.dart';
 import '../providers/app_providers.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -251,6 +252,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: '/provider',
                 builder: (context, _) => ProviderDashboardScreen(
                   onOrders: () => context.go('/provider/orders'),
+                  onIncome: () => context.go('/provider/income'),
                   onSchedule: () => context.go('/provider/schedule'),
                 ),
               ),
@@ -291,6 +293,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/provider/income',
+                builder: (_, __) => const ProviderIncomeScreen(asTab: true),
+              ),
+              GoRoute(
+                path: '/provider/wallet',
+                builder: (_, __) => const ProviderWalletScreen(),
+              ),
+              GoRoute(
+                path: '/provider/banks',
+                builder: (_, __) => const ProviderBankAccountsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/provider/schedule',
                 builder: (_, __) => const ProviderScheduleScreen(),
               ),
@@ -307,16 +325,41 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (_, __) => const ProviderProfileScreen(),
               ),
               GoRoute(
-                path: '/provider/wallet',
-                builder: (_, __) => const ProviderWalletScreen(),
+                path: '/provider/personal-info',
+                builder: (_, __) =>
+                    const ProfileScreen(addressRoute: '/provider/addresses'),
               ),
               GoRoute(
-                path: '/provider/banks',
-                builder: (_, __) => const ProviderBankAccountsScreen(),
+                path: '/provider/addresses',
+                builder: (_, __) => const AddressScreen(),
+              ),
+              GoRoute(
+                path: '/provider/professional-info',
+                builder: (_, __) => const ProviderProfileScreen(),
+              ),
+              GoRoute(
+                path: '/provider/verification',
+                builder: (_, __) => const ProviderVerificationScreen(),
               ),
               GoRoute(
                 path: '/provider/feedback',
                 builder: (_, __) => const ProviderFeedbackScreen(),
+              ),
+              GoRoute(
+                path: '/provider/app-feedback',
+                builder: (_, __) => const FeedbackScreen(),
+              ),
+              GoRoute(
+                path: '/provider/support',
+                builder: (_, __) => const SupportScreen(),
+              ),
+              GoRoute(
+                path: '/provider/reports',
+                builder: (_, __) => const ComplaintScreen(),
+              ),
+              GoRoute(
+                path: '/provider/service-suggestions',
+                builder: (_, __) => const ProviderServiceSuggestionScreen(),
               ),
               GoRoute(
                 path: '/provider/settings',

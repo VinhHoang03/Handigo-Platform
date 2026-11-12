@@ -16,10 +16,11 @@ const schema = load('validations/bookingPolicy.validator.ts', { zod: require('zo
 class AppError extends Error { constructor(message, statusCode) { super(message); this.statusCode = statusCode; } }
 function configuration(saved) {
   return load('services/systemConfig.service.ts', {
-    mongoose: { __esModule: true, default: { connection: { collection: () => ({
+    mongoose: { __esModule: true, default: { connection: { transaction: async callback => callback({}), collection: () => ({
       findOne: async ({ key }) => saved?.[key] ?? null, createIndex: async () => 'key_unique',
       find: () => ({ toArray: async () => Object.entries(saved ?? {}).map(([key, value]) => ({ key, ...value })) }),
     }) } } },
+    '../models/auditLog.model': { AuditLog: { init: async () => {} } },
     '../validations/bookingPolicy.validator': schema,
     '../utils/appError': { AppError },
   });

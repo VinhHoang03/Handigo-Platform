@@ -1,4 +1,8 @@
+import '../../../app/providers/app_providers.dart';
 import 'slide_to_start_order.dart';
+import 'provider_cancel_order_dialog.dart';
+import 'provider_no_show_screen.dart';
+import 'provider_account_screens.dart';
 import '../../orders/presentation/order_payment_panel.dart';
 import '../../orders/presentation/order_detail_overview.dart';
 import '../../orders/presentation/order_followup_panel.dart';
@@ -30,6 +34,7 @@ class _ProviderOrderDetailScreenState
   bool busy = false;
   RepairQuotation? quotation;
   bool quotationLoaded = false;
+  bool editingQuotation = false;
 
   @override
   void initState() {
@@ -92,7 +97,7 @@ class _ProviderOrderDetailScreenState
               if (order != null)
                 PopupMenuItem(
                   value: 'cancel',
-                  enabled: order.status == 'accepted',
+                  enabled: _canCancel(order),
                   child: const Text('Hủy đơn'),
                 ),
             ],
@@ -184,6 +189,30 @@ class _ProviderOrderDetailScreenState
             ),
             const SizedBox(height: 12),
             OrderDetailOverview(order: order, providerView: true),
+            if (_canReportNoShow(order) ||
+                order.customerNoShowStatus != null) ...[
+              const SizedBox(height: 12),
+              _DetailSection(
+                title: 'Liên hệ khách hàng',
+                icon: Icons.person_off_outlined,
+                child: order.customerNoShowStatus == null
+                    ? OutlinedButton.icon(
+                        onPressed: busy ? null : () => _reportNoShow(order),
+                        icon: const Icon(Icons.phone_missed_outlined),
+                        label: const Text('Không liên hệ được khách'),
+                      )
+                    : Text(switch (order.customerNoShowStatus) {
+                        'pending' =>
+                          'Báo cáo khách không có mặt đang chờ duyệt. Chưa thể lập báo giá hoặc bắt đầu làm việc.',
+                        'approved' =>
+                          'Báo cáo đã được chấp thuận. Kết quả xử lý đơn và ví đã được cập nhật.',
+                        'rejected' =>
+                          'Báo cáo không được chấp thuận. Bạn có thể tiếp tục làm việc hoặc liên hệ hỗ trợ.',
+                        _ =>
+                          'Báo cáo khách không có mặt đã được ghi nhận. Vui lòng tải lại để xem kết quả.',
+                      }),
+              ),
+            ],
             const SizedBox(height: 12),
             Card(
               child: Padding(
@@ -209,18 +238,10 @@ class _ProviderOrderDetailScreenState
             if (order.completionEvidenceImages.isNotEmpty)
               _images('Ảnh nghiệm thu', order.completionEvidenceImages),
             if (order.completionNote != null) Text(order.completionNote!),
-            if (order.inspectionRequired) _quotationSummary(order),
+            if (order.inspectionRequired && !order.noShowBlocksWork)
+              _quotationSummary(order),
             const SizedBox(height: 12),
             OrderProgressTimeline(order: order),
-            if (order.status == 'in_progress')
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: OutlinedButton.icon(
-                  onPressed: busy ? null : () => _expectedEnd(context, ref),
-                  icon: const Icon(Icons.schedule, size: 20),
-                  label: const Text('Cập nhật thời gian hoàn tất'),
-                ),
-              ),
           ],
         ),
       ),
@@ -244,42 +265,47 @@ class _ProviderOrderDetailScreenState
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (order.status == 'accepted')
+                      if (order.status == 'accepted' && !order.hasArrived)
                         SlideToStartOrder(
+                          key: const ValueKey('arrival-slide'),
                           busy: busy,
-                          enabled:
-                              order.canStart(quotation) &&
-                              (!order.inspectionRequired || quotationLoaded),
-                          onConfirmed: () => _run(
-                            context,
-                            ref,
-                            () => ref
-                                .read(providerRepositoryProvider)
-                                .startOrder(orderId),
-                            'Đã bắt đầu thực hiện đơn.',
-                          ),
+                          enabled: order.appointmentConfirmed,
+                          onConfirmed: () => _arrive(order),
+                          label: 'Đã đến nơi',
+                          semanticLabel:
+                              'Vuốt sang phải để xác nhận đã đến nơi',
                         )
-                      else
+                      else if (order.status == 'accepted')
                         FilledButton.icon(
                           onPressed:
                               busy ||
-                                  (order.inspectionRequired &&
-                                      (!quotationLoaded ||
-                                          quotation?.usable != true))
+                                  !order.canStart(quotation) ||
+                                  (order.inspectionRequired && !quotationLoaded)
                               ? null
-                              : () => _complete(context, ref),
-                          icon: busy
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.task_alt, size: 20),
+                              : () => _run(
+                                  context,
+                                  ref,
+                                  () => ref
+                                      .read(providerRepositoryProvider)
+                                      .startOrder(orderId),
+                                  'Đã bắt đầu thực hiện đơn.',
+                                ),
+                          icon: const Icon(Icons.play_arrow_rounded),
                           label: Text(
-                            busy ? 'Đang xử lý...' : 'Hoàn tất & nghiệm thu',
+                            busy ? 'Đang xử lý...' : 'Bắt đầu thực hiện',
                           ),
+                        )
+                      else
+                        SlideToStartOrder(
+                          key: const ValueKey('completion-slide'),
+                          busy: busy,
+                          enabled:
+                              !order.inspectionRequired ||
+                              (quotationLoaded && quotation?.usable == true),
+                          onConfirmed: () => _complete(context, ref),
+                          label: 'Hoàn tất & nghiệm thu',
+                          semanticLabel:
+                              'Vuốt sang phải để mở nghiệm thu hoàn tất đơn',
                         ),
                     ],
                   ),
@@ -299,10 +325,12 @@ class _ProviderOrderDetailScreenState
     setState(() => busy = true);
     try {
       await action();
+      if (!mounted) return;
       ref.invalidate(orderDetailProvider(orderId));
       ref.invalidate(providerOrdersProvider);
       ref.invalidate(providerOrderPageProvider);
       ref.invalidate(providerOverviewProvider);
+      await ref.read(orderDetailProvider(orderId).future);
       await _loadQuotation();
       if (context.mounted) {
         ScaffoldMessenger.of(
@@ -320,31 +348,85 @@ class _ProviderOrderDetailScreenState
     }
   }
 
-  Future<void> _expectedEnd(BuildContext context, WidgetRef ref) async {
-    final date = await showDatePicker(
-      context: context,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-      initialDate: DateTime.now(),
-    );
-    if (!context.mounted || date == null) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (time == null || !context.mounted) return;
-    await _run(
-      context,
-      ref,
-      () => ref
+  bool _canCancel(OrderDetail order) =>
+      order.status == 'accepted' &&
+      !order.noShowBlocksWork &&
+      order.currentQuotationId == null &&
+      quotationLoaded &&
+      quotation == null;
+
+  bool _canReportNoShow(OrderDetail order) =>
+      order.status == 'accepted' &&
+      order.currentQuotationId == null &&
+      quotation == null &&
+      order.hasArrived &&
+      order.customerNoShowStatus == null;
+
+  Future<void> _reportNoShow(OrderDetail order) async {
+    if (busy || !_canReportNoShow(order)) return;
+    final owner = ref.read(authControllerProvider).user?.id;
+    setState(() => busy = true);
+    try {
+      await ref
           .read(providerRepositoryProvider)
-          .updateExpectedEnd(
-            orderId,
-            DateTime(date.year, date.month, date.day, time.hour, time.minute),
-          ),
-      'Đã cập nhật thời gian hoàn tất.',
-    );
+          .checkNoShowEligibility(order.id);
+      if (!mounted ||
+          owner == null ||
+          ref.read(authControllerProvider).user?.id != owner) {
+        return;
+      }
+      final sent = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ProviderNoShowScreen(orderId: order.id),
+        ),
+      );
+      if (!mounted || ref.read(authControllerProvider).user?.id != owner) {
+        return;
+      }
+      ref.invalidate(orderDetailProvider(orderId));
+      ref.invalidate(providerOrdersProvider);
+      ref.invalidate(providerOrderPageProvider);
+      ref.invalidate(providerScheduleOrdersProvider);
+      ref.invalidate(providerAssignmentsProvider);
+      ref.invalidate(providerOverviewProvider);
+      ref.invalidate(providerWalletProvider);
+      ref.invalidate(providerWalletTransactionsProvider);
+      await ref.read(orderDetailProvider(orderId).future);
+      await _loadQuotation();
+      if (sent == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã gửi báo cáo khách không có mặt.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ref.invalidate(orderDetailProvider(orderId));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_message(error))));
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
+
+  Future<void> _arrive(OrderDetail order) => _run(context, ref, () async {
+    final owner = ref.read(authControllerProvider).user?.id;
+    await ref
+        .read(providerLocationServiceProvider)
+        .synchronize(
+          shouldUpload: () =>
+              mounted &&
+              owner != null &&
+              ref.read(authControllerProvider).user?.id == owner,
+        );
+    if (!mounted ||
+        owner == null ||
+        ref.read(authControllerProvider).user?.id != owner) {
+      return;
+    }
+    await ref.read(providerRepositoryProvider).arriveOrder(order.id);
+  }, 'Đã xác nhận đến nơi và thông báo cho khách.');
 
   Future<void> _complete(BuildContext context, WidgetRef ref) async {
     final result = await Navigator.push<bool>(
@@ -393,12 +475,17 @@ class _ProviderOrderDetailScreenState
     child:
         quotationLoaded &&
             order.canEditQuotation &&
+            (order.status != 'accepted' || order.hasArrived) &&
+            (quotation == null || editingQuotation) &&
             (quotation == null || quotation!.usable)
         ? QuotationEditorScreen(
             key: ValueKey((order.id, quotation?.id, quotation?.revision)),
             order: order,
             quotation: quotation,
             embedded: true,
+            onCancel: quotation == null
+                ? null
+                : () => setState(() => editingQuotation = false),
             onBusyChanged: (value) {
               if (mounted) setState(() => busy = value);
             },
@@ -407,7 +494,11 @@ class _ProviderOrderDetailScreenState
                 ref.invalidate(orderDetailProvider(orderId));
                 await _loadQuotation();
               } finally {
-                if (mounted) setState(() => busy = false);
+                if (mounted)
+                  setState(() {
+                    busy = false;
+                    editingQuotation = false;
+                  });
               }
             },
           )
@@ -420,7 +511,11 @@ class _ProviderOrderDetailScreenState
                   child: const Text('Tải lại báo giá'),
                 ),
               if (quotationLoaded && quotation == null)
-                const Text('Cần lưu báo giá trước khi bắt đầu thực hiện.'),
+                Text(
+                  order.status == 'accepted' && !order.hasArrived
+                      ? 'Xác nhận đã đến nơi để lập báo giá.'
+                      : 'Cần lưu báo giá trước khi bắt đầu thực hiện.',
+                ),
               if (!order.appointmentConfirmed)
                 const Text('Đang chờ thanh toán và xác nhận lịch hẹn.'),
               if (order.depositPaidAt == null)
@@ -439,6 +534,19 @@ class _ProviderOrderDetailScreenState
                 Text(
                   'Thu trực tiếp: ${_money((quotation!.finalAmount - order.appliedDeposit).clamp(0, double.infinity))}',
                 ),
+                if (quotationLoaded &&
+                    quotation!.usable &&
+                    order.canEditQuotation &&
+                    (order.status != 'accepted' || order.hasArrived)) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: busy
+                        ? null
+                        : () => setState(() => editingQuotation = true),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Chỉnh sửa'),
+                  ),
+                ],
                 if (order.status == 'completed' && quotation!.usable) ...[
                   if (quotation!.directPaymentConfirmedAt != null &&
                       order.paymentStatus == 'paid')
@@ -488,40 +596,31 @@ class _ProviderOrderDetailScreenState
   }
 
   Future<void> _cancelOrder(OrderDetail order) async {
-    final controller = TextEditingController();
+    if (busy || !_canCancel(order)) return;
     final reason = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hủy nhận đơn'),
-        content: TextField(
-          controller: controller,
-          minLines: 2,
-          maxLines: 4,
-          decoration: const InputDecoration(labelText: 'Lý do hủy'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Quay lại'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty)
-                Navigator.pop(context, controller.text.trim());
-            },
-            child: const Text('Xác nhận hủy'),
-          ),
-        ],
-      ),
+      builder: (context) => ProviderCancelOrderDialog(order: order),
     );
-    controller.dispose();
-    if (reason != null && mounted)
-      await _run(
-        context,
-        ref,
-        () => ref.read(orderRepositoryProvider).cancel(order.id, reason),
-        'Đã hủy nhận đơn.',
+    if (reason == null || !mounted) return;
+    final current = ref.read(orderDetailProvider(orderId)).asData?.value;
+    if (current == null ||
+        !_canCancel(current) ||
+        current.hasArrived != order.hasArrived) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Đơn đã thay đổi. Vui lòng kiểm tra và chọn lại lý do hủy.',
+          ),
+        ),
       );
+      return;
+    }
+    await _run(
+      context,
+      ref,
+      () => ref.read(orderRepositoryProvider).cancel(order.id, reason),
+      'Đã hủy nhận đơn.',
+    );
   }
 }
 

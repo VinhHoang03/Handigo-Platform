@@ -1,6 +1,6 @@
-import { Schema, model, Types } from "mongoose";
+import { Document, Schema, model, Types } from "mongoose";
 
-export interface IViolationEmail {
+interface IViolationEmail extends Document {
   violationId: Types.ObjectId;
   userId: Types.ObjectId;
   to: string;
@@ -10,14 +10,14 @@ export interface IViolationEmail {
   status: "pending" | "processing" | "sent" | "failed";
   attempts: number;
   nextAttemptAt: Date;
-  leaseId?: string | null;
-  sentAt?: Date | null;
+  leaseId: string | null;
+  sentAt: Date | null;
 }
 
-const schema = new Schema<IViolationEmail>({
+const ViolationEmailSchema = new Schema<IViolationEmail>({
   violationId: { type: Schema.Types.ObjectId, ref: "Violation", required: true, unique: true },
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-  to: { type: String, required: true },
+  to: { type: String, required: true, trim: true },
   subject: { type: String, required: true },
   text: { type: String, required: true },
   html: { type: String, required: true },
@@ -28,6 +28,6 @@ const schema = new Schema<IViolationEmail>({
   sentAt: { type: Date, default: null },
 }, { timestamps: true });
 
-schema.index({ status: 1, nextAttemptAt: 1 });
+ViolationEmailSchema.index({ status: 1, nextAttemptAt: 1 });
 
-export const ViolationEmail = model<IViolationEmail>("ViolationEmail", schema, "violation_emails");
+export const ViolationEmail = model<IViolationEmail>("ViolationEmail", ViolationEmailSchema);

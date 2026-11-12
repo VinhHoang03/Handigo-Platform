@@ -12,6 +12,9 @@ import { ChevronRight, House, LogOut, User, Wallet } from "lucide-react";
 interface ProviderTopbarProps {
   userAvatar?: string | null;
   isOnline?: boolean;
+  statusUpdating?: boolean;
+  statusConnected?: boolean;
+  statusBusy?: boolean;
   onStatusToggle?: () => void;
   switchLabel?: string;
   onSwitch?: () => void;
@@ -21,6 +24,9 @@ interface ProviderTopbarProps {
 export function ProviderTopbar({
   userAvatar,
   isOnline = false,
+  statusUpdating = false,
+  statusConnected = true,
+  statusBusy = false,
   onStatusToggle,
   switchLabel,
   onSwitch,
@@ -64,7 +70,7 @@ export function ProviderTopbar({
   };
 
   return (
-    <header className="fixed left-4 right-4 top-6 z-30 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest/92 px-4 py-3 shadow-[0_14px_40px_rgba(19,27,46,0.08)] backdrop-blur-xl lg:left-80 xl:left-[21rem]">
+    <header className="fixed left-4 right-4 top-6 z-30 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest/92 px-4 py-3 shadow-[0_14px_40px_rgba(19,27,46,0.08)] backdrop-blur-xl transition-[left] duration-300 ease-out motion-reduce:transition-none lg:left-24 xl:left-28">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <Link
@@ -89,12 +95,17 @@ export function ProviderTopbar({
                 isOnline ? "text-primary" : "text-on-surface-variant"
               }`}
             >
-              {isOnline ? "Trực tuyến" : "Ngoại tuyến"}
+              {statusUpdating ? (isOnline ? "Đang bật nhận việc…" : "Đang tắt nhận việc…")
+                : statusBusy ? "Đang bận" : isOnline && !statusConnected ? "Đang kết nối lại…"
+                : isOnline ? "Trực tuyến" : "Ngoại tuyến"}
             </span>
             <label className="relative inline-flex cursor-pointer items-center">
               <input
                 type="checkbox"
                 checked={isOnline}
+                disabled={statusUpdating || statusBusy}
+                aria-label="Trạng thái nhận việc"
+                aria-busy={statusUpdating}
                 onChange={onStatusToggle}
                 className="peer sr-only"
               />

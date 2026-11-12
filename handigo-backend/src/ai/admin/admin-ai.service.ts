@@ -113,15 +113,26 @@ export async function enqueueAssessment(input: RunInput, adminId: string, schedu
   ensureReviewableSource(input.sourceType, context.row);
   if (!input.preview && input.feature === "complaint_summary") {
     const previous = await AdminAIAssessment.findOne({ feature: input.feature, sourceType: input.sourceType, sourceId: input.sourceId, revision: config.revision, preview: false, appliedSourceHash: context.hash });
-    if (previous) return previous;
+    if (previous && !previous.adminDecision && ["manual", "completed"].includes(previous.status)) return previous;
   }
   if (context.row && input.feature === "provider_application" && !policy.applicationTypes.includes((context.row.applicationType || "initial") as "initial" | "service_addition")) throw new AppError("Hồ sơ nằm ngoài phạm vi bộ tiêu chí.", 422);
   const key = input.preview ? randomUUID() : `${input.feature}:${input.sourceId}:${context.hash}:${config.revision}`;
+  const queuedAt = new Date();
   const stored = await AdminAIAssessment.findOneAndUpdate({ key }, { $setOnInsert: {
     key, feature: input.feature, sourceType: input.sourceType, sourceId: input.sourceId,
     revision: config.revision, policy, preview: input.preview, configuredBy: scheduled ? config.configuredBy : adminId,
     sourceHash: context.hash, from: input.from ? new Date(input.from) : null, to: input.to ? new Date(input.to) : null,
-  } }, { upsert: true, returnDocument: "after", runValidators: true });
+    createdAt: queuedAt, updatedAt: queuedAt,
+  } }, { upsert: true, returnDocument: "after", runValidators: true, timestamps: false });
+  if (!scheduled && !input.preview && ["error", "stale"].includes(stored.status) && !stored.adminDecision) {
+    const restarted = await AdminAIAssessment.findOneAndUpdate({ _id: stored._id, status: stored.status, updatedAt: stored.updatedAt }, {
+      $set: { status: "queued", attempts: 0, nextAt: new Date(), leaseUntil: null, leaseToken: null,
+        error: null, outcome: null, configuredBy: adminId },
+    }, { returnDocument: "after", runValidators: true });
+    const current = restarted || await AdminAIAssessment.findById(stored._id);
+    if (!current) throw new AppError("Tác vụ không còn tồn tại. Vui lòng tải lại.", 404);
+    return current;
+  }
   return stored;
 }
 export type Job = HydratedDocument<InferSchemaType<typeof AdminAIAssessment.schema>>;
@@ -131,29 +142,29 @@ export async function reserveCall(feature: string, limit: number, now = new Date
   const quota = await AdminAIQuota.findOneAndUpdate({ key, count: { $lt: limit } }, { $inc: { count: 1 } }, { returnDocument: "after", runValidators: true });
   if (!quota) throw new AppError("Đã hết hạn mức gọi AI quản trị trong ngày UTC.", 429);
 }
-async function guardAndComplete(job: Job, session: ClientSession, output: AIOutput, checks: CriterionResult[], outcome: string) {
-  const config = await AdminAIConfig.findOneAndUpdate({ feature: job.feature, revision: job.revision, enabled: true }, { $inc: { fence: 1 } }, { returnDocument: "after", runValidators: true, session });
+async function guardAndComplete(job: Job, session: ClientSession, output: AIOutput, checks: CriterionResult[], outcome: string, status: "completed" | "manual" = "completed", applying = true) {
+  const config = await AdminAIConfig.findOneAndUpdate({ feature: job.feature, revision: job.revision, ...(!job.preview ? { enabled: true } : {}) }, { $inc: { fence: 1 } }, { returnDocument: "after", runValidators: true, session });
   if (!config) throw new AppError("Công tắc hoặc phiên bản tiêu chí đã thay đổi.", 409);
-  const admin = await User.exists({ _id: config.configuredBy, role: "ADMIN", status: "active", isDeleted: false }).session(session);
+  const admin = await User.exists({ _id: job.preview ? job.configuredBy : config.configuredBy, role: "ADMIN", status: "active", isDeleted: false }).session(session);
   if (!admin) throw new AppError("Admin cấu hình không còn quyền hoạt động.", 409);
   const context = await loadContext({ sourceType: job.sourceType as RunInput["sourceType"], sourceId: job.sourceId, from: job.from?.toISOString(), to: job.to?.toISOString() }, session);
   ensureReviewableSource(job.sourceType, context.row);
   if (context.hash !== job.sourceHash) throw new AppError("Dữ liệu nguồn đã thay đổi sau khi phân tích.", 409);
-  if (job.feature === "provider_application" && context.row) {
+  if (applying && job.feature === "provider_application" && context.row) {
     const owner = await User.exists({ _id: String(context.row.userId), role: { $in: context.row.applicationType === "service_addition" ? ["PROVIDER"] : ["CUSTOMER", "PROVIDER"] }, status: "active", isDeleted: false }).session(session);
     if (!owner) throw new AppError("Chủ hồ sơ không còn đủ điều kiện tài khoản để tự duyệt.", 409);
   }
-  if (outcome === "auto_rejected") {
+  if (applying && outcome === "auto_rejected") {
     if (job.feature !== "provider_application" || !policySchema.parse(job.policy).autoRejectIncompleteApplications
       || !policySchema.parse(config.policy).autoRejectIncompleteApplications || !context.row || !incompleteApplicationReasons(context.row).length) {
       throw new AppError("Hồ sơ không còn thiếu thông tin hoặc Admin chưa cho phép tự từ chối.", 409);
     }
-  } else if (["provider_application", "service_suggestion"].includes(job.feature)) {
+  } else if (applying && ["provider_application", "service_suggestion"].includes(job.feature)) {
     if (job.feature === "provider_application" && context.row && incompleteApplicationReasons(context.row).length) throw new AppError("Hồ sơ còn thiếu mô tả hoặc ảnh giấy tờ, chưa thể tự duyệt.", 409);
     const latestChecks = [...evaluateCriteria(policySchema.parse(job.policy), context.row), ...output.checks];
     if (!allRequiredPassed(policySchema.parse(job.policy), latestChecks, output)) throw new AppError("Hồ sơ không còn đạt đầy đủ tiêu chí.", 409);
   }
-  const saved = await AdminAIAssessment.updateOne({ _id: job._id, status: "running", leaseToken: job.leaseToken, leaseUntil: { $gt: new Date() } }, { $set: { status: "completed", outcome, output, checks, leaseUntil: null, error: null } }, { session, runValidators: true });
+  const saved = await AdminAIAssessment.updateOne({ _id: job._id, status: "running", leaseToken: job.leaseToken, leaseUntil: { $gt: new Date() } }, { $set: { status, outcome, output, checks, leaseUntil: null, error: null } }, { session, runValidators: true });
   if (saved.modifiedCount !== 1) throw new AppError("Tác vụ AI đã mất quyền xử lý.", 409);
 }
 async function applyResult(job: Job, row: SourceRow | null, output: AIOutput, checks: CriterionResult[], catalogComplete: boolean) {
@@ -232,16 +243,21 @@ export async function processNextAssessment() {
     const checks = [...evaluateCriteria(policy, context.row), ...output.checks];
     await AdminAIAssessment.updateOne(own, { $set: { model: generated.model, usage: generated.usage, metrics: context.metrics, output, checks } }, { runValidators: true });
     const result = await applyResult(job, context.row, output, checks, context.catalogComplete);
-    if (result) await AdminAIAssessment.updateOne(own, { $set: { ...result, output, checks, error: null, leaseUntil: null } }, { runValidators: true });
+    if (result) {
+      await mongoose.connection.transaction(session => guardAndComplete(job, session, output, checks, result.outcome, result.status as "completed" | "manual", false));
+    }
   } catch (error) {
     const code = error instanceof AppError ? error.statusCode : 500;
     const stale = [404, 409].includes(code);
+    const quotaWait = code === 429;
     const retry = !stale && ![400, 410, 422, 429, 503].includes(code) && job.attempts < 3;
+    const tomorrow = new Date();
+    tomorrow.setUTCHours(24, 0, 0, 0);
     await AdminAIAssessment.updateOne(own, { $set: {
-      status: stale ? "stale" : retry ? "retry" : "error", outcome: stale ? "stale" : "manual_review",
+      status: stale ? "stale" : retry || quotaWait ? "retry" : "error", outcome: stale ? "stale" : "manual_review",
       error: error instanceof AppError ? error.message : "Tác vụ AI gặp lỗi nội bộ. Vui lòng kiểm tra thủ công.",
-      nextAt: new Date(Date.now() + job.attempts * 30000), leaseUntil: null,
-    } }, { runValidators: true });
+      nextAt: quotaWait ? tomorrow : new Date(Date.now() + job.attempts * 30000), leaseUntil: null,
+    }, ...(quotaWait ? { $inc: { attempts: -1 } } : {}) }, { runValidators: true });
   }
   return true;
 }

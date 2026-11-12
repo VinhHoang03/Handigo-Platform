@@ -415,12 +415,15 @@ export const updateSupportTicketStatus = async (
     );
   }
 
+  const wasTerminal = TERMINAL_STATUSES.includes(ticket.status);
   ticket.status = payload.status;
   ticket.assignedAdminId = ticket.assignedAdminId ?? new Types.ObjectId(adminId);
   ticket.resolutionNote = payload.resolutionNote ?? ticket.resolutionNote ?? null;
   if (TERMINAL_STATUSES.includes(payload.status)) {
-    ticket.resolvedBy = new Types.ObjectId(adminId);
-    ticket.resolvedAt = new Date();
+    if (!wasTerminal) {
+      ticket.resolvedBy = new Types.ObjectId(adminId);
+      ticket.resolvedAt = new Date();
+    }
   } else {
     ticket.resolvedBy = null;
     ticket.resolvedAt = null;

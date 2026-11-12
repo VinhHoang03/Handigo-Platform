@@ -22,19 +22,20 @@ const formatDate = (value: Date) => new Intl.DateTimeFormat("vi-VN", {
   hour: "2-digit", minute: "2-digit", hour12: false,
 }).format(value) + " (giờ Việt Nam)";
 
-type EmailViolation = Pick<IViolation, "violationType" | "severity" | "penaltyType" | "reason" | "penalty" | "endAt">;
+type EmailViolation = Pick<IViolation, "violationType" | "severity" | "penaltyType" | "reason" | "adminDecision" | "penalty" | "endAt">;
 
-export const buildViolationEmail = (violation: EmailViolation, fullName: string) => {
+export const buildViolationEmail = (violation: EmailViolation, fullName: string, violationId: string) => {
   const type = violation.penaltyType;
   const penalty = penaltyLabels[type];
   const rows: [string, string][] = [
+    ["Mã tra cứu", violationId],
     ["Nội dung vi phạm", violation.violationType],
     ["Lý do xử lý", violation.reason || "Không có thông tin bổ sung"],
     ["Mức độ vi phạm", severityLabels[violation.severity]], ["Hình thức xử lý", penalty],
+    ["Quyết định xử lý", violation.adminDecision || penalty],
   ];
   if (type === "TEMPORARY_SUSPEND") {
-    const duration = violation.penalty?.duration ?? violation.penalty?.durationDays;
-    rows.push(["Thời hạn", `${duration} ${violation.penalty?.durationUnit === "hours" ? "giờ" : "ngày"}`]);
+    rows.push(["Thời hạn", `${violation.penalty?.durationDays} ngày`]);
   }
   if (type === "RESTRICT_FEATURE" && violation.penalty?.feature) {
     rows.push(["Tính năng bị hạn chế", featureLabels[violation.penalty.feature] || violation.penalty.feature]);

@@ -1,6 +1,7 @@
 import { Provider } from "../models/provider.model";
 import { Order } from "../models/order.model";
 import type { ClientSession, Types } from "mongoose";
+import { emitToUser } from "../sockets/socketServer";
 
 // Gọi trong giao dịch đã khóa lịch thợ; báo cáo chờ duyệt không còn giữ thợ bận.
 export const releaseProviderAfterNoShow = async (providerId: Types.ObjectId, orderId: Types.ObjectId, session: ClientSession) => {
@@ -20,15 +21,6 @@ export const markProviderOffline = async (userId: string, onlyOnline = false) =>
     { $set: { availabilityStatus: "offline" } },
     { returnDocument: "after", runValidators: true, projection: { updatedAt: 1 } },
   ).lean();
+  if (provider) emitToUser(userId, "provider:availability", { availabilityStatus: "offline" });
   return provider?.updatedAt ?? null;
-};
-
-export const restoreProviderAfterReconnect = async (userId: string, disconnectedAt: Date) => {
-  // Chỉ khôi phục đúng lần tắt do mất kết nối; không ghi đè thao tác tắt, đăng xuất hoặc trạng thái bận mới hơn.
-  const result = await Provider.updateOne(
-    { userId, isDeleted: false, verified: true, availabilityStatus: "offline", updatedAt: disconnectedAt },
-    { $set: { availabilityStatus: "online" } },
-    { runValidators: true },
-  );
-  return result.modifiedCount > 0;
 };

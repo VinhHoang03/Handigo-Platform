@@ -336,6 +336,9 @@ export const AssignmentService = {
     try {
       result = await session.withTransaction(async () => {
         const lockedProvider = await lockProviderSchedule(provider._id as Types.ObjectId, session);
+        if (lockedProvider.availabilityStatus !== "online") {
+          throw new AppError("Trạng thái nhận việc đã thay đổi. Vui lòng kiểm tra lại trước khi nhận đơn.", 409);
+        }
         const order = await Order.findOne({
           _id: assignment.orderId,
           status: "created",
@@ -417,6 +420,7 @@ export const AssignmentService = {
     emitToUser(result.order.customerId.toString(), "order:updated", {
       orderId: result.order._id.toString(),
     });
+    emitToUser(providerUserId, "provider:availability", { availabilityStatus: isAppointment ? "online" : "busy" });
     try {
       await closeCompetingAssignments(result.order._id as Types.ObjectId, result.assignment._id as Types.ObjectId);
       emitToUser(providerUserId, "assignment:closed", { assignmentId, reason: "accepted" });

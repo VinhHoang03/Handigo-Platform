@@ -436,6 +436,7 @@ export const OrderService = {
       addressSnapshot: {
         recipientName: address.recipientName, recipientPhone: address.recipientPhone,
         fullAddress: address.fullAddress, province: address.province, ward: address.ward,
+        note: address.note,
         latitude: address.latitude, longitude: address.longitude,
       },
       orderType,
@@ -1004,6 +1005,7 @@ export const OrderService = {
       });
       if (!result) throw new AppError("Không thể bắt đầu đơn.", 409);
       emitToUser(result.customerId.toString(), "order:updated", { orderId: result._id.toString() });
+      emitToUser(providerUserId, "provider:availability", { availabilityStatus: "busy" });
       return result;
     } finally { await session.endSession(); }
   },
@@ -1191,6 +1193,7 @@ export const OrderService = {
     if (!completedOrder) {
       throw new AppError("Không thể hoàn tất đơn hàng.", 500);
     }
+    emitToUser(providerUserId, "provider:availability", { availabilityStatus: "online" });
     return completedOrder;
   },
 

@@ -12,8 +12,12 @@ import { complaintDecisionSchema, complaintWorkflowSchema, type ComplaintDecisio
 
 export async function decideComplaint(assessmentId: string, adminId: string, input: ComplaintDecision) {
   const decision = complaintDecisionSchema.parse(input);
-  const assessment = await AdminAIAssessment.findOne({ _id: assessmentId, feature: "complaint_summary", sourceType: "report", preview: false, status: { $in: ["manual", "completed"] }, adminDecision: null }).lean();
+  const assessment = await AdminAIAssessment.findOne({ _id: assessmentId, feature: "complaint_summary", sourceType: "report", preview: false, status: { $in: ["manual", "completed"] } }).lean();
   if (!assessment) throw new AppError("Kết quả chưa sẵn sàng, chỉ là chạy thử hoặc đã được áp dụng. Hãy tải lại hồ sơ.", 409);
+  if (assessment.adminDecision && (!["under_review", "evidence_requested"].includes(assessment.adminDecision.status)
+    || assessment.adminDecision.status === decision.status)) {
+    throw new AppError("Quyết định đã được áp dụng. Hãy tải lại hồ sơ để tiếp tục bước xử lý hợp lệ.", 409);
+  }
   const resolution = assessment.output?.complaintResolution;
   const parsed = complaintWorkflowSchema.safeParse(resolution?.workflow);
   if (!parsed.success) throw new AppError("Phương án cũ chưa đủ dữ liệu nghiệp vụ. Hãy phân tích lại.", 422);
@@ -51,20 +55,26 @@ export async function decideComplaint(assessmentId: string, adminId: string, inp
       });
       if (pending || !succeeded) throw new AppError("Khoản hoàn chưa được hệ thống xác nhận hoàn tất. Tiếp tục theo dõi hoặc xử lý lỗi hoàn tiền.", 422);
     }
-    const saved = await AdminAIAssessment.updateOne({ _id: assessmentId, adminDecision: null, status: { $in: ["manual", "completed"] } }, {
+    const saved = await AdminAIAssessment.updateOne({ _id: assessmentId, updatedAt: assessment.updatedAt,
+      ...(assessment.adminDecision ? { "adminDecision.decidedAt": assessment.adminDecision.decidedAt } : { adminDecision: null }),
+      status: { $in: ["manual", "completed"] } }, {
       $set: { adminDecision: { actorId: new Types.ObjectId(adminId), ...decision, decidedAt: new Date() } },
     }, { session, runValidators: true });
     if (saved.modifiedCount !== 1) throw new AppError("Phương án vừa được xử lý bởi phiên khác. Hãy tải lại.", 409);
   };
+  const afterWrite = async (session: ClientSession) => {
+    const context = await loadContext({ sourceType: "report", sourceId: assessment.sourceId }, session);
+    await AdminAIAssessment.updateOne({ _id: assessmentId }, { $set: { appliedSourceHash: context.hash } }, { session, runValidators: true });
+  };
   if (decision.status === "evidence_requested") {
     const { requestReportEvidence } = await import("../../services/report.service");
-    await requestReportEvidence(adminId, assessment.sourceId, decision.note, undefined, { beforeWrite });
+    await requestReportEvidence(adminId, assessment.sourceId, decision.note, undefined, { beforeWrite, afterWrite });
   } else {
     const { reviewReport } = await import("../../services/report.service");
     await reviewReport(adminId, assessment.sourceId, {
       status: decision.status, reviewNote: `Admin quyết định từ phân tích AI ${assessment._id}. ${decision.note}`.slice(0, 3000),
       resolutionNote: ["resolved", "rejected", "confirmed"].includes(decision.status) ? decision.note : undefined,
-    }, undefined, { beforeWrite });
+    }, undefined, { beforeWrite, afterWrite });
   }
   return { assessmentId, sourceId: assessment.sourceId, status: decision.status };
 }

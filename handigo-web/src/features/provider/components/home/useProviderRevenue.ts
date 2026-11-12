@@ -1,59 +1,130 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import {
   providerDashboardApi,
   type ProviderEarningPoint,
+  type ProviderMonthlyEarningPoint,
 } from "../../api/providerDashboard.api";
 import {
   dateKey,
   getRevenueChart,
   getRevenueRange,
-  getRevenueToday,
+  revenueWeekKey,
+  type RevenueCustomRange,
   type RevenuePeriod,
 } from "./providerHome.utils";
 
-/** Doanh thu theo kỳ đã chọn, không hiển thị dữ liệu của kỳ trước khi đang tải. */
+/** Doanh thu theo tuần, tháng hoặc năm cho biểu đồ trang chủ nhà cung cấp. */
 export function useProviderRevenue() {
   const [revenuePeriod, setRevenuePeriodState] = useState<RevenuePeriod>("week");
-  const [revenueAnchor, setRevenueAnchor] = useState(getRevenueToday);
-  const [result, setResult] = useState<{ key: string; earnings: ProviderEarningPoint[]; error: string | null } | null>(null);
-  const revenueRange = getRevenueRange(revenuePeriod, revenueAnchor);
-  const fromDate = dateKey(revenueRange.dates[0]);
-  const toDate = dateKey(revenueRange.dates[revenueRange.dates.length - 1]);
-  const key = `${fromDate}/${toDate}`;
+  const [revenueWeek, setRevenueWeekState] = useState(() => revenueWeekKey(new Date()));
+  const [revenueMonth, setRevenueMonthState] = useState(() => dateKey(new Date()).slice(0, 7));
+  const [revenueYear, setRevenueYearState] = useState(new Date().getFullYear());
+  const [customRevenueRange, setCustomRevenueRange] = useState<RevenueCustomRange | null>(null);
+  const [revenueEarnings, setRevenueEarnings] = useState<
+    ProviderEarningPoint[]
+  >([]);
+  const [monthlyRevenueEarnings, setMonthlyRevenueEarnings] = useState<
+    ProviderMonthlyEarningPoint[]
+  >([]);
+  const [isLoadingEarnings, setIsLoadingEarnings] = useState(true);
+  const [earningsError, setEarningsError] = useToastFeedback<string | null>(null, "error");
+  const revenueRange = getRevenueRange(
+    revenuePeriod,
+    revenueYear,
+    customRevenueRange,
+    revenueWeek,
+    revenueMonth,
+  );
+  const queryStart = dateKey(revenueRange.queryStart);
+  const queryEnd = dateKey(revenueRange.queryEnd);
 
   useEffect(() => {
     let cancelled = false;
 
     providerDashboardApi
-      .earnings(
-        fromDate,
-        toDate,
-      )
+      .earnings(queryStart, queryEnd)
       .then((result) => {
         if (!cancelled) {
-          setResult({ key, earnings: result.earningsByDay, error: null });
+          setRevenueEarnings(result.earningsByDay);
+          setMonthlyRevenueEarnings(result.earningsByMonth);
+          setEarningsError(null);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setResult({ key, earnings: [], error: "Không thể tải dữ liệu doanh thu." });
+          setEarningsError("Không thể tải dữ liệu doanh thu.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingEarnings(false);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [fromDate, toDate, key]);
+  }, [queryEnd, queryStart, setEarningsError]);
 
   const setRevenuePeriod = (period: RevenuePeriod) => {
+    if (period === "custom" && !customRevenueRange) return;
+    if (period === revenuePeriod) return;
     setRevenuePeriodState(period);
+    setIsLoadingEarnings(true);
+    setEarningsError(null);
   };
 
-  const current = result?.key === key ? result : null;
+  const setRevenueYear = (year: number) => {
+    if (year === revenueYear && revenuePeriod === "year") return;
+    setRevenueYearState(year);
+    setRevenuePeriodState("year");
+    setIsLoadingEarnings(true);
+    setEarningsError(null);
+  };
+
+  const setRevenueWeek = (week: string) => {
+    if (!week) return;
+    if (week === revenueWeek && revenuePeriod === "week") return;
+    setRevenueWeekState(week);
+    setRevenuePeriodState("week");
+    setIsLoadingEarnings(true);
+    setEarningsError(null);
+  };
+
+  const setRevenueMonth = (month: string) => {
+    if (!month) return;
+    if (month === revenueMonth && revenuePeriod === "month") return;
+    setRevenueMonthState(month);
+    setRevenuePeriodState("month");
+    setIsLoadingEarnings(true);
+    setEarningsError(null);
+  };
+
+  const applyCustomRevenueRange = (range: RevenueCustomRange) => {
+    if (
+      revenuePeriod === "custom"
+      && range.fromDate === customRevenueRange?.fromDate
+      && range.toDate === customRevenueRange?.toDate
+    ) return;
+    setCustomRevenueRange(range);
+    setRevenuePeriodState("custom");
+    setIsLoadingEarnings(true);
+    setEarningsError(null);
+  };
+
   const earningsByDay = new Map(
-    (current?.earnings ?? []).map((item) => [item.day, item.amount]),
+    revenueEarnings.map((item) => [item.day, item.amount]),
   );
-  const revenueChart = getRevenueChart(revenuePeriod, revenueRange.dates, earningsByDay);
+  const earningsByMonth = new Map(
+    monthlyRevenueEarnings.map((item) => [item.month, item.amount]),
+  );
+  const revenueChart = getRevenueChart(
+    revenuePeriod,
+    revenueRange.dates,
+    earningsByDay,
+    earningsByMonth,
+  );
   const revenueTotal = revenueChart.reduce(
     (total, item) => total + item.amount,
     0,
@@ -62,10 +133,16 @@ export function useProviderRevenue() {
   return {
     revenuePeriod,
     setRevenuePeriod,
-    revenueAnchor,
-    setRevenueAnchor,
-    isLoadingEarnings: !current,
-    earningsError: current?.error ?? null,
+    revenueWeek,
+    setRevenueWeek,
+    revenueMonth,
+    setRevenueMonth,
+    revenueYear,
+    setRevenueYear,
+    customRevenueRange,
+    applyCustomRevenueRange,
+    isLoadingEarnings,
+    earningsError,
     revenueRange,
     revenueChart,
     revenueTotal,

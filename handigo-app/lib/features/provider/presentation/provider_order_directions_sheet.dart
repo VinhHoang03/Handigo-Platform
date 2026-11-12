@@ -1,11 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../shared/widgets/route_map.dart';
 import '../../orders/domain/order_summary.dart';
 
 class ProviderDirections {
@@ -13,11 +12,18 @@ class ProviderDirections {
     required this.points,
     required this.distanceMeters,
     required this.durationSeconds,
+    this.origin,
+    this.destination,
   });
   final List<LatLng> points;
   final double distanceMeters, durationSeconds;
+  final LatLng? origin, destination;
 
-  factory ProviderDirections.fromJson(Map<String, dynamic> data) {
+  factory ProviderDirections.fromJson(
+    Map<String, dynamic> data, {
+    LatLng? origin,
+    LatLng? destination,
+  }) {
     final routes =
         (data['routes'] as List? ?? [])
             .whereType<Map>()
@@ -65,6 +71,8 @@ class ProviderDirections {
             .toList(),
         distanceMeters: (route['distance'] as num).toDouble(),
         durationSeconds: (route['duration'] as num).toDouble(),
+        origin: origin,
+        destination: destination,
       );
     }
     throw const ApiException('Chưa tìm được đường đến địa chỉ này.');
@@ -117,7 +125,11 @@ final providerOrderDirectionsProvider = FutureProvider.autoDispose
           'steps': false,
         },
       );
-      return ProviderDirections.fromJson(response.data ?? {});
+      return ProviderDirections.fromJson(
+        response.data ?? {},
+        origin: LatLng(position.latitude, position.longitude),
+        destination: LatLng(latitude, longitude),
+      );
     }, retry: (_, _) => null);
 
 class ProviderOrderDirectionsSheet extends ConsumerWidget {
@@ -178,72 +190,11 @@ class ProviderOrderDirectionsSheet extends ConsumerWidget {
                   Expanded(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: FlutterMap(
+                      child: RouteMap(
                         key: ValueKey(value),
-                        options: MapOptions(
-                          initialCenter: value.points.first,
-                          initialZoom: 14,
-                          initialCameraFit: value.points.toSet().length > 1
-                              ? CameraFit.bounds(
-                                  bounds: LatLngBounds.fromPoints(value.points),
-                                  padding: const EdgeInsets.all(40),
-                                )
-                              : null,
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.handigo.handigo_app',
-                          ),
-                          PolylineLayer(
-                            polylines: [
-                              Polyline(
-                                points: value.points,
-                                color: Theme.of(context).colorScheme.primary,
-                                strokeWidth: 5,
-                              ),
-                            ],
-                          ),
-                          MarkerLayer(
-                            markers: [
-                              Marker(
-                                point: value.points.first,
-                                child: const Tooltip(
-                                  message: 'Vị trí hiện tại của bạn',
-                                  child: Icon(
-                                    Icons.my_location,
-                                    size: 32,
-                                    color: Colors.blue,
-                                  ),
-                                ),
-                              ),
-                              Marker(
-                                point: value.points.last,
-                                child: const Tooltip(
-                                  message: 'Địa chỉ khách hàng',
-                                  child: Icon(
-                                    Icons.location_on,
-                                    size: 36,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          RichAttributionWidget(
-                            attributions: [
-                              TextSourceAttribution(
-                                'OpenStreetMap contributors',
-                                onTap: () => launchUrl(
-                                  Uri.parse(
-                                    'https://www.openstreetmap.org/copyright',
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                        points: value.points,
+                        origin: value.origin ?? value.points.first,
+                        destination: value.destination ?? value.points.last,
                       ),
                     ),
                   ),

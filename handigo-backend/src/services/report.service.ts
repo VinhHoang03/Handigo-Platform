@@ -410,6 +410,13 @@ export const reviewReport = async (
       throw new AppError("Báo cáo đã có bản ghi vi phạm, không thể đổi sang trạng thái khác", 400);
     }
     if (current.status === "cancelled") throw new AppError("Báo cáo đã hủy, không thể cập nhật", 400);
+    if (!automated && !assisted && ["confirmed", "rejected", "resolved"].includes(payload.status)) {
+      const { AdminAIAssessment } = await import("../ai/admin/admin-ai.models");
+      if (await AdminAIAssessment.exists({ feature: "complaint_summary", sourceType: "report", sourceId: reportId, preview: false,
+        "output.complaintResolution.workflow": { $ne: null } }).session(session)) {
+        throw new AppError("Hồ sơ đã sử dụng phương án AI. Vui lòng xác nhận công việc và quyết định qua phương án AI; phân tích lại nếu dữ liệu đã thay đổi.", 409);
+      }
+    }
     if (automated && (automated.complaintAction !== "intake" || payload.status !== "under_review" || current.status !== "pending" || current.createdViolationId || current.isCustomerNoShow)) throw new AppError("AI chỉ được tự tiếp nhận khiếu nại đang chờ; quyết định kết thúc cần Admin xác nhận.", 409);
     if (assisted && (current.isCustomerNoShow || current.createdViolationId || REPORT_TERMINAL_STATUSES.includes(current.status))) throw new AppError("Khiếu nại đã kết thúc hoặc thuộc quy trình xử lý riêng.", 409);
     current.status = payload.status;
@@ -422,6 +429,7 @@ export const reviewReport = async (
     current.resolutionNote = payload.resolutionNote ?? current.resolutionNote ?? null;
     await current.save({ session });
     if (automated?.afterWrite) await automated.afterWrite(session);
+    if (assisted?.afterWrite) await assisted.afterWrite(session);
   });
   return getAdminReportById(reportId);
 };
@@ -503,6 +511,7 @@ export const requestReportEvidence = async (adminId: string, reportId: string, r
     report.reviewedAt = new Date();
     await report.save({ session });
     if (automated?.afterWrite) await automated.afterWrite(session);
+    if (assisted?.afterWrite) await assisted.afterWrite(session);
   });
   return getAdminReportById(reportId);
 };

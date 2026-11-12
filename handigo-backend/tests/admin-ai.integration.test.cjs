@@ -30,7 +30,7 @@ async function fixture() {
   const customer = await User.create({ email: `user${sequence}@example.test`, fullName: 'Trần Văn Bình', role: 'CUSTOMER', status: 'active' });
   const category = await Category.create({ name: 'Gia dụng', slug: `gia-dung-${sequence}`, isActive: true });
   const catalog = await Service.create({ categoryId: category._id, name: 'Sửa điện dân dụng', slug: `sua-dien-${sequence}`, serviceType: 'variable_price', depositAmount: 50000, isActive: true });
-  const application = await ProviderApplication.create({ userId: customer._id, applicationType: 'initial', status: 'pending', description: 'Có kinh nghiệm sửa điện dân dụng nhiều năm', experienceYears: 3, serviceIds: [catalog._id], certificates: [] });
+  const application = await ProviderApplication.create({ userId: customer._id, applicationType: 'initial', status: 'pending', description: 'Có kinh nghiệm sửa điện dân dụng nhiều năm', experienceYears: 3, serviceIds: [catalog._id], certificates: [], identityDocument: { type: 'cccd', frontImageUrl: 'https://example.test/front.png', backImageUrl: 'https://example.test/back.png' } });
   return { admin, customer, category, catalog, application };
 }
 async function configure(feature, adminId, customPolicy = policy()) {
@@ -102,7 +102,10 @@ test('AI admin với MongoDB replica set cô lập, transaction thật và API t
   await clean();
   await t.test('Không bật tự duyệt khi nguồn xác minh danh tính bắt buộc chưa sẵn sàng', async () => {
     const f = await fixture();
-    await assert.rejects(service.changeConfig('provider_application', String(f.admin._id), 0, { enabled: true }), error => error.statusCode === 422);
+    const custom = policy();
+    custom.criteria.push({ code: 'independent_identity', kind: 'verified_identity', description: 'Xác minh danh tính độc lập', required: true, value: 0 });
+    const saved = await service.changeConfig('provider_application', String(f.admin._id), 0, { draft: custom });
+    await assert.rejects(service.changeConfig('provider_application', String(f.admin._id), saved.revision, { enabled: true }), error => error.statusCode === 422);
     assert.equal((await models.AdminAIConfig.findOne({ feature: 'provider_application' })).enabled, false);
   });
   await clean();
@@ -182,7 +185,7 @@ test('AI admin với MongoDB replica set cô lập, transaction thật và API t
       await configure('service_suggestion', f.admin._id);
       const job = await service.enqueueAssessment({ feature: 'service_suggestion', sourceType: 'service_suggestion', sourceId: String(suggestion._id), preview: false }, String(f.admin._id)); await service.processNextAssessment();
       const result = await models.AdminAIAssessment.findById(job._id);
-      assert.equal(result.status, scenario === 'approved' ? 'completed' : scenario === 'catalog_changed' ? 'manual' : 'manual', result.error);
+      assert.equal(result.status, scenario === 'approved' ? 'completed' : scenario === 'catalog_changed' ? 'stale' : 'manual', result.error);
       if (scenario === 'approved') { const created = await Service.findOne({ name: 'Sửa cửa gỗ tại nhà' }); assert(created); assert.equal(created.isActive, false); assert.equal((await ServiceSuggestion.findById(suggestion._id)).reviewedBy, null); }
       else assert.equal(await Service.countDocuments(), 1);
       assert.equal(await Category.countDocuments(), 1);
@@ -214,15 +217,15 @@ test('AI admin với MongoDB replica set cô lập, transaction thật và API t
     assert.equal((await SupportTicket.findById(ticket._id)).category, 'OTHER');
   });
   await clean();
-  await t.test('Quét tài nguyên mới bỏ qua hồ sơ tồn và đi qua nhiều trang cùng mốc thời gian', async () => {
+  await t.test('Quét cả hồ sơ tồn khi bật và đi qua nhiều trang cùng mốc thời gian', async () => {
     const f = await fixture();
     await ServiceSuggestion.create({ providerId: new mongoose.Types.ObjectId(), suggestionType: 'service', suggestedServiceName: 'Hồ sơ tồn', description: 'Mô tả dịch vụ tồn trước thời điểm bật' });
     await configure('service_suggestion', f.admin._id);
-    await service.scanAutomaticSources(); assert.equal(await models.AdminAIAssessment.countDocuments(), 0);
+    await service.scanAutomaticSources(); assert.equal(await models.AdminAIAssessment.countDocuments(), 1);
     const stamp = new Date(Date.now() + 10);
     await ServiceSuggestion.collection.insertMany(Array.from({ length: 35 }, (_, index) => ({ providerId: new mongoose.Types.ObjectId(), suggestionType: 'service', suggestedServiceName: `Dịch vụ ${index}`, description: 'Mô tả dịch vụ đủ dữ liệu để chạy phân tích', status: 'pending', isDeleted: false, createdAt: stamp, updatedAt: stamp })));
     await service.scanAutomaticSources(); await service.scanAutomaticSources(); await service.scanAutomaticSources();
-    assert.equal(await models.AdminAIAssessment.countDocuments(), 35);
+    assert.equal(await models.AdminAIAssessment.countDocuments(), 36);
   });
   await clean();
   await t.test('Khôi phục tác vụ sau khi lease của worker cũ hết hạn', async st => {
@@ -509,6 +512,121 @@ test('AI admin với MongoDB replica set cô lập, transaction thật và API t
     const job = await service.enqueueAssessment(input(f), String(f.admin._id));
     for (let i = 0; i < 3; i++) { await models.AdminAIAssessment.updateOne({ _id: job._id }, { nextAt: new Date(0) }); await service.processNextAssessment(); }
     const result = await models.AdminAIAssessment.findById(job._id); assert.equal(result.status, 'error'); assert.equal(result.attempts, 3); assert.equal(await Provider.countDocuments(), 0);
+  });
+  await clean();
+  for (const feature of ['provider_application', 'service_suggestion']) for (const preview of [false, true]) for (const changed of ['source', 'config']) {
+    await clean();
+    await t.test(`${feature}: ${preview ? 'chạy thử' : 'duyệt tay'} báo stale khi ${changed} đổi trong lúc AI chạy`, async st => {
+      const f = await fixture();
+      const cfg = await configure(feature, f.admin._id);
+      const source = feature === 'provider_application' ? f.application : await ServiceSuggestion.create({ providerId: new mongoose.Types.ObjectId(),
+        suggestionType: 'service', suggestedServiceName: 'Dịch vụ thử nghiệm', description: 'Mô tả đủ dài để kiểm tra nội dung đề xuất', categoryId: f.category._id });
+      mockAI(st, async output => {
+        output.checks[0].status = 'unknown';
+        if (changed === 'config') await service.changeConfig(feature, String(f.admin._id), cfg.revision, { enabled: false });
+        else await (feature === 'provider_application' ? ProviderApplication : ServiceSuggestion).updateOne({ _id: source._id }, { description: 'Nội dung đã đổi hoàn toàn trong lúc phân tích' });
+      });
+      const job = await service.enqueueAssessment({ feature, sourceType: feature, sourceId: String(source._id), preview }, String(f.admin._id));
+      await service.processNextAssessment();
+      assert.equal((await models.AdminAIAssessment.findById(job._id)).status, 'stale');
+      assert.equal(await Provider.countDocuments(), 0);
+    });
+  }
+  await clean();
+  await t.test('Hết hạn mức chờ tới ngày UTC tiếp theo, không mất lượt retry; hạn mức mới xử lý được hồ sơ tồn', async st => {
+    const f = await fixture(); mockAI(st);
+    await configure('provider_application', f.admin._id, { ...policy(), dailyCallLimit: 1 });
+    await service.reserveCall('provider_application', 1);
+    const job = await service.enqueueAssessment(input(f), String(f.admin._id));
+    await service.processNextAssessment();
+    const waiting = await models.AdminAIAssessment.findById(job._id);
+    const tomorrow = new Date(); tomorrow.setUTCHours(24, 0, 0, 0);
+    assert.equal(waiting.status, 'retry'); assert.equal(waiting.attempts, 0);
+    assert.equal(waiting.nextAt.getTime(), tomorrow.getTime());
+    assert.equal(await service.processNextAssessment(), false);
+    // Mô phỏng sang ngày mới: có bộ đếm quota mới và đã tới lịch xử lý.
+    await models.AdminAIQuota.deleteMany({});
+    await models.AdminAIAssessment.updateOne({ _id: job._id }, { nextAt: new Date(0) });
+    await service.processNextAssessment();
+    assert.equal((await models.AdminAIAssessment.findById(job._id)).outcome, 'auto_approved');
+  });
+  await clean();
+  await t.test('Tác vụ hết ba lượt lỗi được chạy lại nguyên tử, không reset một job đang chạy', async st => {
+    const f = await fixture(); await configure('provider_application', f.admin._id);
+    let failing = true;
+    mockAI(st, () => { if (failing) throw new AppError('Lỗi mô hình giả lập', 502); });
+    const job = await service.enqueueAssessment(input(f), String(f.admin._id));
+    for (let index = 0; index < 3; index++) {
+      await models.AdminAIAssessment.updateOne({ _id: job._id }, { nextAt: new Date(0) });
+      await service.processNextAssessment();
+    }
+    assert.equal((await models.AdminAIAssessment.findById(job._id)).status, 'error');
+    const restarted = await Promise.all([1, 2].map(() => service.enqueueAssessment(input(f), String(f.admin._id))));
+    assert.ok(restarted.every(item => String(item._id) === String(job._id) && item.status === 'queued'));
+    assert.equal((await models.AdminAIAssessment.findById(job._id)).attempts, 0);
+    failing = false;
+    await Promise.all([service.processNextAssessment(), service.processNextAssessment()]);
+    assert.equal((await models.AdminAIAssessment.findById(job._id)).outcome, 'auto_approved');
+    assert.equal(await Provider.countDocuments(), 1); assert.equal(await Notification.countDocuments(), 1);
+  });
+  await clean();
+  await t.test('Tác vụ lỗi cấu hình được chạy lại sau khi sửa kết nối, tác vụ running giữ nguyên lease', async st => {
+    const f = await fixture(); await configure('provider_application', f.admin._id); mockAI(st);
+    const job = await service.enqueueAssessment(input(f), String(f.admin._id));
+    await models.AdminAIAssessment.updateOne({ _id: job._id }, { status: 'error', attempts: 1, error: 'Lỗi kết nối cũ' });
+    const retry = await service.enqueueAssessment(input(f), String(f.admin._id));
+    assert.equal(retry.status, 'queued'); assert.equal(retry.error, null);
+    await models.AdminAIAssessment.updateOne({ _id: job._id }, { status: 'running', leaseToken: 'worker-dang-chay', attempts: 1 });
+    const running = await service.enqueueAssessment(input(f), String(f.admin._id));
+    assert.equal(running.status, 'running'); assert.equal(running.leaseToken, 'worker-dang-chay'); assert.equal(running.attempts, 1);
+  });
+  for (const status of ['confirmed', 'rejected', 'resolved']) {
+    await clean();
+    await t.test(`API báo cáo thường không đi vòng điều kiện AI để ${status}`, async st => {
+      const f = await complaintFixture(st, { workflow: { category: 'refund', tasks: [{ kind: 'refund', owner: 'admin',
+        instruction: 'Đối soát khoản hoàn trước khi kết thúc.', completionCondition: 'Có khoản hoàn được xác nhận.' }] } });
+      const reports = require('../src/services/report.service');
+      await assert.rejects(reports.reviewReport(String(f.admin._id), String(f.report._id), { status, resolutionNote: 'Ghi chú không thay thế đối soát.' }), error => error.statusCode === 409);
+      assert.equal((await Report.findById(f.report._id)).status, 'under_review');
+      assert.equal((await models.AdminAIAssessment.findById(f.job._id)).adminDecision, null);
+      const complaints = require('../src/services/complaint.service');
+      await assert.rejects(complaints.updateComplaintStatus(String(f.admin._id), String(f.report._id), { status: 'resolved', resolutionNote: 'Đóng qua API tương thích' }), error => error.statusCode === 409);
+    });
+  }
+  await clean();
+  await t.test('Quyết định trung gian tiếp tục dùng AI, giữ kiểm tra công việc và chỉ kết thúc một lần', async st => {
+    const f = await complaintFixture(st);
+    const { decideComplaint } = require('../src/ai/admin/admin-ai.complaint-decision');
+    const intermediate = { status: 'under_review', note: 'Admin tiếp nhận để đối chiếu công việc.', completedTasks: [] };
+    await decideComplaint(String(f.job._id), String(f.admin._id), intermediate);
+    await assert.rejects(decideComplaint(String(f.job._id), String(f.admin._id), intermediate), error => error.statusCode === 409);
+    await assert.rejects(decideComplaint(String(f.job._id), String(f.admin._id), { status: 'resolved', note: 'Chưa có kết quả từng việc.', completedTasks: [] }), error => error.statusCode === 422);
+    const final = { status: 'resolved', note: 'Đã đối chiếu đầy đủ và ghi nhận kết quả.', completedTasks: [{ index: 0, evidence: 'Đã kiểm tra đúng dữ kiện và ghi nhận kết quả.' }] };
+    await decideComplaint(String(f.job._id), String(f.admin._id), final);
+    await assert.rejects(decideComplaint(String(f.job._id), String(f.admin._id), final), error => error.statusCode === 409);
+    assert.equal((await Report.findById(f.report._id)).status, 'resolved');
+  });
+  await clean();
+  await t.test('Sau quyết định trung gian, giao dịch đổi vẫn bắt buộc phân tích lại', async st => {
+    const f = await complaintFixture(st);
+    const { decideComplaint } = require('../src/ai/admin/admin-ai.complaint-decision');
+    await decideComplaint(String(f.job._id), String(f.admin._id), { status: 'under_review', note: 'Admin tiếp nhận và kiểm tra.', completedTasks: [] });
+    await Report.updateOne({ _id: f.report._id }, { description: 'Người gửi bổ sung tình tiết mới.' });
+    await assert.rejects(decideComplaint(String(f.job._id), String(f.admin._id), { status: 'resolved', note: 'Đã kiểm tra nhưng nguồn vừa thay đổi.',
+      completedTasks: [{ index: 0, evidence: 'Kết quả xác minh cũ không còn phù hợp.' }] }), error => error.statusCode === 409);
+  });
+  await clean();
+  await t.test('Báo cáo không dùng AI hoặc chỉ chạy thử giữ được luồng thủ công', async st => {
+    const f = await complaintFixture(st, { preview: true });
+    await require('../src/services/report.service').reviewReport(String(f.admin._id), String(f.report._id), { status: 'resolved', resolutionNote: 'Admin đã tự xác minh và xử lý.' });
+    assert.equal((await Report.findById(f.report._id)).status, 'resolved');
+  });
+  await clean();
+  await t.test('Mô hình lỗi trước khi lập được phương án không khóa luồng xử lý thủ công', async st => {
+    const f = await complaintFixture(st, { preview: true });
+    await models.AdminAIAssessment.updateOne({ _id: f.job._id }, { preview: false, status: 'error', output: null });
+    await require('../src/services/report.service').reviewReport(String(f.admin._id), String(f.report._id), { status: 'resolved', resolutionNote: 'Admin đã tự xác minh và giải quyết.' });
+    assert.equal((await Report.findById(f.report._id)).status, 'resolved');
   });
   await clean();
   await t.test('API kiểm tra xác thực, quyền ADMIN, input sai và không nhận kết quả AI từ client', async () => {
