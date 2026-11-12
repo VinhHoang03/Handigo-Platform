@@ -6,6 +6,7 @@ export type WalletTransactionType =
   | "payment"
   | "refund"
   | "provider_earning"
+  | "provider_weekly_reward"
   | "platform_fee"
   | "withdraw"
   | "withdraw_rejected"
@@ -45,6 +46,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
         "payment",
         "refund",
         "provider_earning",
+        "provider_weekly_reward",
         "platform_fee",
         "withdraw",
         "withdraw_rejected",

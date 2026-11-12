@@ -30,6 +30,7 @@ const startServer = async () => {
       { startReassignmentMonitor, stopReassignmentMonitor },
       { startAgentOrderProgressMonitor, stopAgentOrderProgressMonitor },
       { startOrderRescheduleMonitor, stopOrderRescheduleMonitor },
+      { startProviderRewardsMonitor, stopProviderRewardsMonitor },
     ] = await Promise.all([
       import("./app"),
       import("./configs/db"),
@@ -39,6 +40,7 @@ const startServer = async () => {
       import("./services/orderReassignment.service"),
       import("./services/agentOrderProgress.service"),
       import("./services/orderReschedule.service"),
+      import("./services/providerRewards.service"),
     ]);
 
     await connectDB();
@@ -56,6 +58,7 @@ const startServer = async () => {
     startAgentOrderProgressMonitor();
     startOrderRescheduleMonitor();
     startTemporaryLockMonitor();
+    startProviderRewardsMonitor();
 
     server.listen(PORT, "0.0.0.0", () => {
       serverLogger.info("Máy chủ đang chạy.", { port: PORT });
@@ -84,6 +87,7 @@ const startServer = async () => {
 
       try {
         await stopAgentOrderProgressMonitor();
+        await stopProviderRewardsMonitor();
         server.closeIdleConnections();
         await new Promise<void>((resolve, reject) => {
           server.close((error) => {

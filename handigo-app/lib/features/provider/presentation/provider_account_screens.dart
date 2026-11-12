@@ -2262,6 +2262,7 @@ String _transactionType(String value) =>
       'payment': 'Thanh toán đơn hàng',
       'refund': 'Hoàn tiền',
       'provider_earning': 'Thu nhập dịch vụ sau phí',
+      'provider_weekly_reward': 'Tiền thưởng tuần',
       'platform_fee': 'Phí nền tảng',
       'withdraw': 'Rút tiền',
       'withdraw_rejected': 'Hoàn tiền rút bị từ chối',
