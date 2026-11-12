@@ -6,7 +6,6 @@ import '../../../app/providers/app_providers.dart';
 import '../../../app/routing/app_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/realtime_connection.dart';
-import '../../auth/domain/app_user.dart';
 import '../../orders/presentation/order_screens.dart';
 import '../domain/provider_models.dart';
 import 'provider_assignment_sound.dart';
@@ -33,8 +32,7 @@ class ProviderAssignmentGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     if (!auth.isAuthenticated ||
-        auth.user?.role != UserRole.provider ||
-        auth.user?.providerOnboardingStatus != 'APPROVED' ||
+        auth.user?.canAccessProvider != true ||
         ref.watch(providerUiPreviewProvider) != null) {
       return child;
     }

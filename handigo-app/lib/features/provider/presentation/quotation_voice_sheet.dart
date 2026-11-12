@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
 
 class QuotationVoiceSheet extends StatefulWidget {
   const QuotationVoiceSheet({super.key});
@@ -15,6 +16,22 @@ class _QuotationVoiceSheetState extends State<QuotationVoiceSheet> {
   bool _starting = false;
   String _prefix = '';
   String? _error;
+
+  void _onStatus(String status) {
+    if (mounted && ['done', 'notListening'].contains(status)) {
+      setState(() => _listening = false);
+    }
+  }
+
+  void _onError(SpeechRecognitionError error) {
+    if (!mounted) return;
+    setState(() {
+      _listening = false;
+      _error = error.errorMsg.toLowerCase().contains('language')
+          ? 'Thiết bị chưa nhận dạng được tiếng Việt. Hãy kiểm tra ngôn ngữ giọng nói hoặc nhập mô tả bên dưới.'
+          : 'Chưa nhận được giọng nói. Hãy thử lại hoặc nhập nội dung bên dưới.';
+    });
+  }
 
   @override
   void dispose() {
@@ -36,20 +53,8 @@ class _QuotationVoiceSheetState extends State<QuotationVoiceSheet> {
     });
     try {
       final available = await _speech.initialize(
-        onStatus: (status) {
-          if (mounted && ['done', 'notListening'].contains(status)) {
-            setState(() => _listening = false);
-          }
-        },
-        onError: (_) {
-          if (mounted) {
-            setState(() {
-              _listening = false;
-              _error =
-                  'Chưa nhận được giọng nói. Hãy thử lại hoặc nhập nội dung bên dưới.';
-            });
-          }
-        },
+        onStatus: _onStatus,
+        onError: _onError,
       );
       if (!mounted) return;
       if (!available) {
@@ -59,11 +64,15 @@ class _QuotationVoiceSheetState extends State<QuotationVoiceSheet> {
         );
         return;
       }
+      _speech.statusListener = _onStatus;
+      _speech.errorListener = _onError;
       _prefix = _text.text.trim();
       setState(() => _listening = true);
       await _speech.listen(
         listenOptions: SpeechListenOptions(
-          localeId: 'vi_VN',
+          localeId: 'vi-VN',
+          listenMode: ListenMode.dictation,
+          cancelOnError: true,
           listenFor: const Duration(seconds: 90),
         ),
         onResult: (result) {

@@ -153,6 +153,24 @@ const getWalletByProviderId = async (
   return { provider, wallet };
 };
 
+export async function creditProviderWeeklyReward(
+  userId: Types.ObjectId, amount: number, weekStart: string, session: ClientSession,
+) {
+  assertPositiveAmount(amount);
+  const wallet = await getWalletByUserId(userId, { createIfMissing: true, session });
+  const credited = await Wallet.findOneAndUpdate(
+    { _id: wallet._id, isDeleted: false },
+    { $inc: { balance: amount } },
+    { session, new: true, runValidators: true },
+  );
+  if (!credited) throw new WalletError("WALLET_NOT_FOUND", "Không tìm thấy ví", 404);
+  await createWalletTransaction({
+    walletId: credited._id, userId, type: "provider_weekly_reward", direction: "in",
+    amount, balanceAfter: credited.balance, transactionCodePrefix: "PROVIDER_WEEKLY_REWARD",
+    description: `Tiền thưởng tuần ${weekStart}`, metadata: { weekStart },
+  }, session);
+}
+
 const sumTransactions = async (
   userId: string | Types.ObjectId,
   type: WalletTransactionType,
