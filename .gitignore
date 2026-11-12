@@ -7,7 +7,12 @@ handigo-web/FRONTEND_WEB_INFO.md
 .agents/
 !.agents/
 !.agents/**
+# Cấu hình, skill, subagent và ngữ cảnh Claude Code chỉ dùng trên máy cá nhân, không đưa lên repo.
 .claude/
+CLAUDE.md
+CLAUDE.local.md
+**/CLAUDE.md
+**/CLAUDE.local.md
 .codex/
 !.codex/agents/
 !.codex/agents/**
