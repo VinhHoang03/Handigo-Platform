@@ -22,7 +22,10 @@ class _Tracker extends ProviderLocationService {
   bool failGps = false;
   int reads = 0;
   @override
-  Future<void> synchronize({required bool Function() shouldUpload}) async {
+  Future<void> synchronize({
+    required bool Function() shouldUpload,
+    bool useCachedPosition = false,
+  }) async {
     reads++;
     await Future<void>.delayed(Duration.zero);
     if (failGps) throw const ApiException('Hãy bật GPS để xem khoảng cách.');

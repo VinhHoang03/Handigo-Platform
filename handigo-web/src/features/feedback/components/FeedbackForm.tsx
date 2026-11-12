@@ -20,8 +20,7 @@ export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Prop
   const [comment, setComment] = useState(feedback?.comment || '');
   const [existingImages, setExistingImages] = useState<string[]>(feedback?.images || []);
   const [files, setFiles] = useState<File[]>([]);
-  const [message, setMessage] = useState('');
-  const reportError = (message: string) => { setMessage(message); addToast(message, "error"); };
+  const reportError = (message: string) => { addToast(message, "error"); };
   const previews = useMemo(
     () => files.map((file) => ({ file, url: URL.createObjectURL(file) })),
     [files],
@@ -43,8 +42,6 @@ export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Prop
     }
     if (selectedFiles.length > remaining) {
       reportError(`Bạn chỉ có thể chọn thêm tối đa ${remaining} ảnh.`);
-    } else {
-      setMessage('');
     }
     setFiles((current) => [...current, ...selectedFiles.slice(0, remaining)]);
   };
@@ -63,7 +60,6 @@ export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Prop
     try {
       await save({ orderId, rating, comment: comment.trim() || null, images: existingImages }, files);
       setFiles([]);
-      setMessage('');
       addToast(feedback ? 'Đã cập nhật đánh giá.' : 'Đã gửi đánh giá.', 'success');
     } catch (requestError) {
       reportError(requestError instanceof Error ? requestError.message : 'Không thể lưu đánh giá.');
@@ -143,7 +139,6 @@ export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Prop
         </div>
       </div>
 
-      {message && <p role="alert" className="rounded-2xl bg-primary/10 p-3 text-primary">{message}</p>}
       <div className={feedback && onCancel ? 'grid grid-cols-2 gap-2' : ''}>
         {feedback && onCancel && (
           <button type="button" disabled={saving} onClick={onCancel} className="btn-secondary min-w-0 px-3 text-sm">

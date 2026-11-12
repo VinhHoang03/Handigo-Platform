@@ -85,7 +85,10 @@ class _Tracker extends ProviderLocationService {
   bool fail = false;
   Completer<void>? pending;
   @override
-  Future<void> synchronize({required bool Function() shouldUpload}) async {
+  Future<void> synchronize({
+    required bool Function() shouldUpload,
+    bool useCachedPosition = false,
+  }) async {
     api.events.add('gps');
     if (fail) throw const ApiException('Vui lòng bật GPS.');
     await pending?.future;
