@@ -10,7 +10,7 @@ import {
 import type { DashboardNavItem, DashboardRole } from "./dashboard.types";
 import { ChevronLeft, ChevronsRight, HardHat, Home } from "lucide-react";
 import { NavPendingBadge } from "./NavPendingBadge";
-import { BrandMark } from "../BrandLogo";
+import { BrandLogoArtwork, BrandMark } from "../BrandLogo";
 
 interface DashboardSidebarProps {
   collapsed?: boolean;
@@ -69,17 +69,18 @@ export function DashboardSidebar({
           aria-label={`Handigo - ${subtitle}`}
           className={`flex min-h-12 items-center rounded-xl py-2 ${isCollapsed ? "w-full justify-center gap-0 px-0" : "gap-3 px-1"}`}
         >
-          {isProvider && (
+          {isCollapsed ? (
             <BrandMark className="shadow-[0_8px_18px_rgba(53,37,205,0.18)]" />
-          )}
-          <div className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none ${isCollapsed ? "max-w-0 -translate-x-2 opacity-0" : "max-w-44 translate-x-0 opacity-100 delay-100"}`}>
-              <h1 className="font-headline-md text-xl font-bold leading-none text-primary">
-                Handigo
+          ) : (
+            <div className="shrink-0">
+              <h1>
+                <BrandLogoArtwork className="h-11 w-40" />
               </h1>
-              <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-on-surface-variant">
+              <p className="mt-1 text-center text-[10px] font-medium uppercase tracking-[0.12em] text-on-surface-variant">
                 {subtitle}
               </p>
-          </div>
+            </div>
+          )}
         </Link>}
         {isAdmin && onToggle && (
           <button

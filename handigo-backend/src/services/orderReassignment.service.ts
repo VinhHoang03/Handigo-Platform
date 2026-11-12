@@ -6,7 +6,7 @@ import { AppError } from "../utils/appError";
 import { createLogger } from "../utils/logger";
 import { cancelOrderWithSettlement, cancelSystemOrderWithSettlement } from "./orderCancellation.service";
 import { createNotificationRecord } from "./notification.service";
-import { DispatchService, getMaxMatchingDurationSeconds } from "./dispatch.service";
+import { createMatchingSearch, DispatchService, getMaxMatchingDurationSeconds } from "./dispatch.service";
 import { emitToUser } from "../sockets/socketServer";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { hasProviderArrived } from "./refundPolicy.service";
@@ -14,9 +14,8 @@ import { hasProviderArrived } from "./refundPolicy.service";
 export type ReassignmentDecision = "accept" | "decline";
 
 const CUSTOMER_RESPONSE_TIMEOUT_MS = 15 * 60 * 1000;
-const REASSIGNMENT_SCAN_INTERVAL_MS = 10_000;
 const reassignmentLogger = createLogger("OrderReassignmentService");
-let reassignmentMonitor: NodeJS.Timeout | null = null;
+const reassignmentTimers = new Map<string, NodeJS.Timeout>();
 
 const requireObjectId = (value: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(value)) {
@@ -219,6 +218,17 @@ export const requestDirectProviderReassignment = async (
   );
   if (!order) return null;
 
+  const previous = reassignmentTimers.get(orderId);
+  if (previous) clearTimeout(previous);
+  const timer = setTimeout(() => {
+    reassignmentTimers.delete(orderId);
+    void expirePendingReassignments(orderId).catch((error: unknown) =>
+      reassignmentLogger.error("Không thể xử lý yêu cầu đổi thợ hết hạn.", error, { orderId }),
+    );
+  }, Math.max(reassignment.expiresAt.getTime() - Date.now(), 1));
+  reassignmentTimers.set(orderId, timer);
+  timer.unref();
+
   try {
     await createNotificationRecord({
       userId: order.customerId,
@@ -303,15 +313,18 @@ export const respondToProviderReassignment = async (
     });
   }
 
+  const matchingSearch = await createMatchingSearch(now);
   const matchingOrder = await Order.findOneAndUpdate(
     responseFilter,
     {
       $set: {
         "reassignment.status": "matching",
         "reassignment.respondedAt": now,
+        "reassignment.expiresAt": matchingSearch.expiresAt,
         bookingStatus: "not_required",
         readyForMatching: true,
         matchingStartedAt: null,
+        matchingSearch,
       },
     },
     { new: true, runValidators: true },
@@ -323,10 +336,12 @@ export const respondToProviderReassignment = async (
   return (await Order.findById(orderId)) || matchingOrder;
 };
 
-const expirePendingReassignments = async () => {
+export const expirePendingReassignments = async (orderId?: string | string[]) => {
   const now = new Date();
   const orders = await Order.find({
     status: "created",
+    isDeleted: false,
+    ...(orderId ? { _id: Array.isArray(orderId) ? { $in: orderId } : orderId } : {}),
     $or: [
       {
         "reassignment.status": "awaiting_customer",
@@ -336,15 +351,15 @@ const expirePendingReassignments = async () => {
     ],
   })
     .select("_id")
-    .limit(100)
     .lean();
 
+  let failed = 0;
   for (const order of orders) {
     const currentOrder = await Order.findById(order._id);
     if (!currentOrder || currentOrder.status !== "created") continue;
     const claimedOrder = currentOrder.reassignment?.status === "awaiting_customer"
       ? await Order.findOneAndUpdate(
-          { _id: order._id, status: "created", "reassignment.status": "awaiting_customer" },
+          { _id: order._id, status: "created", "reassignment.status": "awaiting_customer", "reassignment.expiresAt": { $lte: now } },
           { $set: { "reassignment.status": "expired", "reassignment.respondedAt": now } },
           { new: true, runValidators: true },
         )
@@ -355,30 +370,20 @@ const expirePendingReassignments = async () => {
       await cancelSystemOrderWithSettlement(
         claimedOrder._id.toString(),
         "Khách hàng không phản hồi yêu cầu tìm kỹ thuật viên khác trong thời hạn.",
+        "reassignment_timeout",
+        claimedOrder.updatedAt,
       );
     } catch (error) {
+      failed++;
       reassignmentLogger.error("Không thể hủy yêu cầu đổi kỹ thuật viên đã hết hạn.", error, {
         orderId: claimedOrder._id.toString(),
       });
     }
   }
-};
-
-export const startReassignmentMonitor = () => {
-  if (reassignmentMonitor) return;
-  expirePendingReassignments().catch((error: unknown) =>
-    reassignmentLogger.error("Không thể quét yêu cầu đổi kỹ thuật viên.", error),
-  );
-  reassignmentMonitor = setInterval(() => {
-    expirePendingReassignments().catch((error: unknown) =>
-      reassignmentLogger.error("Không thể quét yêu cầu đổi kỹ thuật viên.", error),
-    );
-  }, REASSIGNMENT_SCAN_INTERVAL_MS);
-  reassignmentMonitor.unref();
+  return failed;
 };
 
 export const stopReassignmentMonitor = () => {
-  if (!reassignmentMonitor) return;
-  clearInterval(reassignmentMonitor);
-  reassignmentMonitor = null;
+  for (const timer of reassignmentTimers.values()) clearTimeout(timer);
+  reassignmentTimers.clear();
 };

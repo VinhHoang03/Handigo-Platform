@@ -19,6 +19,7 @@ import 'package:handigo_app/features/orders/presentation/order_payment_panel.dar
 import 'package:handigo_app/features/orders/presentation/order_screens.dart';
 import 'package:handigo_app/features/orders/presentation/tracking_screen.dart';
 import 'package:handigo_app/shared/widgets/provider_avatar.dart';
+import 'package:handigo_app/shared/widgets/rating_stars.dart';
 import 'package:handigo_app/shared/widgets/service_images.dart';
 
 class _Api extends ApiClient {
@@ -339,6 +340,133 @@ void main() {
       expect(find.text('Voucher'), findsNothing);
     },
   );
+
+  testWidgets('Ảnh sự cố nằm dưới mô tả, cùng thẻ chi tiết đơn', (tester) async {
+    const description = 'Điều hòa bị hư và không còn làm lạnh.';
+    final order = OrderDetail.fromJson({
+      '_id': 'order',
+      'status': 'cancelled',
+      'problemDescription': description,
+      'customerAttachments': ['https://example.test/su-co.jpg'],
+      'completionEvidenceImages': ['https://example.test/nghiem-thu.jpg'],
+    });
+    await _show(
+      tester,
+      () => order,
+      size: const Size(320, 844),
+      scale: 2,
+    );
+    final section = find.byType(OrderProblemDescription);
+    await tester.scrollUntilVisible(section, 200);
+    final problemImage = find.descendant(
+      of: section,
+      matching: find.byType(Image),
+    );
+    expect(find.text('Mô tả đơn hàng'), findsOneWidget);
+    expect(find.text(description), findsOneWidget);
+    expect(problemImage, findsOneWidget);
+    expect(
+      tester.getTopLeft(problemImage).dy,
+      greaterThan(tester.getBottomLeft(find.text(description)).dy),
+    );
+    await tester.scrollUntilVisible(find.text('Ảnh nghiệm thu'), 150);
+    expect(
+      find.descendant(of: section, matching: find.text('Ảnh nghiệm thu')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Đơn hoàn thành chỉ hiển thị số tiền đã trả', (tester) async {
+    const approved = RepairQuotation(
+      id: 'quote',
+      status: 'approved',
+      customerConfirmed: true,
+      finalAmount: 500000,
+    );
+    final direct = RepairQuotation.fromJson({
+      '_id': 'quote-direct',
+      'status': 'saved',
+      'finalAmount': 460000,
+      'directPaymentConfirmedAt': '2026-10-23T09:00:00Z',
+      'directPaymentConfirmedAmount': 360000,
+    });
+    expect(direct.directPaymentConfirmedAmount, 360000);
+    for (final (status, inspection, quotation, expected) in [
+      ('paid', false, null, '220.000đ'),
+      ('unpaid', false, null, '0đ'),
+      ('partially_paid', true, approved, '100.000đ'),
+      ('paid', true, approved, '500.000đ'),
+      ('paid', true, direct, '460.000đ'),
+      ('paid', true, null, 'Chưa có dữ liệu'),
+    ]) {
+      final order = OrderDetail.fromJson({
+        '_id': 'completed-order',
+        'status': 'completed',
+        'paymentStatus': status,
+        'paymentMethod': 'wallet',
+        'inspectionRequired': inspection,
+        if (inspection) 'depositPaidAt': '2026-10-23T08:00:00Z',
+        'pricing': {
+          'baseAmount': inspection ? 120000 : 240000,
+          'totalPaidAmount': inspection ? 100000 : 220000,
+        },
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OrderPaymentSummary(order: order, quotation: quotation),
+          ),
+        ),
+      );
+      final paidLabel = find.text('Số tiền đã thanh toán');
+      expect(paidLabel, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.ancestor(of: paidLabel, matching: find.byType(Row)).first,
+          matching: find.text(expected),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Số tiền cần thanh toán'), findsNothing);
+    }
+  });
+
+  testWidgets('Năm sao cách đều và vẫn chọn được nửa sao', (tester) async {
+    double? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 256,
+              child: RatingStars(
+                value: 0,
+                onChanged: (value) => selected = value,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final stars = [
+      for (var index = 1; index <= 5; index++)
+        tester.getRect(find.byTooltip('$index sao')),
+    ];
+    final spacing = stars[1].center.dx - stars[0].center.dx;
+    for (var index = 2; index < stars.length; index++) {
+      expect(
+        stars[index].center.dx - stars[index - 1].center.dx,
+        closeTo(spacing, .01),
+      );
+    }
+    expect(
+      stars[2].center.dx,
+      closeTo(tester.getCenter(find.byType(RatingStars)).dx, .01),
+    );
+    await tester.tapAt(stars[3].centerLeft + const Offset(10, 0));
+    expect(selected, 3.5);
+  });
 
   testWidgets('Báo giá trừ cọc đã trả một lần và chỉ cho xem', (tester) async {
     final order = OrderDetail.fromJson({

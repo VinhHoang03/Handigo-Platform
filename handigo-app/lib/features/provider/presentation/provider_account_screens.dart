@@ -7,6 +7,7 @@ import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/handigo_logo.dart';
 import '../../../shared/widgets/account_overview_widgets.dart';
 import '../../account/domain/account_models.dart';
 import 'provider_screens.dart';
@@ -72,6 +73,7 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
           onPressed: () => showAboutDialog(
             context: context,
             applicationName: 'Handigo Đối tác',
+            applicationIcon: const HandigoLogo(height: 24),
           ),
           icon: const Icon(Icons.help_outline_rounded),
         ),

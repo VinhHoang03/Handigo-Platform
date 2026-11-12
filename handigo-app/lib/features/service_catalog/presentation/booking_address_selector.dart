@@ -40,11 +40,10 @@ class BookingAddressSelector extends ConsumerWidget {
     final changeButton = FilledButton(
       style: FilledButton.styleFrom(
         backgroundColor: theme.colorScheme.primary,
-        foregroundColor: Colors.white,
-        minimumSize: const Size(48, 32),
+        foregroundColor: theme.colorScheme.onPrimary,
+        minimumSize: const Size(48, 40),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         shape: const StadiumBorder(),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       onPressed: () => _selectAddress(context, ref, addressId),
       child: Text(selected == null ? 'Chọn địa chỉ' : 'Đổi'),
@@ -72,19 +71,16 @@ class BookingAddressSelector extends ConsumerWidget {
     final id = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         title: Row(
           children: [
             const Expanded(child: Text('Chọn địa chỉ')),
-            IconButton.filled(
-              tooltip: 'Thêm địa chỉ',
-              icon: const Icon(Icons.add),
-              onPressed: () {
-                addingAddress = true;
-                Navigator.of(context).pop();
-              },
+            IconButton(
+              tooltip: 'Đóng',
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ],
         ),
@@ -111,9 +107,16 @@ class BookingAddressSelector extends ConsumerWidget {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Đóng'),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              icon: const Icon(Icons.add_location_alt_outlined),
+              label: const Text('Thêm địa chỉ'),
+              onPressed: () {
+                addingAddress = true;
+                Navigator.of(context).pop();
+              },
+            ),
           ),
         ],
       ),

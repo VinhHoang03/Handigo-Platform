@@ -1,4 +1,5 @@
 import '../../../shared/utils/address_format.dart';
+import 'order_reschedule.dart';
 
 class OrderSummary {
   const OrderSummary({
@@ -244,6 +245,8 @@ class OrderDetail {
     this.arrivalProviderId,
     this.arrivedAt,
     this.customerNoShowStatus,
+    this.rescheduleEligibility,
+    this.latestRescheduleRequest,
   }) : _statusHistory = statusHistory;
 
   factory OrderDetail.fromJson(Map<String, dynamic> json) {
@@ -371,6 +374,14 @@ class OrderDetail {
       customerNoShowStatus: json['customerNoShow'] is Map
           ? json['customerNoShow']['status'] as String?
           : null,
+      rescheduleEligibility:
+          json['rescheduleEligibility'] is Map<String, dynamic>
+          ? OrderRescheduleEligibility.fromJson(json['rescheduleEligibility'])
+          : null,
+      latestRescheduleRequest:
+          json['latestRescheduleRequest'] is Map<String, dynamic>
+          ? OrderRescheduleRequest.fromJson(json['latestRescheduleRequest'])
+          : null,
     );
   }
 
@@ -414,6 +425,8 @@ class OrderDetail {
   final String? arrivalProviderId;
   final DateTime? arrivedAt;
   final String? customerNoShowStatus;
+  final OrderRescheduleEligibility? rescheduleEligibility;
+  final OrderRescheduleRequest? latestRescheduleRequest;
   bool get noShowBlocksWork =>
       customerNoShowStatus == 'pending' || customerNoShowStatus == 'approved';
   bool get hasArrived =>
@@ -544,6 +557,7 @@ class RepairQuotation {
     this.inspectionNote,
     this.recommendation,
     this.directPaymentConfirmedAt,
+    this.directPaymentConfirmedAmount,
     this.paidDeposit,
     this.remainingDirectPaymentAmount,
     this.customerConfirmed = false,
@@ -567,6 +581,8 @@ class RepairQuotation {
       inspectionNote: quotation['inspectionNote'] as String?,
       recommendation: quotation['recommendation'] as String?,
       directPaymentConfirmedAt: _date(quotation['directPaymentConfirmedAt']),
+      directPaymentConfirmedAmount:
+          (quotation['directPaymentConfirmedAmount'] as num?)?.toDouble(),
       paidDeposit: (quotation['paidDeposit'] as num?)?.toDouble(),
       remainingDirectPaymentAmount:
           (quotation['remainingDirectPaymentAmount'] as num?)?.toDouble(),
@@ -587,6 +603,7 @@ class RepairQuotation {
   final double discountAmount;
   final String? inspectionNote, recommendation;
   final DateTime? directPaymentConfirmedAt;
+  final double? directPaymentConfirmedAmount;
   final double? paidDeposit, remainingDirectPaymentAmount;
   final bool customerConfirmed;
   bool get usable =>

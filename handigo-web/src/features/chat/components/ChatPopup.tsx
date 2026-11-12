@@ -1,6 +1,7 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { isAxiosError } from 'axios';
 import { AsyncState } from '@/components/common/AsyncState';
 import { InitialsAvatar } from '@/components/common/InitialsAvatar';
 import { useAuthStore } from '@/features/auth/store/auth.store';
@@ -14,7 +15,7 @@ import { MessageComposer } from './MessageComposer';
 import { MessageThread } from './MessageThread';
 import { normalizeImageUrl } from '@/utils/imageUrl';
 import { useChatUiStore } from '../store/chatUi.store';
-import { activeOrderConversation, conversationGroupKey, conversationOrderLabel, sortOrderConversations } from '../utils/conversationGroups';
+import { activeOrderConversation, conversationGroupKey, sortOrderConversations } from '../utils/conversationGroups';
 import { MessageCircle, Minus, Wrench, X } from 'lucide-react';
 
 type ChatPopupProps = { orderId?: string; conversation?: Conversation; relatedConversations?: Conversation[]; open: boolean; onClose: () => void };
@@ -31,10 +32,28 @@ function ChatPopupContent({ orderId, conversation: initialConversation, relatedC
   const conversations = relatedConversations ?? loadedConversations;
   const groupKey = loadedConversations[0] ? conversationGroupKey(loadedConversations[0]) : null;
   const conversationKey = conversations.map((item) => item._id).sort().join(',');
-  const history = useChatMessages(open && conversationKey ? conversationKey : null);
-  const activeConversation = activeOrderConversation(conversations);
-  const conversationId = activeConversation?._id ?? null;
-  const reportConversationId = conversationId ?? sortOrderConversations(conversations).at(-1)?._id;
+  const threadId = activeOrderConversation(conversations)?._id ?? sortOrderConversations(conversations).at(-1)?._id;
+  const reportConversationId = threadId;
+  const [availability, setAvailability] = useState<{
+    threadId: string;
+    activeOrder?: { _id: string; orderCode: string } | null;
+  }>();
+  const availabilityRequest = useRef({ revision: 0 });
+  const currentAvailability = availability?.threadId === threadId ? availability : undefined;
+  const activeOrder = currentAvailability?.activeOrder;
+  const conversationId = activeOrder ? threadId : undefined;
+  const refreshAvailability = useCallback(async () => {
+    if (!open || !threadId) return;
+    const pending = availabilityRequest.current;
+    const request = ++pending.revision;
+    try {
+      const result = await chatApi.availability(threadId);
+      if (request === pending.revision) setAvailability({ threadId, activeOrder: result.activeOrder });
+    } catch {
+      if (request === pending.revision) setAvailability({ threadId });
+    }
+  }, [open, threadId]);
+  const history = useChatMessages(open && conversationKey ? conversationKey : null, refreshAvailability);
   const { messages, setMessages, addMessage, updateMessage, removeMessage } = history;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useToastFeedback<string>('', "error");
@@ -51,6 +70,26 @@ function ChatPopupContent({ orderId, conversation: initialConversation, relatedC
     registerOpenPopup();
     return unregisterOpenPopup;
   }, [open, registerOpenPopup, unregisterOpenPopup]);
+
+  useEffect(() => {
+    if (!open || !threadId) return;
+    const pending = availabilityRequest.current;
+    let active = true;
+    const refreshVisible = () => {
+      if (document.visibilityState === 'visible') void refreshAvailability();
+    };
+    window.addEventListener('focus', refreshVisible);
+    document.addEventListener('visibilitychange', refreshVisible);
+    const interval = window.setInterval(refreshVisible, 15000);
+    queueMicrotask(() => { if (active) void refreshAvailability(); });
+    return () => {
+      active = false;
+      pending.revision++;
+      window.removeEventListener('focus', refreshVisible);
+      document.removeEventListener('visibilitychange', refreshVisible);
+      window.clearInterval(interval);
+    };
+  }, [open, threadId, refreshAvailability]);
 
   useEffect(() => {
     if (!open) return;
@@ -127,20 +166,35 @@ function ChatPopupContent({ orderId, conversation: initialConversation, relatedC
 
   if (!open) return null;
 
+  const write = async (action: () => Promise<void>) => {
+    try {
+      await action();
+    } catch (error) {
+      if (threadId && isAxiosError(error) && error.response?.data?.code === 'CHAT_ORDER_INACTIVE') {
+        setAvailability({ threadId, activeOrder: null });
+        void refreshAvailability();
+      }
+      throw error;
+    }
+  };
+
   const send = async (content: string) => {
     if (!conversationId) return;
-    addMessage(await chatApi.send(conversationId, content));
+    await write(async () => addMessage(await chatApi.send(conversationId, content)));
   };
 
   const sendImage = async (file: File) => {
     if (!conversationId) return;
-    const imageUrl = normalizeImageUrl(await chatApi.uploadImage(file));
-    if (!imageUrl) throw new Error('URL ảnh không hợp lệ.');
-    addMessage(await chatApi.sendImage(conversationId, imageUrl));
+    await write(async () => {
+      const imageUrl = normalizeImageUrl(await chatApi.uploadImage(conversationId, file));
+      if (!imageUrl) throw new Error('URL ảnh không hợp lệ.');
+      addMessage(await chatApi.sendImage(conversationId, imageUrl));
+    });
   };
 
   const editMessage = async (messageId: string, content: string) => {
-    updateMessage(await chatApi.updateMessage(messageId, content));
+    if (!conversationId) return;
+    await write(async () => updateMessage(await chatApi.updateMessage(messageId, content)));
   };
 
   const deleteMessage = async (messageId: string) => {
@@ -219,10 +273,18 @@ function ChatPopupContent({ orderId, conversation: initialConversation, relatedC
       </header>
       {notice && <div className="bg-primary/10 px-4 py-2 text-xs text-primary">{notice}</div>}
       {history.error && messages.length > 0 && <div role="alert" className="px-4 py-2 text-sm text-error">{history.error}<button type="button" onClick={history.retry} disabled={history.loading} className="ml-2 font-semibold underline">Thử lại</button></div>}
-      <AsyncState loading={loading || (history.loading && !messages.length)} error={error || (!messages.length ? history.error : '')} onRetry={history.retry}><MessageThread messages={messages} conversations={conversations} currentUserId={currentUserId} onEdit={editMessage} onDelete={deleteMessage} hasMore={history.hasMore} loadingOlder={history.loading} onLoadOlder={() => void history.loadOlder()} /></AsyncState>
+      <AsyncState loading={loading || (history.loading && !messages.length)} error={error || (!messages.length ? history.error : '')} onRetry={history.retry}><MessageThread messages={messages} conversations={conversations} currentUserId={currentUserId} onEdit={conversationId ? editMessage : undefined} onDelete={deleteMessage} hasMore={history.hasMore} loadingOlder={history.loading} onLoadOlder={() => void history.loadOlder()} /></AsyncState>
       {!loading && !error && conversations.length > 0 && <>
-        {activeConversation && <p className="border-t border-outline-variant/30 px-4 py-2 text-xs text-on-surface-variant">Đang trao đổi: {conversationOrderLabel(activeConversation)}</p>}
-        {conversationId ? <MessageComposer key={conversationId} onSend={send} onSendImage={sendImage} /> : <p className="border-t border-outline-variant/30 px-4 py-3 text-sm text-on-surface-variant">Các đơn đã kết thúc. Tin nhắn được lưu tại đây; cuộc trò chuyện sẽ tiếp tục khi có đơn mới được thợ nhận.</p>}
+        {activeOrder && <p className="border-t border-outline-variant/30 px-4 py-2 text-xs text-on-surface-variant">Đang trao đổi về đơn {activeOrder.orderCode}</p>}
+        {conversationId ? <MessageComposer key={conversationId} onSend={send} onSendImage={sendImage} /> : (
+          <p className="border-t border-outline-variant/30 px-4 py-3 text-sm text-on-surface-variant">
+            {activeOrder === null
+              ? 'Chỉ có thể nhắn tin khi có đơn đã được thợ nhận hoặc đang thực hiện.'
+              : currentAvailability
+                ? 'Không thể xác minh quyền gửi tin nhắn. Hệ thống sẽ thử lại.'
+                : 'Đang xác minh quyền gửi tin nhắn.'}
+          </p>
+        )}
       </>}
       {reportOpen && <ChatReportDialog onClose={() => setReportOpen(false)} onSubmit={submitReport} />}
     </aside>,

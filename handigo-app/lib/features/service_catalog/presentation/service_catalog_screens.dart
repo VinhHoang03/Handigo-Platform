@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import '../../../shared/widgets/booking_details_summary.dart';
 import '../../../shared/widgets/app_search_field.dart';
 import '../../../shared/widgets/service_images.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -169,18 +172,10 @@ class _ServiceCatalogScreenState extends ConsumerState<ServiceCatalogScreen> {
             color: scheme.outlineVariant.withValues(alpha: .3),
           ),
         ),
-        title: Row(
-          children: [
-            Icon(Icons.handyman_outlined, color: scheme.primary, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              'Handigo',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+        title: const Text(
+          'Danh sách dịch vụ',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
           IconButton(
@@ -478,28 +473,36 @@ class _CategoryChips extends StatelessWidget {
   final String? selectedId;
   final ValueChanged<String?> onSelected;
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    child: Row(
-      children: [
-        _CatalogChip(
-          label: 'Tất cả',
-          selected: selectedId == null,
-          onPressed: () => onSelected(null),
-        ),
-        ...categories.map(
-          (category) => Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: _CatalogChip(
-              label: category.name,
-              selected: selectedId == category.id,
-              onPressed: () => onSelected(category.id),
+  Widget build(BuildContext context) {
+    final scrollBehavior = ScrollConfiguration.of(context);
+    return ScrollConfiguration(
+      behavior: scrollBehavior.copyWith(
+        dragDevices: {...scrollBehavior.dragDevices, PointerDeviceKind.mouse},
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _CatalogChip(
+              label: 'Tất cả',
+              selected: selectedId == null,
+              onPressed: () => onSelected(null),
             ),
-          ),
+            ...categories.map(
+              (category) => Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: _CatalogChip(
+                  label: category.name,
+                  selected: selectedId == category.id,
+                  onPressed: () => onSelected(category.id),
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _SortChips extends StatelessWidget {
@@ -944,6 +947,8 @@ void _openBooking(BuildContext context, WidgetRef ref, ServiceDetail detail) {
     useRootNavigator: true,
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
     constraints: BoxConstraints.tightFor(
       height: MediaQuery.sizeOf(context).height * .65,
     ),
@@ -1114,13 +1119,27 @@ class _ProcessStep extends StatelessWidget {
 }
 
 class BookingRouteScreen extends ConsumerWidget {
-  const BookingRouteScreen({required this.serviceId, super.key});
+  const BookingRouteScreen({
+    required this.serviceId,
+    this.rebooking,
+    super.key,
+  });
 
   final String serviceId;
+  final RebookingSession? rebooking;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(serviceDetailProvider(serviceId));
+    final session = rebooking;
+    if (session != null &&
+        ref.watch(authControllerProvider).user?.id != session.owner) {
+      return const Scaffold(
+        body: AppMessage(
+          message: 'Vui lòng đăng nhập lại để tiếp tục đặt dịch vụ.',
+        ),
+      );
+    }
     return detail.when(
       loading: () => const Scaffold(body: AppLoading()),
       error: (_, __) => Scaffold(
@@ -1129,15 +1148,53 @@ class BookingRouteScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(serviceDetailProvider(serviceId)),
         ),
       ),
-      data: (value) => BookingScreen(detail: value),
+      data: (value) => session == null
+          ? BookingScreen(detail: value)
+          : ProviderScope(
+              key: ValueKey((session.owner, session.orderId)),
+              overrides: [
+                bookingDraftProvider.overrideWith(
+                  () => BookingDraftController.rebooking(session),
+                ),
+              ],
+              child: BookingScreen(
+                detail: value,
+                rebookOrderCode: session.orderId,
+              ),
+            ),
     );
   }
 }
 
+final _rebookingPriceProvider = FutureProvider.autoDispose
+    .family<BookingPreview?, (String, BookingType, String, String?, int?)>((
+      ref,
+      input,
+    ) async {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!ref.mounted) return null;
+      return ref
+          .watch(serviceCatalogRepositoryProvider)
+          .preview(
+            serviceId: input.$1,
+            type: input.$2,
+            selectedOptions: (jsonDecode(input.$3) as List)
+                .cast<Map<String, dynamic>>(),
+            voucherCode: input.$4,
+            uniformQuantity: input.$5,
+          );
+    });
+
 class BookingScreen extends ConsumerStatefulWidget {
-  const BookingScreen({required this.detail, this.isSheet = false, super.key});
+  const BookingScreen({
+    required this.detail,
+    this.isSheet = false,
+    this.rebookOrderCode,
+    super.key,
+  });
   final ServiceDetail detail;
   final bool isSheet;
+  final String? rebookOrderCode;
   @override
   ConsumerState<BookingScreen> createState() => _BookingScreenState();
 }
@@ -1256,8 +1313,28 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   @override
   Widget build(BuildContext context) {
     final draft = ref.watch(bookingDraftProvider);
+    final livePrice =
+        _step == 0 &&
+            widget.rebookOrderCode != null &&
+            widget.detail.selectionError(draft.selectedOptionIds) == null
+        ? ref.watch(
+            _rebookingPriceProvider((
+              widget.detail.service.id,
+              draft.scheduledAt == null ? BookingType.scheduled : draft.type,
+              jsonEncode(_selectedOptions(draft)),
+              draft.voucherCode,
+              _uniformQuantity ? draft.uniformQuantity : null,
+            )),
+          )
+        : null;
+    final amount = livePrice?.asData?.value?.discountedAmount;
+    final modalSurface = widget.isSheet
+        ? Theme.of(context).colorScheme.surfaceContainerLowest
+        : null;
     return Scaffold(
+      backgroundColor: modalSurface,
       appBar: AppBar(
+        backgroundColor: modalSurface,
         title: Text(_step == 0 ? 'Đặt dịch vụ' : 'Xác nhận & Thanh toán'),
         leading: IconButton(
           tooltip: 'Quay lại',
@@ -1281,6 +1358,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   _BookingForm(
                     detail: widget.detail,
                     addresses: _addresses,
+                    requiresSchedule: widget.rebookOrderCode != null,
                     descriptionController: _descriptionController,
                     voucherController: _voucherController,
                     onAddAddress: _addAddress,
@@ -1376,7 +1454,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   : _payosOrderId != null
                   ? 'Xem chi tiết đơn hàng'
                   : _step == 0
-                  ? 'Tiếp tục'
+                  ? widget.rebookOrderCode == null
+                        ? 'Tiếp tục'
+                        : amount != null
+                        ? 'Thanh toán · ${_money(amount)}'
+                        : livePrice?.isLoading == true
+                        ? 'Đang tính giá…'
+                        : 'Thanh toán'
                   : _inspection
                   ? 'Thanh toán tiền cọc'
                   : draft.paymentMethod == PaymentMethod.cash
@@ -1416,6 +1500,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   String? _validateDraft(BookingDraft draft) {
+    if (widget.rebookOrderCode != null && draft.scheduledAt == null) {
+      return 'Vui lòng chọn ngày và giờ cho đơn đặt lại.';
+    }
     final timeError = bookingTimeError(draft, DateTime.now());
     if (timeError != null) return timeError;
     if (_inspection && draft.paymentMethod == PaymentMethod.cash)
@@ -1433,7 +1520,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       AppToast.show(context, selectionError, type: AppToastType.warning);
       return;
     }
-    if (draft.addressId == null) {
+    if (draft.addressId == null ||
+        (widget.rebookOrderCode != null &&
+            !_addresses.any((address) => address.id == draft.addressId))) {
       AppToast.show(
         context,
         'Vui lòng chọn địa chỉ thực hiện.',
@@ -1516,6 +1605,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   Future<void> _submitOrder() async {
     if (_busy) return;
+    final draftController = ref.read(bookingDraftProvider.notifier);
     final draft = ref.read(bookingDraftProvider);
     final validation = _validateDraft(draft);
     if (validation != null ||
@@ -1565,6 +1655,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         expectedFinalAmount: _preview!.discountedAmount,
       );
       _pendingOrderId = created.id;
+      await draftController.finishRebooking();
       await const PendingBookingStore().save(userId, created.id);
       final payment = await repository.createPayment(
         orderId: created.id,
@@ -1642,7 +1733,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: false,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1701,6 +1792,7 @@ class _BookingForm extends ConsumerWidget {
   const _BookingForm({
     required this.detail,
     required this.addresses,
+    required this.requiresSchedule,
     required this.descriptionController,
     required this.voucherController,
     required this.onAddAddress,
@@ -1708,6 +1800,7 @@ class _BookingForm extends ConsumerWidget {
   });
   final ServiceDetail detail;
   final List<Address> addresses;
+  final bool requiresSchedule;
   final TextEditingController descriptionController;
   final TextEditingController voucherController;
   final VoidCallback onAddAddress;
@@ -1744,8 +1837,10 @@ class _BookingForm extends ConsumerWidget {
           onAddAddress: onAddAddress,
         ),
         const SizedBox(height: 12),
-        const BookingProviderSelector(),
-        const SizedBox(height: 16),
+        if (!requiresSchedule) ...[
+          const BookingProviderSelector(),
+          const SizedBox(height: 16),
+        ],
         Text(
           'Thời gian thực hiện',
           style: theme.textTheme.titleMedium?.copyWith(
@@ -1754,11 +1849,15 @@ class _BookingForm extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 6),
-        const BookingScheduleButton(),
+        BookingScheduleButton(requiresSchedule: requiresSchedule),
         const SizedBox(height: 12),
         if (detail.options.isNotEmpty) ...[
           Text('Chọn gói dịch vụ', style: theme.textTheme.titleMedium),
           ServiceOptionSelector(detail: detail),
+          const SizedBox(height: 16),
+        ],
+        if (requiresSchedule) ...[
+          const BookingProviderSelector(),
           const SizedBox(height: 16),
         ],
         const Divider(height: 1),
@@ -1777,8 +1876,7 @@ class _BookingForm extends ConsumerWidget {
           controller: voucherController,
           inspectionRequired: detail.service.serviceType == 'variable_price',
         ),
-        const SizedBox(height: 8),
-        const SizedBox(height: 12),
+        const SizedBox(height: 20),
         _SectionLabel(
           title: 'Phương thức thanh toán',
           icon: Icons.payments_outlined,
@@ -1792,14 +1890,11 @@ class _BookingForm extends ConsumerWidget {
             .map(
               (method) => Card(
                 margin: const EdgeInsets.only(bottom: 6),
+                color: draft.paymentMethod == method
+                    ? theme.colorScheme.surfaceContainerLow
+                    : theme.colorScheme.surfaceContainerLowest,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(
-                    color: draft.paymentMethod == method
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outlineVariant,
-                    width: draft.paymentMethod == method ? 2 : 1,
-                  ),
                 ),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(14),

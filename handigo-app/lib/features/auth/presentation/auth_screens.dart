@@ -6,6 +6,7 @@ import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/handigo_logo.dart';
 import '../data/social_sign_in.dart';
 import 'otp_code_input.dart';
 
@@ -150,7 +151,10 @@ class AuthScaffold extends StatelessWidget {
   Widget _content(ThemeData theme) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      if (showBrand) ...[const _HandigoMark(), const SizedBox(height: 18)],
+      if (showBrand) ...[
+        const HandigoLogo(height: 52),
+        const SizedBox(height: 18),
+      ],
       Text(
         title,
         textAlign: TextAlign.center,
@@ -188,46 +192,6 @@ class _RoundIconButton extends StatelessWidget {
         shape: const CircleBorder(),
       ),
     ),
-  );
-}
-
-class _HandigoMark extends StatelessWidget {
-  const _HandigoMark();
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: AppTheme.primary,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x333525CD),
-              blurRadius: 10,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.handyman_rounded,
-          color: Colors.white,
-          size: 27,
-        ),
-      ),
-      const SizedBox(width: 10),
-      Text(
-        'Handigo',
-        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.5,
-        ),
-      ),
-    ],
   );
 }
 

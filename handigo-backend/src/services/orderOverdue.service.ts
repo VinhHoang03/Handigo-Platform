@@ -3,14 +3,16 @@ import { Order } from "../models/order.model";
 import { OrderStatus } from "../models/orderStatus.model";
 
 /** Đơn cũ thiếu mốc bắt đầu chỉ dùng lịch sử thực hiện, không lấy ngày tạo đơn. */
-export const findOverdueOrders = async (now: Date, overdueHours: number) => Order.aggregate<{
+export const findOverdueOrders = async (now: Date, overdueHours: number, orderIds?: string[]) => Order.aggregate<{
   _id: Types.ObjectId;
   orderCode: string;
   customerId: Types.ObjectId;
   providerId: Types.ObjectId;
   updatedAt: Date;
+  executionStartedAt: Date;
 }>([
-  { $match: { status: "in_progress", isDeleted: false, "overdueReview.escalatedAt": null } },
+  { $match: { ...(orderIds ? { _id: { $in: orderIds.map(id => new Types.ObjectId(id)) } } : {}),
+    status: "in_progress", isDeleted: false, "overdueReview.escalatedAt": null } },
   { $lookup: {
     from: OrderStatus.collection.name,
     let: { orderId: "$_id", startedAt: "$schedule.expectedStartAt" },
@@ -28,5 +30,5 @@ export const findOverdueOrders = async (now: Date, overdueHours: number) => Orde
   { $match: { executionStartedAt: { $type: "date", $lte: new Date(now.getTime() - overdueHours * 3600000) } } },
   { $sort: { executionStartedAt: 1, _id: 1 } },
   { $limit: 100 },
-  { $project: { _id: 1, orderCode: 1, customerId: 1, providerId: 1, updatedAt: 1 } },
+  { $project: { _id: 1, orderCode: 1, customerId: 1, providerId: 1, updatedAt: 1, executionStartedAt: 1 } },
 ]);

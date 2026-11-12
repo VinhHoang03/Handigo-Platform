@@ -4,7 +4,9 @@ import 'package:handigo_app/features/provider/presentation/provider_assignment_c
 import 'package:handigo_app/features/provider/domain/provider_income.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_directions_sheet.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
@@ -37,8 +39,33 @@ import 'package:handigo_app/features/provider/presentation/provider_order_detail
 import 'package:handigo_app/features/provider/presentation/quotation_editor_screen.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_feedback_panel.dart';
 import 'package:handigo_app/features/services/domain/service_category.dart';
+// ignore: depend_on_referenced_packages
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart'
+    as picker;
 
 final previewKey = GlobalKey();
+
+class _SupportImagePicker extends picker.ImagePickerPlatform {
+  int selectedCount = 0;
+
+  @override
+  Future<picker.XFile?> getImageFromSource({
+    required picker.ImageSource source,
+    picker.ImagePickerOptions options = const picker.ImagePickerOptions(),
+  }) async {
+    final bytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    );
+    final uniqueBytes = Uint8List(bytes.length + 1)..setAll(0, bytes);
+    uniqueBytes.last = ++selectedCount;
+    return picker.XFile.fromData(
+      uniqueBytes,
+      name: 'anh-$selectedCount.png',
+      mimeType: 'image/png',
+    );
+  }
+}
+
 const overview = ProviderOverview(
   walletBalance: 2450000,
   monthlyEarnings: 12500000,
@@ -214,12 +241,13 @@ Future<void> _showScreen(
   ProviderOverview currentOverview = overview,
   List<OrderSummary>? currentOrders,
   Future<void> Function()? syncLocation,
+  Dio? dio,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
-  final api = ApiClient(Dio(), CookieJar());
+  final api = ApiClient(dio ?? Dio(), CookieJar());
   addTearDown(api.close);
   final router = GoRouter(
     routes: [
@@ -291,6 +319,7 @@ Future<void> _showScreen(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (dio != null) apiClientProvider.overrideWithValue(api),
         providerAssignmentPositionProvider.overrideWith(
           (ref) async =>
               throw const ApiException('Bật GPS để xem khoảng cách.'),
@@ -957,7 +986,7 @@ Future<void> main() async {
       const ProviderDashboardScreen(),
       currentOrders: [orders[2], orders[3]],
     );
-    expect(find.text('Handigo'), findsOneWidget);
+    expect(find.bySemanticsLabel('Handigo'), findsOneWidget);
     expect(find.text('Đối tác Handigo'), findsNothing);
     await tester.scrollUntilVisible(
       find.text('Bảo dưỡng máy giặt'),
@@ -1007,7 +1036,91 @@ Future<void> main() async {
     expect(find.text('Loại hỗ trợ'), findsOneWidget);
     expect(find.text('Tiêu đề'), findsOneWidget);
     expect(find.text('Mô tả cần hỗ trợ'), findsOneWidget);
-    expect(find.textContaining('Thêm ảnh'), findsOneWidget);
+    expect(find.text('Thêm ảnh (0/10)'), findsOneWidget);
+    await tester.tap(find.text('Tài khoản'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(find.text('Hướng dẫn sử dụng'), findsOneWidget);
+    await savePreview(tester, 'support-category-menu');
+    await tester.tap(find.text('Thanh toán'));
+    await tester.pumpAndSettle();
+    expect(find.text('Đơn thanh toán liên quan'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Gửi yêu cầu hỗ trợ với đủ 10 ảnh', (tester) async {
+    final originalPicker = picker.ImagePickerPlatform.instance;
+    final imagePicker = _SupportImagePicker();
+    picker.ImagePickerPlatform.instance = imagePicker;
+    addTearDown(() => picker.ImagePickerPlatform.instance = originalPicker);
+    var uploaded = 0;
+    List<dynamic>? submittedAttachments;
+    final dio = Dio(BaseOptions(baseUrl: 'https://example.test'));
+    dio.interceptors.add(
+      InterceptorsWrapper(onRequest: (request, handler) {
+        if (request.path == '/orders/attachments') {
+          final multipart = request.data as FormData;
+          expect(multipart.fields, isEmpty);
+          expect(multipart.files.single.key, 'image');
+          final url = 'https://example.test/anh-${++uploaded}.png';
+          return handler.resolve(
+            Response<Map<String, dynamic>>(
+              requestOptions: request,
+              statusCode: 201,
+              data: {'data': {'url': url}},
+            ),
+          );
+        }
+        if (request.path == '/support-tickets' && request.method == 'POST') {
+          final body = request.data as Map<String, dynamic>;
+          submittedAttachments = body['attachments'] as List<dynamic>;
+          return handler.resolve(
+            Response<Map<String, dynamic>>(
+              requestOptions: request,
+              statusCode: 201,
+              data: {
+                'data': {'_id': 'ticket', 'subject': body['subject']},
+              },
+            ),
+          );
+        }
+        handler.next(request);
+      }),
+    );
+    await _showScreen(tester, const SupportScreen(), dio: dio);
+    await tester.tap(find.byTooltip('Tạo mới'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'Cần hỗ trợ tài khoản',
+    );
+    await tester.enterText(
+      find.byType(TextFormField).last,
+      'Tôi gửi ảnh mô tả lỗi tài khoản.',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+
+    final list = find.descendant(
+      of: find.byType(Form),
+      matching: find.byType(Scrollable),
+    ).first;
+    for (var count = 0; count < 10; count++) {
+      final add = find.text('Thêm ảnh ($count/10)');
+      await tester.scrollUntilVisible(add, 200, scrollable: list);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+    }
+    final full = find.ancestor(
+      of: find.text('Thêm ảnh (10/10)'),
+      matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
+    );
+    expect(tester.widget<OutlinedButton>(full).onPressed, isNull);
+    await tester.tap(find.text('Gửi yêu cầu hỗ trợ'));
+    await tester.pumpAndSettle();
+    expect(imagePicker.selectedCount, 10);
+    expect(uploaded, 10);
+    expect(submittedAttachments, hasLength(10));
     expect(tester.takeException(), isNull);
   });
 

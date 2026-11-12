@@ -233,8 +233,6 @@ class _ProviderOrderDetailScreenState
             ),
             if (order.status == 'completed')
               ProviderOrderFeedbackPanel(orderId: orderId),
-            if (order.customerAttachments.isNotEmpty)
-              _images('Ảnh sự cố', order.customerAttachments),
             if (order.completionEvidenceImages.isNotEmpty)
               _images('Ảnh nghiệm thu', order.completionEvidenceImages),
             if (order.completionNote != null) Text(order.completionNote!),

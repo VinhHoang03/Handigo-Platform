@@ -13,6 +13,7 @@ import type {
 import { EvidenceImagePicker } from "./EvidenceImagePicker";
 import { ReportExtraFields } from "./ReportExtraFields";
 import { SupportOrderPicker } from "./SupportOrderPicker";
+import { SupportResponseNotice } from "./SupportResponseNotice";
 import { TicketExtraFields } from "./TicketExtraFields";
 
 export type CreateCaseKind = "ticket" | "report";
@@ -139,6 +140,7 @@ export function CreateCaseModal({
   return (
     <Modal open={open} title={KIND_TITLES[kind]} onClose={onClose} size="lg" closeOnEsc={!busy} closeOnOverlayClick={!busy}>
       <form onSubmit={submit} className="space-y-5">
+        {kind === "ticket" && <SupportResponseNotice />}
         {kind === "ticket" && <TicketExtraFields category={category} disabled={busy}
           onCategoryChange={value => { setCategory(value); setOrderId(""); }} />}
         {kind === "ticket" && category === "PAYMENT" && <SupportOrderPicker orders={orders} value={orderId}

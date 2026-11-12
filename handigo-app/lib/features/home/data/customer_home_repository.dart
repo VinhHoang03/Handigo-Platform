@@ -14,7 +14,7 @@ class CustomerHomeRepository {
       _loadServices(),
       _loadUnreadCount(),
       _loadOptional(_loadVouchers),
-      _loadOptional(_loadNews),
+      _loadOptional(() async => (await loadNews()).take(4).toList()),
     ]);
     final unreadCount = results.length > 2 && results[2] is num
         ? (results[2] as num).toInt()
@@ -96,13 +96,12 @@ class CustomerHomeRepository {
         .toList();
   }
 
-  Future<List<HomeNewsArticle>> _loadNews() async {
+  Future<List<HomeNewsArticle>> loadNews() async {
     final response = await _api.request('/news');
     final items = response['data'] as List<dynamic>? ?? const [];
     return items
         .whereType<Map<String, dynamic>>()
         .map(HomeNewsArticle.fromJson)
-        .take(4)
         .toList();
   }
 

@@ -41,6 +41,62 @@ class OrderRepository {
     return OrderDetail.fromJson(response['data'] as Map<String, dynamic>);
   }
 
+  Future<bool> previewReschedule(String orderId, DateTime scheduledAt) async {
+    final response = await _api.request(
+      '/orders/$orderId/reschedule-preview',
+      method: 'POST',
+      data: {'scheduledAt': scheduledAt.toUtc().toIso8601String()},
+      authenticated: true,
+    );
+    return (response['data'] as Map<String, dynamic>)['approvalRequired']
+        as bool;
+  }
+
+  Future<void> requestReschedule(
+    OrderDetail order,
+    DateTime scheduledAt,
+    String reason,
+  ) async {
+    await _api.request(
+      '/orders/${order.id}/reschedule-requests',
+      method: 'POST',
+      data: {
+        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+        'reason': reason,
+        if (order.updatedAt != null)
+          'expectedOrderUpdatedAt': order.updatedAt!.toUtc().toIso8601String(),
+      },
+      authenticated: true,
+    );
+  }
+
+  Future<void> respondReschedule(
+    OrderDetail order,
+    String requestId, {
+    required bool accept,
+    String? reason,
+  }) async {
+    await _api.request(
+      '/orders/${order.id}/reschedule-requests/$requestId/respond',
+      method: 'PATCH',
+      data: {
+        'decision': accept ? 'accept' : 'reject',
+        'reason': ?reason,
+        if (order.updatedAt != null)
+          'expectedOrderUpdatedAt': order.updatedAt!.toUtc().toIso8601String(),
+      },
+      authenticated: true,
+    );
+  }
+
+  Future<void> withdrawReschedule(String orderId, String requestId) async {
+    await _api.request(
+      '/orders/$orderId/reschedule-requests/$requestId/cancel',
+      method: 'PATCH',
+      authenticated: true,
+    );
+  }
+
   Future<CancellationPreview> cancellationPreview(
     String id, {
     bool series = false,

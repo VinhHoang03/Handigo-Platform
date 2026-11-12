@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+import '../../features/booking/presentation/booking_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/domain/app_user.dart';
@@ -11,12 +13,14 @@ import '../../features/orders/presentation/tracking_screen.dart';
 import '../../features/notifications/presentation/notification_screens.dart';
 import '../../features/chat/presentation/chat_screens.dart';
 import '../../features/account/presentation/account_screens.dart';
+import '../../features/account/presentation/customer_withdrawals.dart';
 import '../../features/provider_onboarding/presentation/provider_onboarding_screens.dart';
 import '../../features/provider/presentation/provider_screens.dart';
 import '../../features/provider/presentation/provider_order_detail_screen.dart';
 import '../../features/provider/presentation/provider_account_screens.dart';
 import '../../features/provider/presentation/provider_income_screen.dart';
 import '../providers/app_providers.dart';
+import '../theme/app_theme.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authControllerProvider.notifier);
@@ -106,14 +110,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             : const ForgotPasswordScreen(),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (_, __, navigationShell) =>
-            CustomerShell(navigationShell: navigationShell),
+        builder: (context, _, navigationShell) => Theme(
+          data: AppTheme.customerModals(Theme.of(context)),
+          child: CustomerShell(navigationShell: navigationShell),
+        ),
         branches: [
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/customer',
                 builder: (_, __) => const CustomerHomeScreen(),
+              ),
+              GoRoute(
+                path: '/customer/news',
+                builder: (_, _) => const CustomerNewsScreen(),
               ),
               GoRoute(
                 path: '/customer/notifications',
@@ -141,6 +151,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: '/customer/bookings/new/:serviceId',
                 builder: (_, state) => BookingRouteScreen(
                   serviceId: state.pathParameters['serviceId']!,
+                  rebooking: state.extra is RebookingSession
+                      ? state.extra as RebookingSession
+                      : null,
                 ),
               ),
               GoRoute(
@@ -209,6 +222,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/customer/wallet',
                 builder: (_, __) => const WalletScreen(),
+              ),
+              GoRoute(
+                path: '/customer/wallet/withdrawals',
+                builder: (_, _) => const CustomerWithdrawalsScreen(),
+              ),
+              GoRoute(
+                path: '/customer/wallet/activity',
+                builder: (_, _) =>
+                    const CustomerPaymentHistoryScreen(walletActivity: true),
               ),
               GoRoute(
                 path: '/customer/wallet/history',

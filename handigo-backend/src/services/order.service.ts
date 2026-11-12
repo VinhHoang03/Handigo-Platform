@@ -18,6 +18,7 @@ import { AppError } from "../utils/appError";
 import { withTransactionRetry } from "../utils/transaction";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
+import { scheduleOrderDeadline } from "./orderDeadline.service";
 import { getOrderInterval, lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
 import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt, isWithinAppointmentHours } from "../utils/bookingPolicy";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
@@ -411,6 +412,8 @@ export const OrderService = {
 
 
     // 6. Persist order
+    const paymentDueAt = payload.paymentMethod === "cash" ? null
+      : new Date(Date.now() + (await getBookingPolicy()).paymentHoldMinutes * 60_000);
     const orderDates = orderType === "normal" ? [null] : occurrenceDates;
     const orderDocuments = orderDates.map((orderDate) => {
       const orderVoucher = voucherResult;
@@ -443,7 +446,7 @@ export const OrderService = {
       scheduledAt: orderDate,
       schedule: pricingSnapshot.schedule,
       bookingStatus: "not_required",
-      paymentDueAt: null,
+      paymentDueAt,
       status: "created",
       statusVersion: 1,
       paymentMethod: payload.paymentMethod,
@@ -510,6 +513,7 @@ export const OrderService = {
     }
     finally { await session.endSession(); }
     const order = createdOrders[0] as unknown as IOrder;
+    for (const created of createdOrders) scheduleOrderDeadline(created);
 
     return order;
   },
@@ -966,7 +970,7 @@ export const OrderService = {
     return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory, customerCancellationDeadline, ...rescheduleContext };
   },
 
-  async startOrder(orderId: string, providerUserId: string): Promise<IOrder> {
+  async startOrder(orderId: string, providerUserId: string, enableWorkConfirmation = false): Promise<IOrder> {
     const identity = await getProviderByUserId(providerUserId);
     const policy = await getBookingPolicy();
     const session = await mongoose.startSession();
@@ -998,12 +1002,14 @@ export const OrderService = {
           await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy, { checkWorkingCalendar: false });
         }
         order.status = "in_progress";
+        if (enableWorkConfirmation) order.workConfirmation = { nextAt: new Date(now.getTime() + 2 * 3_600_000) };
         provider.availabilityStatus = "busy";
         await provider.save({ session });
         await order.save({ session });
         return order;
       });
       if (!result) throw new AppError("Không thể bắt đầu đơn.", 409);
+      scheduleOrderDeadline(result);
       emitToUser(result.customerId.toString(), "order:updated", { orderId: result._id.toString() });
       emitToUser(providerUserId, "provider:availability", { availabilityStatus: "busy" });
       return result;
@@ -1072,10 +1078,10 @@ export const OrderService = {
     }
 
     const session = await mongoose.startSession();
-    let completedOrder: IOrder | null = null;
+    let completedOrder: IOrder | undefined;
 
     try {
-      await session.withTransaction(async () => {
+      completedOrder = await session.withTransaction(async () => {
         const transactionalOrder = await Order.findById(orderId).session(session);
         const transactionalProvider = await Provider.findById(provider._id).session(
           session,
@@ -1184,7 +1190,7 @@ export const OrderService = {
         transactionalProvider.availabilityStatus = "online";
         await transactionalProvider.save({ session });
 
-        completedOrder = transactionalOrder;
+        return transactionalOrder;
       });
     } finally {
       await session.endSession();
@@ -1193,6 +1199,8 @@ export const OrderService = {
     if (!completedOrder) {
       throw new AppError("Không thể hoàn tất đơn hàng.", 500);
     }
+    emitToUser(completedOrder.customerId.toString(), "order:updated", { orderId });
+    emitToUser(providerUserId, "order:updated", { orderId });
     emitToUser(providerUserId, "provider:availability", { availabilityStatus: "online" });
     return completedOrder;
   },

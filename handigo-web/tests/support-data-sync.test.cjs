@@ -266,6 +266,7 @@ function createFormFixture(role = 'CUSTOMER', kind = 'ticket') {
     '../api/caseManagement.api': { caseManagementApi: { createTicket: async payload => sent.push(payload), createReport: async payload => sent.push(payload) } },
     './EvidenceImagePicker': { EvidenceImagePicker: 'images' }, './ReportExtraFields': { ReportExtraFields: 'report-fields' },
     './TicketExtraFields': { TicketExtraFields: 'ticket-fields' }, './SupportOrderPicker': { SupportOrderPicker: 'orders' },
+    './SupportResponseNotice': { SupportResponseNotice: 'support-notice' },
   }).CreateCaseModal;
   return { sent, loads, render: () => h.render(() => component({ open: true, role, kind, onClose() {}, onCreated() {} })) };
 }
@@ -320,6 +321,7 @@ test('Form hỗ trợ có tiêu đề, không chọn ưu tiên; chỉ thanh toá
   for (const role of ['CUSTOMER', 'PROVIDER']) {
     const f = createFormFixture(role);
     let tree = f.render();
+    assert.equal(all(tree, node => node.type === 'support-notice').length, 1);
     assert.equal(all(tree, node => node.type === 'input').length, 1);
     await all(tree, node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
     assert.equal(f.sent.length, 0, 'Không gửi yêu cầu khi tiêu đề trống.');
@@ -338,6 +340,7 @@ test('Form hỗ trợ có tiêu đề, không chọn ưu tiên; chỉ thanh toá
     assert.equal(f.sent[1].orderId, undefined); assert.equal(f.sent[1].category, 'GUIDANCE');
   }
   const report = createFormFixture('CUSTOMER', 'report').render();
+  assert.equal(all(report, node => node.type === 'support-notice').length, 0);
   assert.equal(all(report, node => node.type === 'input').length, 1, 'Báo cáo vẫn giữ trường tiêu đề riêng.');
 });
 

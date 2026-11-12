@@ -39,7 +39,7 @@ import { getOrderOperationPolicy, getRefundPolicy } from "./systemConfig.service
 import { settleCustomerNoShow, CustomerNoShowReview } from "./customerNoShowSettlement.service";
 
 type CancellationRole = "customer" | "provider" | "admin";
-type SystemCancellationType = "payment_timeout" | "provider_unavailable";
+type SystemCancellationType = "payment_timeout" | "provider_unavailable" | "provider_late" | "work_confirmation_timeout" | "reassignment_timeout";
 
 export interface CancellationExpectation {
   paidAmount: number;
@@ -58,6 +58,7 @@ interface CancelOrderInput {
   reason: string;
   system?: boolean;
   systemCancellationType?: SystemCancellationType;
+  expectedUpdatedAt?: Date;
 }
 
 interface WalletRefundResult {
@@ -354,9 +355,10 @@ const refundWalletPayments = async (
   order: IOrder,
   reason: string,
   session: ClientSession,
+  refundSystemCancellation = false,
 ) => {
   const refunded: WalletRefundResult[] = [];
-  const refundQrToWallet = shouldRefundQrToWallet(order);
+  const refundQrToWallet = refundSystemCancellation || shouldRefundQrToWallet(order);
   const payments = await Payment.find({
     orderId: order._id,
     method: refundQrToWallet ? { $in: ["wallet", "payos"] } : "wallet",
@@ -465,7 +467,7 @@ const refundWalletPayments = async (
       paymentId: payment._id as Types.ObjectId,
       amount: refundAmount,
     });
-    if (payment.method === "payos" && isArrivalCancellationPolicy(order)) {
+    if (payment.method === "payos" && (refundSystemCancellation || isArrivalCancellationPolicy(order))) {
       await Refund.updateOne({ paymentId: payment._id }, { $setOnInsert: {
         orderId: order._id, customerId: payment.customerId, amount: refundAmount, reason,
         referenceId: "REFUND" + payment._id.toString(), sourceMethod: "payos",
@@ -1417,6 +1419,7 @@ const notifyCancellation = async (
   if (order.providerId) {
     const provider = await Provider.findById(order.providerId).select("userId");
     if (provider) {
+      emitToUser(provider.userId.toString(), "order:updated", { orderId: order._id.toString() });
       await createNotificationRecord({
         userId: provider.userId,
         type: "ORDER",
@@ -1480,6 +1483,19 @@ export const cancelOrdersWithSettlement = async (
 
         await assertCancellationAccess(order, input, session);
 
+        if (input.system && input.expectedUpdatedAt && (
+          order.updatedAt?.getTime() !== input.expectedUpdatedAt.getTime()
+          || (input.systemCancellationType === "payment_timeout" && (order.paymentStatus !== "unpaid" || order.paymentMethod === "cash"))
+          || (input.systemCancellationType === "provider_late" && (order.status !== "accepted" || order.arrival || order.customerNoShow))
+          || (input.systemCancellationType === "reassignment_timeout" && (order.status !== "created"
+            || !["declined", "expired"].includes(order.reassignment?.status ?? "")))
+          || (input.systemCancellationType === "work_confirmation_timeout" && (order.status !== "in_progress"
+            || !order.workConfirmation?.expiresAt || order.workConfirmation.expiresAt > new Date()))
+        )) {
+          results.push({ input, order, newlyCancelled: false, walletRefunds: [], skipped: true });
+          continue;
+        }
+
         // Thợ có thể vừa nhận đơn khi bộ quét hết hạn đang chạy.
         if (input.system && input.systemCancellationType === "provider_unavailable"
           && order.status !== "created") {
@@ -1497,7 +1513,9 @@ export const cancelOrdersWithSettlement = async (
           throw new AppError("Thợ đã bắt đầu làm việc, bạn không thể hủy đơn hàng.", 409);
         }
 
-        if (!CANCELLABLE_STATUSES.includes(order.status as any)) {
+        const missedWorkConfirmation = input.system && input.systemCancellationType === "work_confirmation_timeout"
+          && order.status === "in_progress";
+        if (!missedWorkConfirmation && !CANCELLABLE_STATUSES.includes(order.status as any)) {
           throw new AppError(
             'Không thể hủy đơn hàng ở trạng thái "' + order.status + '".',
             400,
@@ -1535,6 +1553,12 @@ export const cancelOrdersWithSettlement = async (
         session,
         input.system ? undefined : reason,
       );
+      if (missedWorkConfirmation) {
+        // Cửa sổ xác nhận hết hạn do hệ thống xử lý, hoàn toàn bộ số tiền thực thu.
+        Object.assign(refundPolicy, { canCancel: true, refundRate: 100, refundAmount: paidAmount,
+          cancellationFee: 0, providerCompensation: 0, providerCompensationRate: 0,
+          platformRetainedAmount: 0, policyReason: "Thợ không xác nhận đang làm việc đúng hạn." });
+      }
       if (!refundPolicy.canCancel) {
         throw new AppError(refundPolicy.policyReason, 409);
       }
@@ -1574,7 +1598,8 @@ export const cancelOrdersWithSettlement = async (
       }
 
       const replacementFailed = input.system && input.systemCancellationType === "provider_unavailable"
-        && order.reassignment?.automatic && order.reassignment.status === "matching";
+        && order.reassignment?.status === "matching";
+      const eligibleForReplacementVoucher = replacementFailed && order.reassignment?.automatic;
       const wasInProgress = order.status === "in_progress";
 
       const claimedOrder = await Order.findOneAndUpdate(
@@ -1587,6 +1612,7 @@ export const cancelOrdersWithSettlement = async (
             status: "cancelled",
             readyForMatching: false,
             cancellation,
+            ...(input.systemCancellationType === "payment_timeout" ? { bookingStatus: "expired" } : {}),
             ...(input.customerNoShowReview ? { customerNoShow: order.customerNoShow } : {}),
             ...(replacementFailed ? { "reassignment.status": "failed" } : {}),
           },
@@ -1602,7 +1628,7 @@ export const cancelOrdersWithSettlement = async (
         throw new AppError("Đơn hàng vừa được xử lý bởi yêu cầu khác.", 409);
       }
 
-      if (replacementFailed) {
+      if (eligibleForReplacementVoucher) {
         // Cấp mã trong cùng giao dịch hủy đơn, mã theo đơn ngăn cấp trùng khi thử lại.
         await Voucher.updateOne(
           { code: `HDREPLACE${claimedOrder._id.toString().toUpperCase()}` },
@@ -1678,6 +1704,7 @@ export const cancelOrdersWithSettlement = async (
           claimedOrder,
           reason,
           session,
+          Boolean(input.system && input.systemCancellationType && !eligibleForReplacementVoucher),
         );
         await compensateProviderPayments(claimedOrder, session);
 
@@ -1741,6 +1768,7 @@ export const cancelSystemOrderWithSettlement = async (
   orderId: string,
   reason: string,
   systemCancellationType?: SystemCancellationType,
+  expectedUpdatedAt?: Date,
 ) =>
   cancelOrderWithSettlement({
     orderId,
@@ -1748,6 +1776,7 @@ export const cancelSystemOrderWithSettlement = async (
     reason,
     system: true,
     systemCancellationType,
+    expectedUpdatedAt,
   });
 
 export const backfillLegacyPayosRefunds = async (limit = 500) => {
