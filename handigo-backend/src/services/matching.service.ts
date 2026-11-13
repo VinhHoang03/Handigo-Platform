@@ -14,6 +14,12 @@ import { getOnlineUserIds } from "../sockets/socketServer";
 
 const matchingLogger = createLogger("MatchingService");
 
+/**
+ * Thời gian tối đa từ lần cập nhật vị trí gần nhất để thợ còn được ghép đơn.
+ * App thợ gửi vị trí định kỳ 5 phút/lần, nên giữ thêm khoảng dư cho GPS chậm và mạng yếu.
+ */
+const PROVIDER_LOCATION_FRESHNESS_MS = 7 * 60_000;
+
 export interface ProviderCandidate {
   providerId: Types.ObjectId;
   userId: Types.ObjectId;
@@ -118,7 +124,7 @@ export const MatchingService = {
         ownerType: "provider",
         isActive: true,
         isDeleted: false,
-        ...(requireOnline && { lastUpdatedAt: { $gte: new Date(Date.now() - 120_000) } }),
+        ...(requireOnline && { lastUpdatedAt: { $gte: new Date(Date.now() - PROVIDER_LOCATION_FRESHNESS_MS) } }),
         userId: { $in: eligibleProviderUserIds },
         coordinates: {
           $nearSphere: {

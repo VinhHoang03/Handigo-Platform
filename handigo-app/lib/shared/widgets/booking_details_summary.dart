@@ -9,6 +9,7 @@ class BookingDetailsSummary extends StatelessWidget {
     this.placedAt,
     this.isPreview = false,
     this.compact = false,
+    this.showAddress = true,
     this.providerName,
     this.options = const [],
     this.quantity,
@@ -19,7 +20,7 @@ class BookingDetailsSummary extends StatelessWidget {
   final String address;
   final String? contact, providerName;
   final DateTime? scheduledAt, placedAt;
-  final bool isPreview, compact;
+  final bool isPreview, compact, showAddress;
   final List<({String name, int quantity})> options;
   final int? quantity;
   final String? serviceName;
@@ -117,7 +118,9 @@ class BookingDetailsSummary extends StatelessWidget {
               placedAt!,
             ),
         ],
-        if (compact)
+        if (!showAddress)
+          const SizedBox.shrink()
+        else if (compact)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(

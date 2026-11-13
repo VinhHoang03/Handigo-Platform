@@ -1106,7 +1106,7 @@ class _FinanceMoneyFormState extends ConsumerState<_FinanceMoneyForm> {
         body: Form(
           key: _form,
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             children: [
               if (_checkoutUrl == null) ...[
                 if (widget.withdrawal) ...[

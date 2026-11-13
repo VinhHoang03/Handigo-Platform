@@ -34,6 +34,18 @@ class MapSurface extends ConsumerWidget {
   }
 }
 
+const mapPrimaryTileUrl = String.fromEnvironment(
+  'MAP_TILE_URL',
+  defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+);
+
+// Truyền `--dart-define=MAP_TILE_FALLBACK_URL=` (rỗng) để tắt nguồn dự phòng.
+const mapFallbackTileUrl = String.fromEnvironment(
+  'MAP_TILE_FALLBACK_URL',
+  defaultValue:
+      'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+);
+
 class MapTiles extends StatefulWidget {
   const MapTiles({this.tileProvider, super.key});
   final TileProvider? tileProvider;
@@ -42,15 +54,22 @@ class MapTiles extends StatefulWidget {
 }
 
 class _MapTilesState extends State<MapTiles> {
-  static const tileUrl = String.fromEnvironment(
-    'MAP_TILE_URL',
-    defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  );
+  static const primaryTileUrl = mapPrimaryTileUrl;
+  static const fallbackTileUrl = mapFallbackTileUrl;
   bool failed = false;
   bool receivedTile = false, errorQueued = false, timedOut = false;
+  // Nguồn chính có thể bị chặn/chập chờn theo mạng (lỗi TLS, timeout), nên
+  // chuyển cả lớp sang nguồn dự phòng để bản đồ không bị trộn hai kiểu tile.
+  bool usingFallback = false;
   String? diagnostic;
   Timer? loadingTimer;
   int revision = 0;
+
+  String get tileUrl => usingFallback ? fallbackTileUrl : primaryTileUrl;
+  bool get canUseFallback =>
+      !usingFallback &&
+      fallbackTileUrl.isNotEmpty &&
+      fallbackTileUrl != primaryTileUrl;
 
   @override
   void initState() {
@@ -64,13 +83,32 @@ class _MapTilesState extends State<MapTiles> {
     timedOut = false;
     loadingTimer = Timer(const Duration(seconds: 12), () {
       if (mounted && !receivedTile) {
+        report('TILE_TIMEOUT');
+        if (canUseFallback) {
+          switchToFallback();
+          return;
+        }
         setState(() {
           failed = true;
           timedOut = true;
         });
-        report('TILE_TIMEOUT');
       }
     });
+  }
+
+  void switchToFallback() {
+    if (kDebugMode) {
+      final host = Uri.tryParse(fallbackTileUrl)?.host ?? 'nguồn không hợp lệ';
+      debugPrint('[Bản đồ nền] Chuyển sang nguồn dự phòng: $host');
+    }
+    setState(() {
+      usingFallback = true;
+      failed = false;
+      errorQueued = false;
+      diagnostic = null;
+      revision++;
+    });
+    watchLoading();
   }
 
   void report(String code) {
@@ -126,8 +164,14 @@ class _MapTilesState extends State<MapTiles> {
                   ? 'TILE_HTTP_${error.statusCode}'
                   : 'TILE_LOAD_FAILED',
             );
+            final fallback = canUseFallback;
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) setState(() => failed = true);
+              if (!mounted) return;
+              if (fallback) {
+                switchToFallback();
+              } else {
+                setState(() => failed = true);
+              }
             });
           }
         },
@@ -157,6 +201,8 @@ class _MapTilesState extends State<MapTiles> {
                 '${kDebugMode && diagnostic != null ? '\n$diagnostic' : ''}',
               ),
               onPressed: () => setState(() {
+                // Thử lại từ nguồn chính; lỗi tiếp sẽ tự chuyển dự phòng.
+                usingFallback = false;
                 failed = false;
                 errorQueued = false;
                 diagnostic = null;
@@ -177,11 +223,13 @@ Widget mapAttribution() => Align(
     child: InkWell(
       onTap: () =>
           launchUrl(Uri.parse('https://www.openstreetmap.org/copyright')),
-      child: const Padding(
-        padding: EdgeInsets.all(4),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
         child: Text(
-          '© OpenStreetMap contributors',
-          style: TextStyle(fontSize: 11, color: Colors.black87),
+          mapFallbackTileUrl.contains('cartocdn.com')
+              ? '© OpenStreetMap contributors © CARTO'
+              : '© OpenStreetMap contributors',
+          style: const TextStyle(fontSize: 11, color: Colors.black87),
         ),
       ),
     ),

@@ -1595,7 +1595,7 @@ class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: AppSearchField(
               maxLength: 100,
               hintText: 'Tìm đơn hàng',
@@ -1940,125 +1940,119 @@ class ProviderAccountScreen extends ConsumerWidget {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-              children: [
-                AccountProfileSummaryCard(
-                  name: user?.fullName ?? 'Đối tác Handigo',
-                  contact: user?.email ?? 'Chưa cập nhật email',
-                  avatarUrl: user?.avatar,
-                  onEdit: () => context.push('/provider/personal-info'),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          children: [
+            AccountProfileSummaryCard(
+              name: user?.fullName ?? 'Đối tác Handigo',
+              contact: user?.email ?? 'Chưa cập nhật email',
+              avatarUrl: user?.avatar,
+              onEdit: () => context.push('/provider/personal-info'),
+            ),
+            const SizedBox(height: 24),
+            AccountSection(
+              title: 'Hồ sơ đối tác',
+              items: [
+                AccountMenuItem(
+                  label: 'Xác thực tài khoản',
+                  subtitle: 'Email, điện thoại và giấy tờ tùy thân',
+                  iconAsset: '$accountIconPath/shield.svg',
+                  onTap: () => context.push('/provider/verification'),
                 ),
-                const SizedBox(height: 24),
-                AccountSection(
-                  title: 'Hồ sơ đối tác',
-                  items: [
-                    AccountMenuItem(
-                      label: 'Xác thực tài khoản',
-                      subtitle: 'Email, điện thoại và giấy tờ tùy thân',
-                      iconAsset: '$accountIconPath/shield.svg',
-                      onTap: () => context.push('/provider/verification'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Thông tin nghề nghiệp',
-                      subtitle: 'Chuyên môn, dịch vụ và chứng chỉ',
-                      iconAsset: '$accountIconPath/file.svg',
-                      onTap: () => context.push('/provider/professional-info'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Đánh giá khách hàng',
-                      subtitle: 'Theo dõi chất lượng dịch vụ của bạn',
-                      iconAsset: '$accountIconPath/star.svg',
-                      onTap: () => context.push('/provider/feedback'),
-                    ),
-                  ],
+                AccountMenuItem(
+                  label: 'Thông tin nghề nghiệp',
+                  subtitle: 'Chuyên môn, dịch vụ và chứng chỉ',
+                  iconAsset: '$accountIconPath/file.svg',
+                  onTap: () => context.push('/provider/professional-info'),
                 ),
-                const SizedBox(height: 24),
-                AccountSection(
-                  title: 'Cài đặt ứng dụng',
-                  items: [
-                    AccountMenuItem(
-                      label: 'Thông báo & nhắc lịch',
-                      subtitle: 'Lịch hẹn, tin nhắn và cập nhật dịch vụ',
-                      iconAsset: '$accountIconPath/bell.svg',
-                      onTap: () => context.push('/provider/notifications'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Ngôn ngữ',
-                      subtitle: 'Tiếng Việt',
-                      iconAsset: '$accountIconPath/globe.svg',
-                      comingSoon: true,
-                    ),
-                    AccountMenuItem(
-                      label: 'Bảo mật & đăng nhập',
-                      subtitle: 'Mật khẩu, Face ID và vân tay',
-                      iconAsset: '$accountIconPath/shield.svg',
-                      onTap: () => context.push('/provider/settings'),
-                    ),
-                    const AccountMenuItem(
-                      label: 'Giao diện',
-                      subtitle: 'Sáng · Theo cài đặt thiết bị',
-                      iconAsset: '$accountIconPath/moon.svg',
-                      comingSoon: true,
-                    ),
-                  ],
+                AccountMenuItem(
+                  label: 'Đánh giá khách hàng',
+                  subtitle: 'Theo dõi chất lượng dịch vụ của bạn',
+                  iconAsset: '$accountIconPath/star.svg',
+                  onTap: () => context.push('/provider/feedback'),
                 ),
-                const SizedBox(height: 24),
-                AccountSection(
-                  title: 'Hỗ trợ & báo cáo',
-                  items: [
-                    AccountMenuItem(
-                      label: 'Trung tâm hỗ trợ',
-                      subtitle: 'Gửi và theo dõi yêu cầu hỗ trợ',
-                      iconAsset: '$accountIconPath/help.svg',
-                      onTap: () => context.push('/provider/support'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Báo cáo sự cố',
-                      subtitle: 'Phản ánh vấn đề trong quá trình làm việc',
-                      iconAsset: '$accountIconPath/chat.svg',
-                      onTap: () => context.push('/provider/reports'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Đề xuất dịch vụ',
-                      subtitle: 'Gửi ý tưởng dịch vụ mới cho Handigo',
-                      iconAsset: '$accountIconPath/gift.svg',
-                      onTap: () =>
-                          context.push('/provider/service-suggestions'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Điều khoản & quyền riêng tư',
-                      subtitle: 'Cách Handigo bảo vệ dữ liệu của bạn',
-                      iconAsset: '$accountIconPath/file.svg',
-                      onTap: () => context.push('/provider/settings'),
-                    ),
-                    AccountMenuItem(
-                      label: 'Đánh giá Handigo',
-                      subtitle: 'Chia sẻ trải nghiệm của bạn',
-                      iconAsset: '$accountIconPath/star.svg',
-                      onTap: () => context.push('/provider/app-feedback'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                AccountLogoutButton(
-                  onPressed: () async {
-                    final confirmed = await showAccountLogoutConfirmation(
-                      context,
-                      userName: user?.fullName ?? 'Đối tác Handigo',
-                    );
-                    if (confirmed) {
-                      await ref.read(authControllerProvider).logout();
-                    }
-                  },
-                ),
-                const AccountVersionFooter(),
               ],
             ),
-          ),
+            const SizedBox(height: 24),
+            AccountSection(
+              title: 'Cài đặt ứng dụng',
+              items: [
+                AccountMenuItem(
+                  label: 'Thông báo & nhắc lịch',
+                  subtitle: 'Lịch hẹn, tin nhắn và cập nhật dịch vụ',
+                  iconAsset: '$accountIconPath/bell.svg',
+                  onTap: () => context.push('/provider/notifications'),
+                ),
+                AccountMenuItem(
+                  label: 'Ngôn ngữ',
+                  subtitle: 'Tiếng Việt',
+                  iconAsset: '$accountIconPath/globe.svg',
+                  comingSoon: true,
+                ),
+                AccountMenuItem(
+                  label: 'Bảo mật & đăng nhập',
+                  subtitle: 'Mật khẩu, Face ID và vân tay',
+                  iconAsset: '$accountIconPath/shield.svg',
+                  onTap: () => context.push('/provider/settings'),
+                ),
+                const AccountMenuItem(
+                  label: 'Giao diện',
+                  subtitle: 'Sáng · Theo cài đặt thiết bị',
+                  iconAsset: '$accountIconPath/moon.svg',
+                  comingSoon: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            AccountSection(
+              title: 'Hỗ trợ & báo cáo',
+              items: [
+                AccountMenuItem(
+                  label: 'Trung tâm hỗ trợ',
+                  subtitle: 'Gửi và theo dõi yêu cầu hỗ trợ',
+                  iconAsset: '$accountIconPath/help.svg',
+                  onTap: () => context.push('/provider/support'),
+                ),
+                AccountMenuItem(
+                  label: 'Báo cáo sự cố',
+                  subtitle: 'Phản ánh vấn đề trong quá trình làm việc',
+                  iconAsset: '$accountIconPath/chat.svg',
+                  onTap: () => context.push('/provider/reports'),
+                ),
+                AccountMenuItem(
+                  label: 'Đề xuất dịch vụ',
+                  subtitle: 'Gửi ý tưởng dịch vụ mới cho Handigo',
+                  iconAsset: '$accountIconPath/gift.svg',
+                  onTap: () => context.push('/provider/service-suggestions'),
+                ),
+                AccountMenuItem(
+                  label: 'Điều khoản & quyền riêng tư',
+                  subtitle: 'Cách Handigo bảo vệ dữ liệu của bạn',
+                  iconAsset: '$accountIconPath/file.svg',
+                  onTap: () => context.push('/provider/settings'),
+                ),
+                AccountMenuItem(
+                  label: 'Đánh giá Handigo',
+                  subtitle: 'Chia sẻ trải nghiệm của bạn',
+                  iconAsset: '$accountIconPath/star.svg',
+                  onTap: () => context.push('/provider/app-feedback'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            AccountLogoutButton(
+              onPressed: () async {
+                final confirmed = await showAccountLogoutConfirmation(
+                  context,
+                  userName: user?.fullName ?? 'Đối tác Handigo',
+                );
+                if (confirmed) {
+                  await ref.read(authControllerProvider).logout();
+                }
+              },
+            ),
+            const AccountVersionFooter(),
+          ],
         ),
       ),
     );
