@@ -125,7 +125,7 @@ void main() {
     expect(find.text('Đổi'), findsOneWidget);
     final next = find.widgetWithText(
       FilledButton,
-      'Sang thanh toán · 270.000đ',
+      'Thanh toán · 270.000đ',
     );
     expect(next, findsOneWidget);
     await tester.tap(next);

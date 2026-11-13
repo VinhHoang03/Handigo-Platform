@@ -101,6 +101,7 @@ class OrderDetailOverview extends StatelessWidget {
               scheduledAt: order.scheduledAt,
               placedAt: order.createdAt,
               compact: true,
+              showAddress: !providerView,
             ),
             if (!providerView && contactName?.isNotEmpty == true) ...[
               const SizedBox(height: 12),

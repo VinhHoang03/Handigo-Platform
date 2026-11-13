@@ -147,24 +147,19 @@ class AccountDetailScaffold extends StatelessWidget {
       ),
       body: SafeArea(
         top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Theme(
-              data: theme.copyWith(
-                cardTheme: CardThemeData(
-                  color: accountSurface,
-                  surfaceTintColor: Colors.transparent,
-                  elevation: 0,
-                  margin: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
+        child: Theme(
+          data: theme.copyWith(
+            cardTheme: CardThemeData(
+              color: accountSurface,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              margin: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
               ),
-              child: child,
             ),
           ),
+          child: child,
         ),
       ),
       bottomNavigationBar: bottomNavigationBar,
