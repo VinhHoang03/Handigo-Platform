@@ -10,11 +10,24 @@ const getTransporter = () => {
 
   return nodemailer.createTransport({
     service: "gmail",
+    connectionTimeout: 30_000,
+    greetingTimeout: 30_000,
+    socketTimeout: 60_000,
     auth: {
       user,
       pass,
     },
   });
+};
+
+export const sendNotificationEmail = async (message: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  messageId: string;
+}): Promise<void> => {
+  await getTransporter().sendMail({ ...message, from: process.env.EMAIL_USER });
 };
 
 export const sendOtpEmail = async (

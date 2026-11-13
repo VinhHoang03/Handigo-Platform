@@ -7,7 +7,12 @@ handigo-web/FRONTEND_WEB_INFO.md
 .agents/
 !.agents/
 !.agents/**
+# Cấu hình, skill, subagent và ngữ cảnh Claude Code chỉ dùng trên máy cá nhân, không đưa lên repo.
 .claude/
+CLAUDE.md
+CLAUDE.local.md
+**/CLAUDE.md
+**/CLAUDE.local.md
 .codex/
 !.codex/agents/
 !.codex/agents/**
@@ -80,6 +85,14 @@ GRAPH_REPORT.md
 # Local development files
 *.local
 *.tmp
+
+# Skill Impeccable và ngữ cảnh thiết kế chỉ dùng trên máy cá nhân.
+/.agents/skills/impeccable/
+.impeccable/
+/PRODUCT.md
+/handigo-web/DESIGN.md
+/handigo-app/PRODUCT.md
+/handigo-app/DESIGN.md
 
 # IDE và editor directories
 .vscode/*

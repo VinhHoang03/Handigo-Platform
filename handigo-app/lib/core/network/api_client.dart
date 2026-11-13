@@ -131,6 +131,53 @@ class ApiClient {
     }
   }
 
+  Future<Uint8List> paymentQr(String paymentId) =>
+      _payosQr('/payments/${Uri.encodeComponent(paymentId)}/qr');
+
+  Future<Uint8List> walletDepositQr(String orderCode) =>
+      _payosQr('/wallets/me/deposit/${Uri.encodeComponent(orderCode)}/qr');
+
+  Future<Uint8List> _payosQr(String path) async {
+    if (_loggingOut) {
+      throw const ApiException('Phiên làm việc đã kết thúc.', statusCode: 401);
+    }
+    final sentToken = _token;
+    Future<Uint8List> send() async {
+      final response = await _dio.get<List<int>>(
+        path,
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {if (_token != null) 'Authorization': 'Bearer $_token'},
+        ),
+      );
+      return Uint8List.fromList(response.data!);
+    }
+
+    try {
+      return await send();
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 401) {
+        throw ApiException.fromDio(error);
+      }
+      if (_token == sentToken) await refresh();
+      if (_loggingOut || _token == null) {
+        throw const ApiException(
+          'Phiên làm việc đã kết thúc.',
+          statusCode: 401,
+        );
+      }
+      try {
+        return await send();
+      } on DioException catch (retryError) {
+        if (retryError.response?.statusCode == 401) {
+          await clearSession();
+          onSessionExpired?.call();
+        }
+        throw ApiException.fromDio(retryError);
+      }
+    }
+  }
+
   Future<MultipartFile> _imagePart(XFile file) async {
     final mimeType =
         file.mimeType ??
@@ -149,7 +196,14 @@ class ApiClient {
     );
   }
 
-  Future<String> uploadOrderAttachment(XFile file, {String? purpose}) async {
+  Future<String> uploadOrderAttachment(
+    XFile file, {
+    String? purpose,
+    void Function(int sent, int total)? onSendProgress,
+  }) async {
+    if (await file.length() > 5 * 1024 * 1024) {
+      throw const ApiException('Ảnh không được vượt quá 5 MB.');
+    }
     Future<String> send() async {
       final response = await _dio.post<Map<String, dynamic>>(
         '/orders/attachments',
@@ -157,8 +211,11 @@ class ApiClient {
           'image': await _imagePart(file),
           if (purpose != null) 'purpose': purpose,
         }),
+        onSendProgress: onSendProgress,
         options: Options(
           headers: {if (_token != null) 'Authorization': 'Bearer $_token'},
+          sendTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 90),
         ),
       );
       final data = response.data?['data'];
@@ -249,6 +306,7 @@ class ApiClient {
     List<XFile> files, {
     String field = 'images',
     Map<String, String> data = const {},
+    Duration? receiveTimeout,
   }) async {
     if (_loggingOut) throw const ApiException('Phiên làm việc đang kết thúc.');
     Future<dynamic> send() async {
@@ -261,6 +319,7 @@ class ApiClient {
         data: form,
         options: Options(
           headers: {if (_token != null) 'Authorization': 'Bearer $_token'},
+          receiveTimeout: receiveTimeout,
         ),
       );
       return response.data?['data'];

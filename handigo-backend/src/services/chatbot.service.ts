@@ -24,7 +24,7 @@ const getConversation = async (user: RequestUser) => {
       $set: { role: user.role, isDeleted: false, deletedAt: null },
       $setOnInsert: { userId: user.id },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true },
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true },
   );
 };
 

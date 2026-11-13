@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/paged_result.dart';
@@ -12,8 +13,14 @@ class ServiceCatalogRepository {
   const ServiceCatalogRepository(this._api);
   final ApiClient _api;
 
-  Future<String> uploadAttachment(XFile file) =>
-      _api.uploadOrderAttachment(file, purpose: 'order_problem');
+  Future<String> uploadAttachment(
+    XFile file, {
+    void Function(int sent, int total)? onSendProgress,
+  }) => _api.uploadOrderAttachment(
+    file,
+    purpose: 'order_problem',
+    onSendProgress: onSendProgress,
+  );
 
   Future<Map<String, dynamic>> bookingPolicies() async =>
       (await _api.request(
@@ -238,6 +245,8 @@ class ServiceCatalogRepository {
     );
     return PaymentResult.fromJson(response['data'] as Map<String, dynamic>);
   }
+
+  Future<Uint8List> paymentQr(String paymentId) => _api.paymentQr(paymentId);
 
   Future<PaymentResult> reconcilePayment(String orderId) async {
     final response = await _api.request(

@@ -7,6 +7,11 @@ export const currentLocationSchema = z.object({
 
 export type CurrentLocationPayload = z.infer<typeof currentLocationSchema>;
 
+export const trackingLocationSchema = currentLocationSchema.extend({
+  accuracy: z.number().finite().min(0).optional(),
+  capturedAt: z.number().finite().min(0).optional(),
+});
+
 export const reverseGeocodeQuerySchema = z.object({
   latitude: z.coerce
     .number()

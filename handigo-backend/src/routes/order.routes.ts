@@ -21,6 +21,7 @@ import {
   cancellationPreviewQuerySchema,
   cancelOrderSchema,
   completeOrderSchema,
+  startOrderSchema,
   customerNoShowSchema,
   customerNoShowEvidenceSchema,
   createRepairQuotationSchema,
@@ -57,6 +58,7 @@ import {
   cancelOrder,
   previewCancellation,
   startOrder,
+  confirmWorking,
   arriveOrder,
   customerNoShowEligibility,
   createCustomerNoShowReport,
@@ -73,7 +75,6 @@ import {
   createRepairQuotation,
   updateRepairQuotation,
   getRepairQuotation,
-  confirmRepairQuotation,
   rejectRepairQuotation,
   selectAppointmentProvider,
   respondToReassignment,
@@ -231,8 +232,12 @@ router.post(
   roleMiddleware("PROVIDER"),
   approvedProviderMiddleware,
   validate(orderIdParamSchema, "params"),
+  validate(startOrderSchema),
   startOrder,
 );
+
+router.post("/:orderId/work-confirmation", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  validate(orderIdParamSchema, "params"), confirmWorking);
 
 router.post(
   "/:orderId/quotation/payment/confirm",
@@ -339,14 +344,6 @@ router.get(
   roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(orderIdParamSchema, "params"),
   getRepairQuotation,
-);
-
-// POST   /orders/quotations/:quotationId/confirm → Customer: tương thích client cũ
-router.post(
-  "/quotations/:quotationId/confirm",
-  roleMiddleware("CUSTOMER"),
-  validate(quotationIdParamSchema, "params"),
-  confirmRepairQuotation,
 );
 
 // POST   /orders/quotations/:quotationId/reject  → Customer: reject quotation

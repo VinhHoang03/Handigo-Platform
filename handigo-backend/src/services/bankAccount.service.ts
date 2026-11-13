@@ -91,7 +91,7 @@ const lockOwnedBankAccount = async (userId: string, bankAccountId: string, sessi
   const account = await BankAccount.findOneAndUpdate(
     { _id: bankAccountId, userId, isDeleted: false },
     { $inc: { __v: 1 } },
-    { new: true, session, runValidators: true },
+    { returnDocument: "after", session, runValidators: true },
   );
   if (!account) throw new AppError("Không tìm thấy tài khoản ngân hàng", 404);
   return account;
@@ -172,7 +172,7 @@ export const updateMyBankAccount = async (
       const bankAccount = await BankAccount.findOneAndUpdate(
         { _id: bankAccountId, userId: user.id, isDeleted: false },
         payload,
-        { new: true, session, runValidators: true },
+        { returnDocument: "after", session, runValidators: true },
       );
       if (!bankAccount) throw new AppError("Không tìm thấy tài khoản ngân hàng", 404);
       return bankAccount;

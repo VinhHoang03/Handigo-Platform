@@ -2,8 +2,35 @@ import { Request, Response } from "express";
 import { requireAuthenticatedUser } from "../middlewares/authContext";
 import * as feedbackService from "../services/feedback.service";
 import { sendControllerError } from "../utils/controllerError";
+import * as moderationService from "../services/feedbackModeration.service";
+import { moderationListSchema, moderationReviewSchema, moderationReportQuerySchema } from "../validations/feedback.validator";
+import { getFeedbackModerationReport } from "../services/feedbackModerationReport.service";
 
 const getUserId = (req: Request) => requireAuthenticatedUser(req).id;
+
+export const getModerationReport = async (req: Request, res: Response) => {
+  try {
+    const result = await getFeedbackModerationReport(moderationReportQuerySchema.parse(req.query));
+    return res.json({ success: true, data: result });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
+
+export const listModeration = async (req: Request, res: Response) => {
+  try {
+    const { page, limit, resourceId, kind } = moderationListSchema.parse(req.query);
+    const user = requireAuthenticatedUser(req);
+    const result = await moderationService.listFeedbackModeration(page, limit, user.role === "ADMIN" ? undefined : user.id, resourceId, kind);
+    return res.json({ success: true, data: result });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
+
+export const reviewModeration = async (req: Request, res: Response) => {
+  try {
+    const { status } = moderationReviewSchema.parse(req.body);
+    const result = await moderationService.reviewFeedbackModeration(req.params.id as string, getUserId(req), status);
+    return res.json({ success: true, data: result });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
 
 export const getServiceFeedbacks = async (req: Request, res: Response) => {
   try {
@@ -108,6 +135,8 @@ export const setFeedbackVisibility = async (req: Request, res: Response) => {
     const feedback = await feedbackService.setFeedbackVisibility(
       req.params.id as string,
       req.body.isVisible,
+      getUserId(req),
+      req.body.expectedVersion,
     );
 
     return res.json({

@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { buildMatchingSearch, getMatchingSearchStage, getProviderResponseTimeoutSeconds } from "../utils/matchingSearch";
 
 import { Order } from "../models/order.model";
+import { Payment } from "../models/payment.model";
 import User from "../models/user.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Address } from "../models/address.model";
@@ -14,14 +15,15 @@ import { getAssignmentRealtimePayload } from "./assignmentRealtime.service";
 import { createLogger } from "../utils/logger";
 import { cancelSystemOrderWithSettlement } from "./orderCancellation.service";
 import { createNotificationRecord } from "./notification.service";
-import { reconcilePayosPaymentForExpiration } from "./payment.service";
+import { deadlineFor, recoverOrderDeadlines, stopOrderDeadlines } from "./orderDeadline.service";
+import { expirePendingReassignments } from "./orderReassignment.service";
 import { getOrderInterval } from "./providerSchedule.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { ScheduleInterval } from "../utils/bookingPolicy";
 import { findOverdueOrders } from "./orderOverdue.service";
 import { isRetryableWriteConflict } from "../utils/transaction";
 
-async function createMatchingSearch(startedAt: Date) {
+export async function createMatchingSearch(startedAt: Date) {
   const [initial, expanded, delay, duration] = await Promise.all([
     getNumberConfigValue("INITIAL_PROVIDER_RADIUS_KM", 5),
     getNumberConfigValue("MAX_PROVIDER_RADIUS_KM", 10),
@@ -30,6 +32,17 @@ async function createMatchingSearch(startedAt: Date) {
   ]);
   return buildMatchingSearch(startedAt, Math.max(initial, 0.1),
     Math.max(expanded, initial, 0.1), Math.max(delay, 0.1), Math.max(duration, 0.1));
+}
+
+async function getMatchingStart(orderId: string, fallback: Date) {
+  const order = await Order.findById(orderId).select("orderType paymentStatus inspectionRequired reassignment").lean();
+  if (order?.reassignment?.status === "matching") return order.reassignment.respondedAt ?? fallback;
+  if (!order || order.orderType !== "normal"
+    || !["paid", "partially_paid"].includes(order.paymentStatus)) return fallback;
+  const payment = await Payment.findOne({ orderId, status: "paid", isDeleted: false, paidAt: { $ne: null },
+    paymentType: order.inspectionRequired ? "inspection_deposit" : "full" })
+    .sort({ paidAt: 1 }).select("paidAt").lean();
+  return payment?.paidAt ?? fallback;
 }
 /** Số giây một provider có thể phản hồi trước khi chuyển sang provider tiếp theo. */
 const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
@@ -46,20 +59,45 @@ export const getProviderResponseTimeoutMs = async () => {
   return getProviderResponseTimeoutSeconds(responseSeconds, expandAfterMinutes) * 1000;
 };
 
-/** Số provider tối đa được thử sau khi khách đồng ý tìm provider thay thế. */
-export const MAX_DIRECT_PROVIDER_ATTEMPTS = 3;
-
 /** Số lượt matching tối đa trước khi hủy đơn. */
 const DEFAULT_MAX_MATCHING_ATTEMPTS = 5;
 
 /** Bắt đầu tìm thợ trước giờ hẹn bao nhiêu phút. */
 const DEFAULT_SCHEDULED_DISPATCH_LEAD_MINUTES = 15;
 
-/** Chu kỳ quét để khôi phục timeout sau khi backend restart. */
-const MATCHING_TIMEOUT_SCAN_INTERVAL_MS = 10_000;
-
-let timeoutMonitor: NodeJS.Timeout | null = null;
+let activeScan: Promise<{ failed: number }> | null = null;
 const dispatchLogger = createLogger("DispatchService");
+const matchingStageTimers = new Map<string, NodeJS.Timeout>();
+
+function scheduleMatchingStage(orderId: string, at: Date) {
+  const previous = matchingStageTimers.get(orderId);
+  if (previous) clearTimeout(previous);
+  const timer = setTimeout(async () => {
+    matchingStageTimers.delete(orderId);
+    try {
+      const order = await Order.findById(orderId).select("status readyForMatching preferredProviderId matchingSearch matchingStartedAt");
+      if (!order || order.status !== "created" || !order.readyForMatching || order.preferredProviderId) return;
+      const expiresAt = order.matchingSearch?.expiresAt
+        ?? (await createMatchingSearch(await getMatchingStart(orderId, order.matchingStartedAt ?? at))).expiresAt;
+      if (expiresAt <= new Date()) {
+        if (!await cancelUnmatchedOrder(orderId, "Không tìm được thợ trước khi hết hạn tìm kiếm.")) {
+          scheduleMatchingStage(orderId, new Date(Date.now() + 60_000));
+        }
+        return;
+      }
+      scheduleMatchingStage(orderId, expiresAt);
+      const ctx = await getDispatchContext(orderId);
+      if (!ctx) return;
+      const { triedProviderIds } = await getTriedProviderState(orderId);
+      await DispatchService.dispatchOrder(orderId, ctx, triedProviderIds);
+    } catch (error: unknown) {
+      dispatchLogger.error("Không thể tiếp tục tìm thợ khi đến mốc điều phối.", error, { orderId });
+      scheduleMatchingStage(orderId, new Date(Date.now() + 60_000));
+    }
+  }, Math.max(at.getTime() - Date.now(), 1));
+  matchingStageTimers.set(orderId, timer);
+  timer.unref();
+}
 
 interface DispatchContext {
   scheduleIntervals?: ScheduleInterval[];
@@ -228,7 +266,7 @@ async function sendAssignmentBatch(
         { orderId: data.orderId, providerId: data.providerId,
           status: { $in: ["cancelled", "rejected", "timeout"] }, isDeleted: false },
         { $set: { ...data, respondedAt: null, rejectReason: null } },
-        { new: true, runValidators: true },
+        { returnDocument: "after", runValidators: true },
       );
       if (existing) return existing;
     }
@@ -287,20 +325,7 @@ async function sendAssignmentBatch(
       });
     }
 
-    const assignmentTimer = setTimeout(() => {
-      DispatchService._onAssignmentTimeout(
-        orderId,
-        assignment._id.toString(),
-        candidate.providerId,
-        ctx,
-      ).catch((error: unknown) =>
-        dispatchLogger.error("Xử lý timeout assignment thất bại.", error, {
-          assignmentId: assignment._id.toString(),
-          orderId,
-        }),
-      );
-    }, Math.max(deadline.getTime() - Date.now(), 1));
-    assignmentTimer.unref();
+    scheduleAssignmentTimeout(orderId, assignment._id.toString(), candidate.providerId, ctx, deadline);
   }
 
   dispatchLogger.info("Đã phát đơn cho nhóm provider.", {
@@ -330,7 +355,7 @@ async function sendDirectProviderRequest(
     { orderId: data.orderId, providerId: data.providerId,
       status: { $in: ["cancelled", "rejected", "timeout"] }, isDeleted: false },
     { $set: { ...data, respondedAt: null, rejectReason: null } },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   ) ?? await OrderAssignment.create(data);
 
   const realtimeAssignment = await getAssignmentRealtimePayload(
@@ -350,20 +375,21 @@ async function sendDirectProviderRequest(
     data: { orderId, assignmentId: assignment._id },
   });
 
-  const assignmentTimer = setTimeout(() => {
-    DispatchService._onAssignmentTimeout(
-      orderId,
-      assignment._id.toString(),
-      candidate.providerId,
-      ctx,
-    ).catch((error: unknown) =>
-      dispatchLogger.error("Xử lý timeout yêu cầu trực tiếp thất bại.", error, {
-        assignmentId: assignment._id.toString(),
-        orderId,
-      }),
+  scheduleAssignmentTimeout(orderId, assignment._id.toString(), candidate.providerId, ctx, deadline);
+}
+
+const assignmentTimers = new Map<string, NodeJS.Timeout>();
+
+function scheduleAssignmentTimeout(orderId: string, assignmentId: string, providerId: Types.ObjectId, ctx: DispatchContext, deadline: Date) {
+  if (assignmentTimers.has(assignmentId)) return;
+  const timer = setTimeout(() => {
+    assignmentTimers.delete(assignmentId);
+    DispatchService._onAssignmentTimeout(orderId, assignmentId, providerId, ctx).catch((error: unknown) =>
+      dispatchLogger.error("Không thể xử lý yêu cầu nhận đơn hết hạn.", error, { assignmentId, orderId }),
     );
   }, Math.max(deadline.getTime() - Date.now(), 1));
-  assignmentTimer.unref();
+  assignmentTimers.set(assignmentId, timer);
+  timer.unref();
 }
 
 export const DispatchService = {
@@ -377,11 +403,12 @@ export const DispatchService = {
       status: "created",
       readyForMatching: true,
     }).select(
-      "customerId orderCode serviceId addressId preferredProviderId orderType scheduledAt matchingStartedAt",
+      "customerId orderCode serviceId addressId preferredProviderId orderType scheduledAt matchingStartedAt matchingSearch reassignment",
     );
     if (!order || order.matchingStartedAt) return;
 
     const matchingStartedAt = new Date();
+    const savedReplacementSearch = order.reassignment?.status === "matching" ? order.matchingSearch : null;
     const claimedOrder = await Order.findOneAndUpdate(
       {
         _id: order._id,
@@ -392,12 +419,21 @@ export const DispatchService = {
       {
         $set: {
           matchingStartedAt,
-          matchingSearch: order.preferredProviderId ? null : await createMatchingSearch(matchingStartedAt),
+          matchingSearch: order.preferredProviderId ? null
+            : savedReplacementSearch ?? await createMatchingSearch(await getMatchingStart(orderId, matchingStartedAt)),
         }
       },
       { returnDocument: "after", runValidators: true },
     );
     if (!claimedOrder) return;
+
+    if (claimedOrder.matchingSearch && claimedOrder.matchingSearch.expiresAt <= new Date()) {
+      if (!await cancelUnmatchedOrder(orderId, "Không tìm được thợ trước khi hết hạn tìm kiếm.")) {
+        scheduleMatchingStage(orderId, new Date(Date.now() + 60_000));
+      }
+      return;
+    }
+    if (claimedOrder.matchingSearch) scheduleMatchingStage(orderId, claimedOrder.matchingSearch.expiresAt);
 
     const ctx = await getDispatchContext(orderId);
     if (!ctx) {
@@ -478,7 +514,7 @@ export const DispatchService = {
     if (!order.matchingSearch) {
       await Order.updateOne(
         { _id: orderId, status: "created", matchingSearch: null },
-        { $set: { matchingSearch: await createMatchingSearch(order.matchingStartedAt || new Date()) } },
+        { $set: { matchingSearch: await createMatchingSearch(await getMatchingStart(orderId, order.matchingStartedAt || new Date())) } },
         { runValidators: true },
       );
       order = await Order.findById(orderId).select(
@@ -488,10 +524,13 @@ export const DispatchService = {
     if (!order || order.status !== "created" || !order.readyForMatching || order.preferredProviderId || !order.matchingSearch) return;
     const stage = getMatchingSearchStage(order.matchingSearch);
     if (stage.expired) {
-      await cancelUnmatchedOrder(orderId,
-        `Không tìm thấy thợ phù hợp trong bán kính ${order.matchingSearch.expandedRadiusKm} km sau thời gian tìm kiếm.`);
+      if (!await cancelUnmatchedOrder(orderId,
+        `Không tìm thấy thợ phù hợp trong bán kính ${order.matchingSearch.expandedRadiusKm} km sau thời gian tìm kiếm.`)) {
+        scheduleMatchingStage(orderId, new Date(Date.now() + 60_000));
+      }
       return;
     }
+    scheduleMatchingStage(orderId, order.matchingSearch.expiresAt);
     const hasPendingAssignment = await OrderAssignment.exists({
       orderId: order._id,
       status: "pending",
@@ -499,21 +538,8 @@ export const DispatchService = {
     });
     if (hasPendingAssignment) return;
 
-    const isAutomaticReplacement = order.reassignment?.status === "matching" && order.reassignment.automatic;
-    const matchingDeadline = order.matchingSearch.expiresAt;
-    if (matchingDeadline <= new Date()) {
-      await cancelUnmatchedOrder(
-        orderId,
-        "Không có provider nhận đơn trong vòng 5 phút.",
-      );
-      return;
-    }
-
-    const isDirectReplacement = order.reassignment?.status === "matching";
-    const maxAttempts = isDirectReplacement
-      ? MAX_DIRECT_PROVIDER_ATTEMPTS
-      : maxMatchingAttempts;
-    if (!isAutomaticReplacement && triedProviderIds.length >= maxAttempts) {
+    const isReplacement = order.reassignment?.status === "matching";
+    if (!isReplacement && triedProviderIds.length >= maxMatchingAttempts) {
       await cancelUnmatchedOrder(
         orderId,
         `Không có provider nhận đơn sau ${maxMatchingAttempts} lượt matching.`,
@@ -525,12 +551,9 @@ export const DispatchService = {
       return;
     }
 
-    const candidateLimit = isAutomaticReplacement ? matchingBatchSize : isDirectReplacement
-      ? 1
-      : Math.min(
-        matchingBatchSize,
-        maxAttempts - triedProviderIds.length,
-      );
+    const candidateLimit = isReplacement
+      ? (order.reassignment?.automatic ? matchingBatchSize : 1)
+      : Math.min(matchingBatchSize, maxMatchingAttempts - triedProviderIds.length);
     const batchNumber = Math.floor(triedProviderIds.length / matchingBatchSize) + 1;
 
     const matchingOptions = {
@@ -551,8 +574,10 @@ export const DispatchService = {
       ...matchingOptions,
       requireOnline: true,
     });
-    // Bộ quét định kỳ tìm lại thợ vừa trực tuyến và khôi phục sau khởi động lại.
-    if (candidates.length === 0 || stage.deadline.getTime() <= Date.now()) return;
+    if (candidates.length === 0 || stage.deadline.getTime() <= Date.now()) {
+      scheduleMatchingStage(orderId, stage.deadline);
+      return;
+    }
 
     const deadline = new Date(
       Math.min(
@@ -678,16 +703,99 @@ export const DispatchService = {
     );
   },
 
-  /**
-   * Khôi phục timeout bị bỏ lỡ khi process restart và hủy đơn quá thời hạn.
-   */
-  startTimeoutMonitor(): void {
-    if (timeoutMonitor) return;
+  async previewOrderScan(now: Date) {
+    const [booking, overdueHours, assignments] = await Promise.all([
+      getBookingPolicy(),
+      getNumberConfigValue("OVERDUE_ORDER_ESCALATION_HOURS", 24),
+      OrderAssignment.find({ status: "pending", isDeleted: false }).select("orderId responseDeadline").lean(),
+    ]);
+    const overdue = new Map((await findOverdueOrders(now, Math.max(overdueHours, 1)))
+      .map(order => [String(order._id), order.executionStartedAt]));
+    const pending = new Map<string, Date>();
+    const expired = new Map<string, Date>();
+    for (const assignment of assignments) {
+      const id = String(assignment.orderId);
+      const deadline = assignment.responseDeadline;
+      if (deadline > now) pending.set(id, deadline);
+      else if (!expired.has(id) || deadline < expired.get(id)!) expired.set(id, deadline);
+    }
+    const rows = [];
+    const orders = Order.find({ status: { $in: ["created", "accepted", "in_progress"] }, isDeleted: false })
+      .select("orderCode status paymentStatus paymentMethod paymentDueAt bookingStatus createdAt updatedAt providerId arrival customerNoShow schedule scheduledAt workConfirmation orderType readyForMatching matchingSearch matchingStartedAt preferredProviderId reassignment inspectionRequired depositPaidAt")
+      .cursor();
+    for await (const order of orders) {
+      const id = String(order._id);
+      let deadline = deadlineFor(order);
+      if (!deadline && order.status === "created" && !order.readyForMatching && !order.paymentDueAt
+        && order.paymentStatus === "unpaid" && ["wallet", "bank"].includes(order.paymentMethod)) {
+        deadline = { kind: "payment", at: new Date(order.createdAt.getTime() + booking.paymentHoldMinutes * 60_000) };
+      }
+      let reason = "";
+      let action = "";
+      let since = order.createdAt;
+      let dueAt: Date | null = null;
+      if (deadline && deadline.at <= now) {
+        dueAt = deadline.at;
+        since = deadline.at;
+        const details = {
+          payment: ["Quá hạn thanh toán", "Đối soát rồi hủy nếu chưa nhận tiền"],
+          arrival: ["Thợ chưa đến nơi", "Hủy đơn và hoàn khoản đã thu"],
+          work_timeout: ["Thợ bỏ lỡ xác nhận", "Hủy đơn và hoàn khoản đã thu"],
+          work_open: ["Đến lượt xác nhận tiến độ", "Mở lượt xác nhận cho thợ"],
+        };
+        [reason, action] = details[deadline.kind];
+      } else if (order.status === "created") {
+        const reassignment = order.reassignment;
+        if (reassignment && (["declined", "expired"].includes(reassignment.status)
+          || (reassignment.status === "awaiting_customer" && reassignment.expiresAt <= now))) {
+          since = reassignment.requestedAt;
+          dueAt = reassignment.expiresAt;
+          reason = "Yêu cầu đổi thợ đã kết thúc";
+          action = "Hủy đơn và hoàn khoản đã thu";
+        } else if (order.readyForMatching || (order.orderType === "normal" && !order.providerId
+          && !order.preferredProviderId && !reassignment && order.bookingStatus === "not_required"
+          && (order.paymentStatus === "paid" || (order.inspectionRequired && order.paymentStatus === "partially_paid" && order.depositPaidAt)))) {
+          since = order.matchingStartedAt ?? order.reassignment?.respondedAt ?? order.createdAt;
+          if (!order.preferredProviderId) {
+            dueAt = order.matchingSearch?.expiresAt
+              ?? (await createMatchingSearch(await getMatchingStart(id, order.matchingStartedAt ?? now))).expiresAt;
+          }
+          if (dueAt && dueAt <= now) {
+            reason = reassignment?.status === "matching" ? "Hết hạn tìm thợ thay thế" : "Hết hạn tìm thợ";
+            action = "Hủy đơn và hoàn khoản đã thu";
+          } else if (expired.has(id) || !pending.has(id)) {
+            dueAt = expired.get(id) ?? dueAt;
+            reason = expired.has(id) ? "Yêu cầu nhận đơn quá hạn" : "Điều phối cần khôi phục";
+            action = "Kiểm tra và tiếp tục điều phối";
+          }
+        } else if (expired.has(id)) {
+          dueAt = expired.get(id)!;
+          reason = "Yêu cầu nhận đơn quá hạn";
+          action = "Xử lý yêu cầu đã hết hạn";
+        }
+      } else if (overdue.has(id)) {
+        since = overdue.get(id)!;
+        dueAt = new Date(since.getTime() + Math.max(overdueHours, 1) * 3_600_000);
+        reason = "Thực hiện quá lâu";
+        action = "Đánh dấu và gửi thông báo";
+      }
+      if (reason) rows.push({ id, orderCode: order.orderCode, status: order.status,
+        paymentStatus: order.paymentStatus, reason, action, since, dueAt, updatedAt: order.updatedAt });
+    }
+    return rows.sort((a, b) => a.since.getTime() - b.since.getTime());
+  },
 
-    const scanOnce = async (recoverStalledOrders = false) => {
-      const now = new Date();
+  /** Khôi phục các đơn bị gián đoạn khi quản trị viên yêu cầu quét. */
+  scanOrders(orderIds?: string[]): Promise<{ failed: number }> {
+    if (activeScan) {
+      if (orderIds) throw new AppError("Đang có lượt xử lý đơn. Vui lòng thử lại sau.", 409);
+      return activeScan;
+    }
+    const scope = orderIds ? { _id: { $in: orderIds } } : {};
+
+    const scanOverdueOrders = async (now: Date) => {
       const overdueHours = Math.max(await getNumberConfigValue("OVERDUE_ORDER_ESCALATION_HOURS", 24), 1);
-      const overdueOrders = await findOverdueOrders(now, overdueHours);
+      const overdueOrders = await findOverdueOrders(now, overdueHours, orderIds);
       for (const order of overdueOrders) {
         const claimed = await Order.findOneAndUpdate(
           { _id: order._id, status: "in_progress", isDeleted: false, updatedAt: order.updatedAt, "overdueReview.escalatedAt": null },
@@ -704,93 +812,99 @@ export const DispatchService = {
         const admins = await User.find({ role: "ADMIN", isDeleted: false, status: "active" }).select("_id").lean();
         await Promise.all(admins.map((admin) => createNotificationRecord({ userId: admin._id, type: "ORDER", title: "Đơn quá hạn cần quản trị xử lý", content: message, data: { orderId: order._id, overdueReview: true } }, { emitRealtime: true })));
       }
-      const expiredPaymentOrders = await Order.find({
-        status: { $in: ["created", "accepted"] },
-        bookingStatus: "awaiting_payment",
-        paymentDueAt: { $lte: now },
-      })
-        .select("_id")
-        .limit(100)
-        .lean();
+    };
 
-      for (const order of expiredPaymentOrders) {
-        try {
-          const reconciliation = await reconcilePayosPaymentForExpiration(
-            order._id.toString(),
-          );
-          if (reconciliation.order?.bookingStatus !== "awaiting_payment") {
-            continue;
-          }
-        } catch (error: unknown) {
-          dispatchLogger.error(
-            "Tạm hoãn hủy lịch vì chưa thể đối soát PayOS.",
-            error,
-            { orderId: order._id.toString() },
-          );
-          continue;
-        }
-
-        const expirationResult = await Order.updateOne(
-          {
-            _id: order._id,
-            bookingStatus: "awaiting_payment",
-            paymentStatus: { $nin: ["paid", "partially_paid"] },
-          },
-          { $set: { bookingStatus: "expired" } },
-        );
-        if (expirationResult.modifiedCount === 0) continue;
-        await cancelSystemOrderWithSettlement(
-          order._id.toString(),
-          "Đã hết thời hạn thanh toán giữ lịch.",
-          "payment_timeout",
-        );
-
+    const scanOnce = async () => {
+      const now = new Date();
+      let failed = 0;
+      try { await scanOverdueOrders(now); }
+      catch (error) {
+        failed++;
+        dispatchLogger.error("Không thể kiểm tra đơn đang thực hiện quá hạn.", error);
       }
 
-      const expiredAssignments = await OrderAssignment.find({
+      try { failed += await recoverOrderDeadlines(orderIds); }
+      catch (error) {
+        failed++;
+        dispatchLogger.error("Không thể khôi phục các mốc xử lý đơn.", error);
+      }
+      try { failed += await expirePendingReassignments(orderIds); }
+      catch (error) {
+        failed++;
+        dispatchLogger.error("Không thể xử lý yêu cầu đổi thợ hết hạn.", error);
+      }
+
+      const pendingAssignments = await OrderAssignment.find({
+        ...(orderIds ? { orderId: { $in: orderIds } } : {}),
         status: "pending",
-        responseDeadline: { $lte: now },
+        isDeleted: false,
       })
         .sort({ responseDeadline: 1 })
-        .limit(100)
         .lean();
 
-      for (const assignment of expiredAssignments) {
-        const ctx = await getDispatchContext(assignment.orderId.toString());
-        if (!ctx) continue;
-
-        await DispatchService._onAssignmentTimeout(
-          assignment.orderId.toString(),
-          assignment._id.toString(),
-          assignment.providerId,
-          ctx,
-        );
+      for (const assignment of pendingAssignments) {
+        const orderId = assignment.orderId.toString();
+        const assignmentId = assignment._id.toString();
+        try {
+          const ctx = await getDispatchContext(orderId);
+          if (!ctx) continue;
+          if (assignment.responseDeadline > new Date()) {
+            scheduleAssignmentTimeout(orderId, assignmentId, assignment.providerId, ctx, assignment.responseDeadline);
+          } else {
+            await DispatchService._onAssignmentTimeout(orderId, assignmentId, assignment.providerId, ctx);
+          }
+        } catch (error) {
+          failed++;
+          dispatchLogger.error("Không thể xử lý yêu cầu nhận đơn trong lượt quét.", error, { orderId, assignmentId });
+        }
       }
 
+      await Order.updateMany({ ...scope, status: "created", orderType: "normal", isDeleted: false,
+        providerId: null, preferredProviderId: null, readyForMatching: false,
+        bookingStatus: "not_required", reassignment: null,
+        $or: [{ paymentStatus: "paid" }, { paymentStatus: "partially_paid", inspectionRequired: true, depositPaidAt: { $ne: null } }],
+      }, { $set: { readyForMatching: true } }, { runValidators: true });
+
       const readyOrders = await Order.find({
+        ...scope,
         status: "created",
         readyForMatching: true,
         matchingStartedAt: null,
       })
         .select("_id")
-        .limit(100)
         .lean();
 
       for (const order of readyOrders) {
-        await DispatchService.dispatchReadyOrder(order._id.toString());
+        const orderId = order._id.toString();
+        try { await DispatchService.dispatchReadyOrder(orderId); }
+        catch (error) {
+          failed++;
+          dispatchLogger.error("Không thể khởi động tìm thợ trong lượt quét.", error, { orderId });
+        }
       }
 
       {
         const activeOrders = await Order.find({
+          ...scope,
           status: "created",
           readyForMatching: true,
           matchingStartedAt: { $ne: null },
         })
-          .select("_id preferredProviderId")
+          .select("_id preferredProviderId matchingSearch matchingStartedAt")
           .lean();
 
         for (const order of activeOrders) {
           try {
+            const orderId = order._id.toString();
+            if (!order.preferredProviderId) {
+              const expiresAt = order.matchingSearch?.expiresAt
+                ?? (await createMatchingSearch(await getMatchingStart(orderId, order.matchingStartedAt ?? now))).expiresAt;
+              if (expiresAt <= new Date()) {
+                if (!await cancelUnmatchedOrder(orderId, "Không tìm được thợ trước khi hết hạn tìm kiếm.")) failed++;
+                continue;
+              }
+              scheduleMatchingStage(orderId, expiresAt);
+            }
             const hasPendingAssignment = await OrderAssignment.exists({
               orderId: order._id,
               status: "pending",
@@ -798,7 +912,6 @@ export const DispatchService = {
             if (hasPendingAssignment) continue;
 
             if (order.preferredProviderId) {
-              if (!recoverStalledOrders) continue;
               await Order.updateOne(
                 { _id: order._id, status: "created" },
                 { $set: { matchingStartedAt: null } },
@@ -808,7 +921,7 @@ export const DispatchService = {
               continue;
             }
 
-            const ctx = await getDispatchContext(order._id.toString());
+            const ctx = await getDispatchContext(orderId);
             if (!ctx) continue;
 
             const triedState = await getTriedProviderState(order._id);
@@ -822,38 +935,26 @@ export const DispatchService = {
               triedState.triedProviderIds,
             );
           } catch (error: unknown) {
+            failed++;
             dispatchLogger.error("Không thể xử lý đơn trong lượt quét điều phối.", error, {
               orderId: order._id.toString(),
             });
           }
         }
       }
+      return { failed };
     };
 
-    let scanning = false;
-    const scan = async (recoverStalledOrders = false) => {
-      if (scanning) return;
-      scanning = true;
-      try { await scanOnce(recoverStalledOrders); }
-      finally { scanning = false; }
-    };
-
-    scan(true).catch((error: unknown) =>
-      dispatchLogger.error("Quét timeout ban đầu thất bại.", error),
-    );
-    timeoutMonitor = setInterval(() => {
-      scan().catch((error: unknown) =>
-        dispatchLogger.error("Quét timeout định kỳ thất bại.", error),
-      );
-    }, MATCHING_TIMEOUT_SCAN_INTERVAL_MS);
-    timeoutMonitor.unref();
+    activeScan = scanOnce().finally(() => { activeScan = null; });
+    return activeScan;
   },
 
   stopTimeoutMonitor(): void {
-    if (!timeoutMonitor) return;
-
-    clearInterval(timeoutMonitor);
-    timeoutMonitor = null;
+    for (const timer of matchingStageTimers.values()) clearTimeout(timer);
+    matchingStageTimers.clear();
+    for (const timer of assignmentTimers.values()) clearTimeout(timer);
+    assignmentTimers.clear();
+    stopOrderDeadlines();
   },
 
   /**

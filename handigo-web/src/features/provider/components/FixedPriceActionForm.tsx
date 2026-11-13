@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { Order } from '@/types/booking';
 import { ReliableImage } from '@/components/common/ReliableImage';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
-import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
+import { getAppliedQuotationDeposit, getDirectRepairPayment, isQuotationPaidOnline } from '@/utils/quotationPayment';
 import type { QuotationDetail } from '../types/providerOrder.types';
 import { formatMoney } from '../utils/providerOrder.utils';
 import { CircleCheckBig, ImagePlus, X } from "lucide-react";
@@ -62,6 +62,12 @@ export function FixedPriceActionForm({
   const showPaymentConfirmation = order.inspectionRequired && onConfirmPayment && repairQuotation
     && order.status === 'completed'
     && (repairQuotation.status === 'saved' || (repairQuotation.status === 'approved' && repairQuotation.customerConfirmed));
+  // Khách đã trả phần báo giá qua Ví Handigo hoặc QR PayOS thì thợ không còn xác nhận thu tiền trực tiếp.
+  const quotationPaidOnline = isQuotationPaidOnline(order, repairQuotation);
+  const canConfirmDirectPayment = Boolean(showPaymentConfirmation && order.paymentStatus !== 'paid'
+    && !quotationPaidOnline && !repairQuotation?.directPaymentConfirmedAt);
+  const canConfirmCashPayment = !order.inspectionRequired && order.status === 'completed'
+    && order.paymentMethod === 'cash' && order.paymentStatus === 'unpaid';
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -203,13 +209,17 @@ export function FixedPriceActionForm({
             {order.paymentMethod === 'wallet' ? 'Đã thanh toán qua ví' : 'Đã thanh toán qua QR'}
           </p>
         )}
-        {showPaymentConfirmation && (order.paymentStatus === 'paid' ? (
+        {showPaymentConfirmation && (quotationPaidOnline ? (
           <p role="status" className="flex items-center gap-2 rounded-xl bg-success-container px-4 py-3 text-sm font-semibold text-on-success-container">
             <CircleCheckBig aria-hidden="true" size={20} />
-            {repairQuotation.directPaymentConfirmedAt ? 'Đã xác nhận thanh toán báo giá'
-              : order.paymentMethod === 'bank' ? 'Khách đã thanh toán qua QR PayOS' : 'Khách đã thanh toán bằng Ví Handigo'}
+            {order.paymentMethod === 'bank' ? 'Khách đã thanh toán qua QR PayOS' : 'Khách đã thanh toán bằng Ví Handigo'}. Không thu thêm tiền mặt.
           </p>
-        ) : (
+        ) : order.paymentStatus === 'paid' ? (
+          <p role="status" className="flex items-center gap-2 rounded-xl bg-success-container px-4 py-3 text-sm font-semibold text-on-success-container">
+            <CircleCheckBig aria-hidden="true" size={20} />
+            Đã xác nhận thanh toán báo giá
+          </p>
+        ) : canConfirmDirectPayment && (
           <button
             type="button"
             disabled={busy}
@@ -247,14 +257,14 @@ export function FixedPriceActionForm({
         </div>
       </div>
       <ConfirmDialog
-        open={cashConfirmation !== null}
+        open={cashConfirmation !== null && canConfirmCashPayment}
         title="Xác nhận đã nhận tiền mặt"
         message={`Bạn xác nhận đã nhận đủ ${formatMoney(cashConfirmation ?? 0)} tiền mặt từ khách?`}
         busy={busy}
         onCancel={() => { if (!busy) setCashConfirmation(null); }}
         onConfirm={() => {
           if (cashConfirmation === null || !onConfirmCashPayment || busy) return;
-          if (cashConfirmation !== order.pricing.totalPaidAmount || order.paymentStatus !== 'unpaid') {
+          if (!canConfirmCashPayment || cashConfirmation !== order.pricing.totalPaidAmount) {
             setValidationError('Trạng thái hoặc số tiền đã thay đổi. Vui lòng kiểm tra lại đơn.');
             setCashConfirmation(null); return;
           }
@@ -262,13 +272,17 @@ export function FixedPriceActionForm({
         }}
       />
       <ConfirmDialog
-        open={paymentConfirmation !== null}
+        open={paymentConfirmation !== null && canConfirmDirectPayment}
         title="Xác nhận đã thanh toán báo giá"
         message={`Bạn xác nhận đã nhận đủ ${formatMoney(paymentConfirmation?.amount)} tiền sửa chữa trực tiếp từ khách theo báo giá này?`}
         busy={busy}
         onCancel={() => { if (!busy) setPaymentConfirmation(null); }}
         onConfirm={() => {
           if (!paymentConfirmation || !onConfirmPayment || busy) return;
+          if (!canConfirmDirectPayment) {
+            setValidationError('Khách đã thanh toán trực tuyến hoặc trạng thái đơn đã thay đổi. Không cần xác nhận thu tiền mặt.');
+            setPaymentConfirmation(null); return;
+          }
           void onConfirmPayment(paymentConfirmation.quotationId, paymentConfirmation.revision).then((succeeded) => {
             if (succeeded) setPaymentConfirmation(null);
           });

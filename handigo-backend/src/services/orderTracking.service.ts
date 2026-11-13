@@ -1,4 +1,5 @@
-import { Order } from "../models/order.model";
+import { Order, type IOrder } from "../models/order.model";
+import { startSession } from "mongoose";
 import { Provider } from "../models/provider.model";
 import { Location } from "../models/location.model";
 import { Address } from "../models/address.model";
@@ -6,6 +7,62 @@ import { AppError } from "../utils/appError";
 import * as locationService from "./location.service";
 import { getDrivingRoute } from "./routing.service";
 import type { TrackingRouteQuery } from "../validations/order.validator";
+import { haversineMeters } from "./matching.service";
+import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
+import { withTransactionRetry } from "../utils/transaction";
+
+type TrackingLocationPayload = {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  capturedAt?: number;
+};
+
+// Chỉ xác nhận từ GPS mới, sai số tối đa 50 m, qua hai mẫu cách nhau ít nhất 8 giây.
+const detectProviderMovement = async (orderId: string, providerId: IOrder["providerId"], payload: TrackingLocationPayload) => {
+  const now = Date.now();
+  if (payload.accuracy === undefined || !Number.isFinite(payload.accuracy) || payload.accuracy < 0 || payload.accuracy > 50 ||
+    payload.capturedAt === undefined || !Number.isFinite(payload.capturedAt) ||
+    payload.capturedAt > now + 5000 || now - payload.capturedAt > 30_000) return;
+
+  const session = await startSession();
+  try {
+    const notification = await withTransactionRetry(session, async () => {
+      const order = await Order.findOne({ _id: orderId, providerId, status: "accepted", isDeleted: false })
+        .select("customerId orderCode arrival +movementTracking").session(session).lean();
+      if (!order || (order.arrival && String(order.arrival.providerId) === String(providerId))) return null;
+      const sampleAt = new Date(payload.capturedAt!);
+      const previous = order.movementTracking;
+      const sameProvider = previous && String(previous.providerId) === String(providerId);
+      if (sameProvider && (previous.notifiedAt || sampleAt.getTime() - previous.lastSampleAt.getTime() < 8000)) return null;
+
+      const tracking = sameProvider ? { ...previous } : {
+        providerId: providerId!, latitude: payload.latitude, longitude: payload.longitude,
+        lastSampleAt: sampleAt, confirmationStartedAt: null, notifiedAt: null,
+      };
+      let startedMoving = false;
+      if (sameProvider) {
+        const distance = haversineMeters(tracking.latitude, tracking.longitude, payload.latitude, payload.longitude);
+        if (distance >= 200) {
+          startedMoving = Boolean(tracking.confirmationStartedAt &&
+            sampleAt.getTime() - previous.lastSampleAt.getTime() <= 60_000);
+          tracking.confirmationStartedAt = startedMoving ? tracking.confirmationStartedAt : sampleAt;
+        } else tracking.confirmationStartedAt = null;
+      }
+      tracking.lastSampleAt = sampleAt;
+      if (startedMoving) tracking.notifiedAt = new Date();
+      await Order.updateOne({ _id: order._id, providerId, status: "accepted", isDeleted: false },
+        { $set: { movementTracking: tracking } }, { session, runValidators: true });
+      if (!startedMoving) return null;
+      return createNotificationRecord({
+        userId: order.customerId, type: "ORDER", title: "Thợ đã bắt đầu di chuyển",
+        content: `Thợ của đơn ${order.orderCode} đã bắt đầu di chuyển. Bạn có thể theo dõi vị trí và thời gian dự kiến đến trên bản đồ.`,
+        data: { orderId: String(order._id), action: "provider_started_moving" },
+      }, { session, deferRealtime: true });
+    });
+    if (notification) emitRealtimeNotification(notification);
+  } finally { await session.endSession(); }
+};
 
 type TrackingRole = "CUSTOMER" | "PROVIDER";
 
@@ -59,7 +116,7 @@ const getTrackingParticipants = async (
   role: TrackingRole,
   options: { requireActiveTracking?: boolean } = {},
 ) => {
-  const order = await Order.findById(orderId)
+  const order = await Order.findOne({ _id: orderId, isDeleted: false })
     .select("customerId providerId addressId addressSnapshot status createdAt")
     .lean();
   if (!order) {
@@ -77,7 +134,7 @@ const getTrackingParticipants = async (
     throw new AppError(trackingText.inactiveOrder, 400);
   }
 
-  const provider = await Provider.findById(order.providerId)
+  const provider = await Provider.findOne({ _id: order.providerId, isDeleted: false })
     .select("userId")
     .lean();
   if (!provider) {
@@ -211,15 +268,13 @@ export const updateOrderTrackingLocation = async (
   orderId: string,
   userId: string,
   role: TrackingRole,
-  payload: { latitude: number; longitude: number },
+  payload: TrackingLocationPayload,
 ) => {
   if (role !== "PROVIDER") {
     throw new AppError(trackingText.forbidden, 403);
   }
 
-  const { order, customerUserId, providerUserId } = await getTrackingParticipants(orderId, userId, role);
-  void customerUserId;
-  void providerUserId;
+  const { order } = await getTrackingParticipants(orderId, userId, role);
   if (!locationUpdateAllowedStatuses.includes(order.status)) {
     throw new AppError(trackingText.inactiveOrder, 400);
   }
@@ -236,6 +291,7 @@ export const updateOrderTrackingLocation = async (
   }
 
   const location = await locationService.updateCurrentLocation(userId, payload);
+  if (order.status === "accepted") await detectProviderMovement(orderId, order.providerId, payload);
   return {
     orderId,
     ownerType: role === "PROVIDER" ? "provider" : "customer",

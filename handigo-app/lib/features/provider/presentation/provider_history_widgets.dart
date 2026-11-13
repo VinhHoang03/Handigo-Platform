@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../orders/domain/order_summary.dart';
 import '../../orders/presentation/order_screens.dart';
+import 'provider_assignment_customer_info.dart';
 
 class ProviderHistoryFilter extends StatelessWidget {
   const ProviderHistoryFilter({
@@ -39,7 +40,9 @@ class ProviderHistoryFilter extends StatelessWidget {
               child: Text(
                 '$count',
                 style: TextStyle(
-                  color: selected ? scheme.primary : scheme.onSurfaceVariant,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Colors.black
+                      : scheme.onSurface,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -59,6 +62,11 @@ class ProviderHistoryOrderCard extends StatelessWidget {
   final OrderSummary order;
 
   @override
-  Widget build(BuildContext context) =>
-      OrderSummaryCard(order: order, providerView: true);
+  Widget build(BuildContext context) => OrderSummaryCard(
+    order: order,
+    providerView: true,
+    providerInfo: order.serviceType == 'variable_price'
+        ? ProviderAssignmentCustomerInfo(orderId: order.id, order: order)
+        : null,
+  );
 }

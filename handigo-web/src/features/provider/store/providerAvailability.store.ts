@@ -8,6 +8,8 @@ interface ProviderAvailabilityState {
   availabilityStatus: ProviderAvailabilityStatus;
   initializationStatus: InitializationStatus;
   isUpdating: boolean;
+  isConnected: boolean;
+  setIsConnected: (isConnected: boolean) => void;
   startInitialization: (providerUserId: string) => boolean;
   completeInitialization: (
     providerUserId: string,
@@ -25,6 +27,8 @@ export const useProviderAvailabilityStore =
     availabilityStatus: "offline",
     initializationStatus: "idle",
     isUpdating: false,
+    isConnected: false,
+    setIsConnected: (isConnected) => set({ isConnected }),
     startInitialization: (providerUserId) => {
       const state = get();
       if (

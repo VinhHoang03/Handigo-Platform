@@ -9,6 +9,9 @@ import '../domain/order_summary.dart';
 import 'order_screens.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../booking/data/pending_booking_store.dart';
+import '../../booking/presentation/booking_payos_panel.dart';
+import '../../../shared/widgets/app_feedback.dart';
+import '../../service_catalog/presentation/booking_voucher_selector.dart';
 
 final orderPaymentsProvider = FutureProvider.autoDispose
     .family<List<Map<String, dynamic>>, String>(
@@ -82,26 +85,56 @@ class _OrderPaymentPanelState extends ConsumerState<OrderPaymentPanel>
               !widget.order.inspectionRequired || method != PaymentMethod.cash,
         )
         .toList();
-    final method = await showModalBottomSheet<PaymentMethod>(
-      useRootNavigator: true,
-      context: context,
+    final method = await AppBottomSheet.show<PaymentMethod>(
+      context,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(title: Text('Chọn phương thức thanh toán')),
-            for (final method in methods)
-              ListTile(
-                title: Text(
-                  {
-                    'wallet': 'Ví Handigo',
-                    'bank': 'PayOS',
-                    'cash': 'Tiền mặt',
-                  }[method.name]!,
-                ),
-                onTap: () => Navigator.pop(context, method),
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Phương thức thanh toán',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Đóng',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
-          ],
+              const SizedBox(height: 8),
+              for (final method in methods)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  iconColor: Theme.of(context).colorScheme.primary,
+                  leading: Icon(switch (method) {
+                    PaymentMethod.wallet =>
+                      Icons.account_balance_wallet_outlined,
+                    PaymentMethod.bank => Icons.qr_code_rounded,
+                    PaymentMethod.cash => Icons.payments_outlined,
+                  }),
+                  title: Text(switch (method) {
+                    PaymentMethod.wallet => 'Ví Handigo',
+                    PaymentMethod.bank => 'PayOS',
+                    PaymentMethod.cash => 'Tiền mặt',
+                  }),
+                  subtitle: Text(switch (method) {
+                    PaymentMethod.wallet => 'Dùng số dư trong Ví Handigo',
+                    PaymentMethod.bank => 'Quét mã QR để chuyển khoản',
+                    PaymentMethod.cash => 'Thanh toán trực tiếp cho thợ',
+                  }),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pop(context, method),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -133,7 +166,9 @@ class _OrderPaymentPanelState extends ConsumerState<OrderPaymentPanel>
         expectedAmount: widget.order.totalAmount,
       );
       refresh();
-      if (result.checkoutUrl != null && result.status != 'paid') {
+      if (method != PaymentMethod.bank &&
+          result.checkoutUrl != null &&
+          result.status != 'paid') {
         final uri = Uri.parse(result.checkoutUrl!);
         if (!['https', 'http'].contains(uri.scheme) ||
             !await launchUrl(uri, mode: LaunchMode.externalApplication))
@@ -156,35 +191,14 @@ class _OrderPaymentPanelState extends ConsumerState<OrderPaymentPanel>
   Future<void> editVoucher({bool remove = false}) async {
     if (busy) return;
     setState(() => busy = true);
-    final input = TextEditingController();
     final code = remove
         ? ''
         : await showDialog<String>(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Áp dụng mã ưu đãi'),
-              content: TextField(
-                controller: input,
-                maxLength: 50,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(labelText: 'Mã voucher'),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Quay lại'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (input.text.trim().isNotEmpty)
-                      Navigator.pop(context, input.text.trim());
-                  },
-                  child: const Text('Áp dụng'),
-                ),
-              ],
+            builder: (_) => _OrderVoucherDialog(
+              inspectionRequired: widget.order.inspectionRequired,
             ),
           );
-    input.dispose();
     if (code == null || !mounted) {
       if (mounted) setState(() => busy = false);
       return;
@@ -281,11 +295,13 @@ class _OrderPaymentPanelState extends ConsumerState<OrderPaymentPanel>
               ),
             ],
             if (order.paymentMethod == 'bank' &&
-                order.paymentStatus == 'unpaid') ...[
+                order.paymentStatus == 'unpaid' &&
+                order.status != 'cancelled') ...[
               const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: busy ? null : checkPayment,
-                child: const Text('Kiểm tra thanh toán PayOS'),
+              BookingPayosPanel(
+                key: ValueKey(order.id),
+                orderId: order.id,
+                onPaid: refresh,
               ),
             ],
             if (order.status == 'created' && order.paymentStatus == 'unpaid')
@@ -306,6 +322,52 @@ class _OrderPaymentPanelState extends ConsumerState<OrderPaymentPanel>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _OrderVoucherDialog extends StatefulWidget {
+  const _OrderVoucherDialog({required this.inspectionRequired});
+
+  final bool inspectionRequired;
+
+  @override
+  State<_OrderVoucherDialog> createState() => _OrderVoucherDialogState();
+}
+
+class _OrderVoucherDialogState extends State<_OrderVoucherDialog> {
+  final _input = TextEditingController();
+
+  @override
+  void dispose() {
+    _input.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final code = _input.text.trim().toUpperCase();
+    return AlertDialog(
+      scrollable: true,
+      title: const Text('Áp dụng mã ưu đãi'),
+      content: SizedBox(
+        width: 400,
+        child: BookingVoucherField(
+          controller: _input,
+          inspectionRequired: widget.inspectionRequired,
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Đóng'),
+        ),
+        FilledButton(
+          onPressed: code.isEmpty ? null : () => Navigator.pop(context, code),
+          child: const Text('Áp dụng'),
+        ),
+      ],
     );
   }
 }
@@ -357,11 +419,39 @@ class OrderPaymentSummary extends StatelessWidget {
   final OrderDetail order;
   final RepairQuotation? quotation;
 
+  double? _completedPaidAmount(double paidDeposit) {
+    if (!order.inspectionRequired) {
+      return order.paymentStatus == 'paid' ? order.totalAmount : 0;
+    }
+    if (order.paymentStatus != 'paid') return paidDeposit;
+
+    final repair = quotation;
+    if (repair == null) return null;
+    if (!repair.usable) return paidDeposit;
+
+    final repairAmount = (repair.finalAmount - paidDeposit)
+        .clamp(0, double.infinity)
+        .toDouble();
+    final paidRepair = repair.directPaymentConfirmedAt == null
+        ? repairAmount
+        : repair.directPaymentConfirmedAmount ?? repairAmount;
+    return paidDeposit + paidRepair;
+  }
+
   @override
   Widget build(BuildContext context) {
     final voucher = (order.pricing['voucherDiscountAmount'] as num?) ?? 0;
     final baseAmount = order.pricing['baseAmount'] as num?;
     final paidDeposit = quotation?.paidDeposit ?? order.appliedDeposit;
+    final completed = order.status == 'completed';
+    final refunded = [
+      'refunded',
+      'partially_refunded',
+    ].contains(order.paymentStatus);
+    final showPaidAmount = completed && !refunded;
+    final paidAmount = showPaidAmount
+        ? _completedPaidAmount(paidDeposit)
+        : null;
     final amountDue =
         providerView && quotation?.directPaymentConfirmedAt != null
         ? 0
@@ -376,9 +466,10 @@ class OrderPaymentSummary extends StatelessWidget {
                     ));
     final showAmountDue =
         amountDue != null &&
+        !completed &&
         (!providerView || !order.inspectionRequired || quotation != null) &&
-        !['cancelled'].contains(order.status) &&
-        !['refunded', 'partially_refunded'].contains(order.paymentStatus);
+        order.status != 'cancelled' &&
+        !refunded;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -403,12 +494,20 @@ class OrderPaymentSummary extends StatelessWidget {
         if (providerView &&
             order.inspectionRequired &&
             quotation == null &&
+            !completed &&
             order.status != 'cancelled')
           const _PaymentLine(
             label: 'Số tiền cuối cần thu',
             value: 'Chờ báo giá',
           ),
-        if (showAmountDue) ...[
+        if (showPaidAmount) ...[
+          const Divider(height: 20),
+          _PaymentLine(
+            label: 'Số tiền đã thanh toán',
+            value: paidAmount == null ? 'Chưa có dữ liệu' : _money(paidAmount),
+            emphasized: true,
+          ),
+        ] else if (showAmountDue) ...[
           const Divider(height: 20),
           _PaymentLine(
             label: providerView

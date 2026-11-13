@@ -11,8 +11,8 @@ export const feedbackService = {
       if (!isCurrent()) throw new Error('Đơn hàng đã thay đổi. Vui lòng mở lại đánh giá.');
       const finalPayload = { ...payload, images: [...(payload.images || []), ...uploaded] };
       return feedbackId
-        ? feedbackApi.update(feedbackId, finalPayload)
-        : feedbackApi.create(finalPayload);
+        ? await feedbackApi.update(feedbackId, finalPayload)
+        : await feedbackApi.create(finalPayload);
     } catch (error) {
       if (axios.isAxiosError<{ message?: string }>(error)) {
         throw new Error(error.response?.data?.message || 'Không thể tải ảnh hoặc lưu đánh giá.', { cause: error });

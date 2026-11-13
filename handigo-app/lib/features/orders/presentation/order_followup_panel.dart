@@ -370,6 +370,7 @@ class _InlineOrderReviewState extends ConsumerState<_InlineOrderReview> {
         Text(
           '${formatRating(rating)} / 5 sao',
           style: Theme.of(context).textTheme.bodySmall,
+          textAlign: TextAlign.center,
         ),
       if (rating > 0) ...[
         const SizedBox(height: 8),

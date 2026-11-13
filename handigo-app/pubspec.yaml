@@ -17,6 +17,8 @@ dependencies:
   cookie_jar: ^4.0.8
   dio_cookie_manager: ^3.3.0
   flutter_secure_storage: ^10.0.0
+  google_sign_in: ^7.2.0
+  flutter_facebook_auth: ^7.1.8
   intl: ^0.20.2
   image_picker: ^1.1.2
   url_launcher: ^6.3.1
@@ -28,6 +30,7 @@ dependencies:
   flutter_map: ^8.3.2
   latlong2: ^0.9.1
   audioplayers: ^6.7.1
+  material_symbols_icons: ^4.2960.0
 
 dev_dependencies:
   flutter_test:

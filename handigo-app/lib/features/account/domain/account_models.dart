@@ -49,14 +49,40 @@ class WalletInfo {
     this.balance = 0,
     this.pendingBalance = 0,
     this.currency = 'VND',
+    this.totalEarnings,
+    this.totalWithdrawn,
   });
   factory WalletInfo.fromJson(Map<String, dynamic> json) => WalletInfo(
     balance: _num(json['balance']),
     pendingBalance: _num(json['pendingBalance']),
     currency: '${json['currency'] ?? 'VND'}',
+    totalEarnings: _nullableNum(json['totalEarnings']),
+    totalWithdrawn: _nullableNum(json['totalWithdrawn']),
   );
   final double balance, pendingBalance;
+  final double? totalEarnings, totalWithdrawn;
   final String currency;
+}
+
+class WalletSummary {
+  const WalletSummary({
+    this.currentBalance = 0,
+    this.totalEarnings = 0,
+    this.totalWithdrawals = 0,
+    this.totalPlatformFeesPaid = 0,
+  });
+
+  factory WalletSummary.fromJson(Map<String, dynamic> json) => WalletSummary(
+    currentBalance: _num(json['currentBalance']),
+    totalEarnings: _num(json['totalEarnings']),
+    totalWithdrawals: _num(json['totalWithdrawals']),
+    totalPlatformFeesPaid: _num(json['totalPlatformFeesPaid']),
+  );
+
+  final double currentBalance;
+  final double totalEarnings;
+  final double totalWithdrawals;
+  final double totalPlatformFeesPaid;
 }
 
 class WalletTransactionItem {
@@ -118,6 +144,11 @@ class VoucherItem {
     this.startAt,
     this.endAt,
     this.applicableOrderType,
+    this.maxDiscountAmount,
+    this.neverExpires = false,
+    this.isActive = true,
+    this.status = 'ACTIVE',
+    this.reservedOrderId,
   });
   factory VoucherItem.fromJson(Map<String, dynamic> json) => VoucherItem(
     code: '${json['code'] ?? ''}',
@@ -129,11 +160,56 @@ class VoucherItem {
     startAt: json['startAt'] as String?,
     endAt: json['endAt'] as String?,
     applicableOrderType: json['applicableOrderType'] as String?,
+    maxDiscountAmount: _nullableNum(json['maxDiscountAmount']),
+    neverExpires: json['neverExpires'] == true,
+    isActive: json['isActive'] != false,
+    status: '${json['status'] ?? 'ACTIVE'}',
+    reservedOrderId: _valueId(json['reservedOrderId']),
   );
   final String code, name;
   final String? description, discountType, startAt, endAt;
   final String? applicableOrderType;
   final double discountValue, minOrderAmount;
+  final double? maxDiscountAmount;
+  final bool neverExpires, isActive;
+  final String status;
+  final String? reservedOrderId;
+
+  bool get expired =>
+      !neverExpires &&
+      endAt != null &&
+      DateTime.tryParse(endAt!)?.isBefore(DateTime.now()) == true;
+  bool get usable =>
+      isActive &&
+      !expired &&
+      !['INACTIVE', 'EXPIRED'].contains(status.toUpperCase()) &&
+      (startAt == null ||
+          DateTime.tryParse(startAt!)?.isAfter(DateTime.now()) != true);
+}
+
+class VoucherUsageItem {
+  const VoucherUsageItem({
+    required this.name,
+    required this.code,
+    required this.discountAmount,
+    required this.status,
+    this.orderId,
+    this.orderCode,
+    this.usedAt,
+  });
+  factory VoucherUsageItem.fromJson(Map<String, dynamic> json) =>
+      VoucherUsageItem(
+        name: '${json['name'] ?? 'Voucher đã sử dụng'}',
+        code: '${json['code'] ?? ''}',
+        discountAmount: _num(json['discountAmount']),
+        status: '${json['status'] ?? 'used'}',
+        orderId: json['orderId'] as String?,
+        orderCode: json['orderCode'] as String?,
+        usedAt: json['usedAt'] as String?,
+      );
+  final String name, code, status;
+  final double discountAmount;
+  final String? orderId, orderCode, usedAt;
 }
 
 class FeedbackItem {
@@ -175,7 +251,7 @@ class SupportItem {
     title: '${json['subject'] ?? json['title'] ?? ''}',
     description: '${json['description'] ?? ''}',
     status: '${json['status'] ?? ''}',
-    category: json['category'] as String?,
+    category: (json['category'] ?? json['reportType']) as String?,
     createdAt: json['createdAt'] as String?,
   );
   final String id, title, description, status;
@@ -187,3 +263,8 @@ String? _valueId(dynamic value) =>
     value is Map ? '${value['_id'] ?? value['id'] ?? ''}' : value as String?;
 double _num(dynamic value) =>
     value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+double? _nullableNum(dynamic value) => value == null
+    ? null
+    : value is num
+    ? value.toDouble()
+    : double.tryParse('$value');

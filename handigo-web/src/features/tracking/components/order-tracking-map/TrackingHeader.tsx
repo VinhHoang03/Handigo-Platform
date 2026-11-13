@@ -1,7 +1,8 @@
 import { mapText } from "./constants";
-import { LocateFixed, Ruler } from "lucide-react";
+import { Clock3, LocateFixed, Ruler } from "lucide-react";
 
 interface TrackingHeaderProps {
+  etaLabel: string | null;
   liveTrackingEnabled: boolean;
   otherPartyLabel: string;
   addressLine: string;
@@ -9,6 +10,7 @@ interface TrackingHeaderProps {
 }
 
 export function TrackingHeader({
+  etaLabel,
   liveTrackingEnabled,
   otherPartyLabel,
   addressLine,
@@ -28,6 +30,12 @@ export function TrackingHeader({
             ? `Bạn và ${otherPartyLabel} ${mapText.bothLocationNote}`
             : addressLine || mapText.fallbackAddress}
         </p>
+        {etaLabel && (
+          <p role="status" className="flex items-center gap-2 text-sm font-semibold text-primary">
+            <Clock3 aria-hidden="true" size={18} />
+            {etaLabel}
+          </p>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-2">

@@ -8,11 +8,17 @@ final customerHomeRepositoryProvider = Provider<CustomerHomeRepository>(
   (ref) => CustomerHomeRepository(ref.watch(apiClientProvider)),
 );
 
-final customerHomeProvider = FutureProvider<CustomerHomeData>(
-  (ref) async {
-    final locationState = ref.watch(deviceLocationProvider);
-    return ref.watch(customerHomeRepositoryProvider).load(
-      currentPosition: locationState.asData?.value.position,
-    );
-  },
+final customerHomeRewardsProvider = FutureProvider.autoDispose<HomeRewards>(
+  (ref) => ref.watch(customerHomeRepositoryProvider).loadRewards(),
 );
+
+final customerNewsProvider = FutureProvider.autoDispose<List<HomeNewsArticle>>(
+  (ref) => ref.watch(customerHomeRepositoryProvider).loadNews(),
+);
+
+final customerHomeProvider = FutureProvider<CustomerHomeData>((ref) async {
+  final locationState = ref.watch(deviceLocationProvider);
+  return ref
+      .watch(customerHomeRepositoryProvider)
+      .load(currentPosition: locationState.asData?.value.position);
+});

@@ -107,6 +107,7 @@ const SupportTicketSchema = new Schema<ISupportTicket>(
 SupportTicketSchema.index({ requesterId: 1, createdAt: -1 });
 SupportTicketSchema.index({ status: 1, priority: 1, createdAt: -1 });
 SupportTicketSchema.index({ assignedAdminId: 1, status: 1 });
+SupportTicketSchema.index({ status: 1, createdAt: 1, _id: 1 });
 
 export const SupportTicket = model<ISupportTicket>(
   "SupportTicket",

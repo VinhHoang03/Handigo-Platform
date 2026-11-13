@@ -11,6 +11,8 @@ export interface IServiceSuggestion extends Document, IBaseDocument {
   status: "pending" | "approved" | "rejected";
   reviewedBy?: Types.ObjectId | null;
   reviewedAt?: Date | null;
+  reviewSource?: "manual" | "ai";
+  aiAssessmentId?: Types.ObjectId | null;
   adminNote?: string | null;
   createdServiceId?: Types.ObjectId | null;
   createdCategoryId?: Types.ObjectId | null;
@@ -32,6 +34,8 @@ const ServiceSuggestionSchema = new Schema<IServiceSuggestion>(
     status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
     reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     reviewedAt: { type: Date, default: null },
+    reviewSource: { type: String, enum: ["manual", "ai"], default: "manual" },
+    aiAssessmentId: { type: Schema.Types.ObjectId, ref: "AdminAIAssessment", default: null },
     adminNote: { type: String, default: null },
     createdServiceId: { type: Schema.Types.ObjectId, ref: "Service", default: null },
     createdCategoryId: { type: Schema.Types.ObjectId, ref: "Category", default: null },
@@ -52,6 +56,7 @@ ServiceSuggestionSchema.pre("validate", function () {
 
 ServiceSuggestionSchema.index({ providerId: 1, status: 1 });
 ServiceSuggestionSchema.index({ suggestionType: 1, status: 1, createdAt: -1 });
+ServiceSuggestionSchema.index({ status: 1, updatedAt: 1, _id: 1 });
 
 export const ServiceSuggestion = model<IServiceSuggestion>(
   "ServiceSuggestion",

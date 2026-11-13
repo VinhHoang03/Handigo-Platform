@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { StatCard } from "../components/shared/StatCard";
-import { systemConfigApi } from "../api/systemConfig.api";
+import { systemConfigApi, type OrderScanReport } from "../api/systemConfig.api";
+import { OrderScanModal } from "../components/system-configs/OrderScanModal";
 import type {
   ConfigFormState,
   ConfigGroupKey,
@@ -22,7 +23,7 @@ import {
   stringifyValue,
 } from "../components/system-configs/system-config-format";
 import type { SystemConfigPayload, SystemConfigQuery, UpdateSystemConfigPayload } from "../types/systemConfig.types";
-import { Globe, Settings, Zap } from "lucide-react";
+import { Globe, ListChecks, Settings, Zap } from "lucide-react";
 
 export default function AdminSystemConfigsPage() {
   const { addToast } = useToast();
@@ -30,6 +31,10 @@ export default function AdminSystemConfigsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>("", "error");
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanReport, setScanReport] = useState<OrderScanReport | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [scanError, setScanError] = useState("");
   const [activeGroup, setActiveGroup] = useState<ConfigGroupKey | "all">("all");
   const [editing, setEditing] = useState<ConfigItem | null>(null);
   const [form, setForm] = useState<ConfigFormState>({
@@ -131,13 +136,49 @@ export default function AdminSystemConfigsPage() {
     }
   };
 
+  const scanOrders = async () => {
+    if (scanning) return;
+    setScanning(true);
+    try {
+      setScanError("");
+      setScanReport(await systemConfigApi.previewOrderScan());
+    } catch (err) {
+      addToast(getErrorMessage(err), "error");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const processOrders = async () => {
+    if (!scanReport || processing) return;
+    setProcessing(true);
+    try {
+      const { failed, skipped } = await systemConfigApi.scanOrders(scanReport.token);
+      setScanReport(null);
+      if (failed || skipped) {
+        addToast(`Đã chạy xử lý. ${failed} lượt lỗi, ${skipped} đơn đã thay đổi từ lúc quét.`, failed ? "error" : "info");
+      } else addToast("Đã xử lý các đơn trong báo cáo.", "success");
+    } catch (err) {
+      setScanError(getErrorMessage(err));
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   return (
     <DashboardShell role="ADMIN">
       <div className="space-y-6">
         <header className="admin-page-header">
           <AdminPageTitle title="Cấu hình hệ thống" />
-        <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
-      </header>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button type="button" className="btn-secondary inline-flex items-center gap-2" disabled={scanning}
+              onClick={() => void scanOrders()} aria-busy={scanning}>
+              <ListChecks aria-hidden="true" size={18} />
+              {scanning ? "Đang quét đơn…" : "Quét đơn"}
+            </button>
+            <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
+          </div>
+        </header>
 
         <div className="grid gap-4 sm:grid-cols-3">
           <StatCard icon={Settings} label="Đã thiết lập" value={stats.configuredCount} />
@@ -182,6 +223,8 @@ export default function AdminSystemConfigsPage() {
         onCancel={() => setPendingSave(null)}
         onConfirm={confirmSave}
       />
+      {scanReport && <OrderScanModal report={scanReport} busy={processing} error={scanError}
+        onClose={() => setScanReport(null)} onProcess={() => void processOrders()} />}
     </DashboardShell>
   );
 }

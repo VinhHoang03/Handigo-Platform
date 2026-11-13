@@ -16,6 +16,7 @@ import * as categoryService from "./category.service";
 import * as catalogService from "./service.service";
 import { withTransactionRetry } from '../utils/transaction';
 import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
+import type { AutomatedReviewContext } from "../ai/admin/admin-ai.review-context";
 
 const ensureObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
@@ -113,6 +114,7 @@ const updateServiceSuggestionInSession = async (
   data: UpdateServiceSuggestionPayload,
   adminId: string,
   session: ClientSession,
+  automation?: AutomatedReviewContext,
 ) => {
   ensureObjectId(suggestionId, "Mã đề xuất");
   ensureObjectId(adminId, "Mã admin");
@@ -126,6 +128,17 @@ const updateServiceSuggestionInSession = async (
     throw new AppError("Không tìm thấy đề xuất", 404);
   }
 
+  const changesDecision = data.status !== undefined || data.categoryId !== undefined
+    || data.createdServiceId !== undefined || data.createdCategoryId !== undefined || Boolean(data.serviceDraft);
+  if (suggestion.status !== "pending" && changesDecision) {
+    throw new AppError("Đề xuất đã được xử lý, không thể thay đổi quyết định hoặc dịch vụ/danh mục liên kết. Vui lòng làm mới.", 409);
+  }
+
+  if (automation) {
+    if (suggestion.status !== "pending" || suggestion.suggestionType !== "service") throw new AppError("Đề xuất không còn phù hợp để AI tự duyệt.", 409);
+    await automation.beforeWrite(session);
+  }
+
   if (data.serviceDraft) {
     if (suggestion.suggestionType !== 'service') throw new AppError('Chỉ đề xuất dịch vụ mới được tạo dịch vụ.', 400);
     if (suggestion.status !== 'pending' || suggestion.createdServiceId) throw new AppError('Đề xuất đã được xử lý hoặc đã có dịch vụ liên kết. Vui lòng làm mới.', 409);
@@ -134,10 +147,12 @@ const updateServiceSuggestionInSession = async (
     if (!await Category.exists({ _id: data.serviceDraft.categoryId, isDeleted: false }).session(session)) throw new AppError('Không tìm thấy danh mục.', 404);
   }
 
-  const updateData: Partial<IServiceSuggestion> = {
-    reviewedBy: new Types.ObjectId(adminId),
+  const updateData: Partial<IServiceSuggestion> = changesDecision ? {
+    reviewedBy: automation ? null : new Types.ObjectId(adminId),
     reviewedAt: new Date(),
-  };
+    reviewSource: automation ? "ai" : "manual",
+    aiAssessmentId: automation ? new Types.ObjectId(automation.assessmentId) : null,
+  } : {};
 
   if (data.status !== undefined) {
     updateData.status = data.status;
@@ -241,9 +256,9 @@ const updateServiceSuggestionInSession = async (
   }
 
   const updatedSuggestion = await ServiceSuggestion.findOneAndUpdate(
-    { _id: suggestionId, isDeleted: false, ...(data.serviceDraft ? { status: 'pending', createdServiceId: null } : {}) },
-    { $set: updateData },
-    { new: true, runValidators: true, session },
+    { _id: suggestionId, isDeleted: false, status: suggestion.status, ...(data.serviceDraft ? { createdServiceId: null } : {}) },
+    { $set: updateData, $inc: { __v: 1 } },
+    { returnDocument: "after", runValidators: true, session },
   ).lean<IServiceSuggestion>();
 
   if (!updatedSuggestion) {
@@ -268,12 +283,12 @@ const updateServiceSuggestionInSession = async (
   return { suggestion: updatedSuggestion, notification };
 };
 
-export const updateServiceSuggestion = async (suggestionId: string, data: UpdateServiceSuggestionPayload, adminId: string): Promise<IServiceSuggestion> => {
+export const updateServiceSuggestion = async (suggestionId: string, data: UpdateServiceSuggestionPayload, adminId: string, automation?: AutomatedReviewContext): Promise<IServiceSuggestion> => {
   ensureObjectId(suggestionId, 'Mã đề xuất');
   ensureObjectId(adminId, 'Mã admin');
   const session = await mongoose.startSession();
   try {
-    const result = await withTransactionRetry(session, () => updateServiceSuggestionInSession(suggestionId, data, adminId, session));
+    const result = await withTransactionRetry(session, () => updateServiceSuggestionInSession(suggestionId, data, adminId, session, automation));
     if (!result) throw new AppError('Không thể cập nhật đề xuất. Vui lòng thử lại.', 409);
     if (result.notification) emitRealtimeNotification(result.notification);
     return await getServiceSuggestionById(suggestionId);

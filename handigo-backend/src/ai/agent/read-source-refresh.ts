@@ -3,6 +3,9 @@ import type { AgentTool } from "../tools/tool.interface";
 
 // Danh sách tường minh: không suy quyền phát lại từ riêng cờ mutates=false của một tool mới.
 export const REFRESHABLE_READ_TOOLS = new Set([
+  "get_booking_reschedule", "get_booking_arrival_estimate", "get_my_rewards", "get_reward_history",
+  "get_my_reward_vouchers", "get_my_wallet", "get_wallet_history", "get_wallet_deposit_status",
+  "get_repair_advice", "analyze_repair_images",
   "search_customer_knowledge", "get_system_info", "search_services", "get_service", "get_service_catalog", "get_addresses",
   "get_price", "get_available_times", "get_booking_vouchers", "search_booking_providers", "get_cancellation_preview",
   "get_booking", "get_my_bookings", "search_my_bookings", "get_previous_providers", "get_booking_provider",

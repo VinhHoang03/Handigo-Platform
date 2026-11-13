@@ -12,11 +12,19 @@ class ProviderLocationService extends ChangeNotifier {
     : _now = now ?? DateTime.now;
   final ApiClient _api;
   final DateTime Function() _now;
-  static const checkInterval = Duration(seconds: 30);
+  /// Chu kỳ gửi vị trí tự động lên hệ thống khi thợ bật nhận việc.
+  static const checkInterval = Duration(minutes: 5);
+
+  /// Thời gian thử lại khi lấy hoặc lưu vị trí lỗi.
+  static const retryInterval = Duration(seconds: 30);
+
+  /// Bỏ qua mẫu GPS nhiễu nếu lần lưu thành công gần nhất còn trong khoảng này.
+  static const noisySampleGrace = Duration(minutes: 6);
   static const movementThreshold = 25.0;
   StreamSubscription<Position>? _positions;
   Timer? _watchdog;
   Position? _anchor;
+  Position? _currentPosition;
   DateTime? _lastSampleAt, _lastSentAt;
   Future<void>? _operation;
   bool Function()? _shouldUpload;
@@ -25,13 +33,15 @@ class ProviderLocationService extends ChangeNotifier {
   bool _tracking = false, _disposed = false;
   ApiException? error;
   bool get tracking => _tracking;
+  Position? get synchronizedPosition => _anchor;
+  Position? get currentPosition => _currentPosition ?? synchronizedPosition;
 
   LocationSettings get streamSettings {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return AndroidSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 25,
-        intervalDuration: const Duration(seconds: 5),
+        intervalDuration: const Duration(seconds: 30),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'Handigo đang bật nhận việc',
           notificationChannelName: 'Vị trí khi nhận việc',
@@ -57,14 +67,27 @@ class ProviderLocationService extends ChangeNotifier {
     );
   }
 
-  Future<void> synchronize({required bool Function() shouldUpload}) {
+  Future<void> synchronize({
+    required bool Function() shouldUpload,
+    bool useCachedPosition = false,
+  }) {
     final generation = _generation;
     bool allowed() => !_disposed && generation == _generation && shouldUpload();
     return _run(() async {
       if (!allowed()) return;
       await _checkPermission(request: true);
       if (!allowed()) return;
-      final position = await _readPosition();
+      final recent = _currentPosition;
+      final age = recent == null ? null : _now().difference(recent.timestamp);
+      final position =
+          useCachedPosition &&
+              recent != null &&
+              age != null &&
+              !age.isNegative &&
+              age <= const Duration(seconds: 30) &&
+              recent.accuracy <= 25
+          ? recent
+          : await _readPosition();
       await _accept(position, allowed, force: true, manual: true);
     }, afterRunning: true);
   }
@@ -87,24 +110,36 @@ class ProviderLocationService extends ChangeNotifier {
         await _checkPermission();
         if (!_tracking || !allowed() || _disposed) return;
         _ensureStream();
+        final sentAt = _lastSentAt;
         if (force ||
+            error != null ||
             _lastSampleAt == null ||
-            _now().difference(_lastSampleAt!) >= checkInterval) {
+            _now().difference(_lastSampleAt!) >= checkInterval ||
+            sentAt == null ||
+            _now().difference(sentAt) >= checkInterval) {
           await _accept(await _readPosition(), allowed, force: force);
         }
       });
     } catch (failure) {
       if (generation == _generation) _report(failure);
     } finally {
-      _scheduleCheck();
+      _scheduleCheck(_nextCheckDelay());
     }
   }
 
-  void _scheduleCheck() {
+  void _scheduleCheck([Duration delay = checkInterval]) {
     _watchdog?.cancel();
     if (_tracking && !_disposed) {
-      _watchdog = Timer(checkInterval, () => unawaited(check()));
+      _watchdog = Timer(delay, () => unawaited(check()));
     }
+  }
+
+  /// Lượt kiểm tra kế tiếp rơi vào lúc đến hạn gửi định kỳ; khi đang lỗi thì thử lại sớm.
+  Duration _nextCheckDelay() {
+    final sentAt = _lastSentAt;
+    if (error != null || sentAt == null) return retryInterval;
+    final remaining = checkInterval - _now().difference(sentAt);
+    return remaining < retryInterval ? retryInterval : remaining;
   }
 
   void _ensureStream() {
@@ -122,7 +157,9 @@ class ProviderLocationService extends ChangeNotifier {
               _run(() => _accept(position, allowed)).catchError((
                 Object failure,
               ) {
-                if (generation == _generation) _report(failure);
+                if (generation != _generation) return;
+                _report(failure);
+                _scheduleCheck(_nextCheckDelay());
               }),
             );
           },
@@ -132,6 +169,8 @@ class ProviderLocationService extends ChangeNotifier {
             _positions = null;
             unawaited(subscription?.cancel());
             _report(failure);
+            // Kết nối lại luồng GPS sớm thay vì chờ đến chu kỳ gửi định kỳ.
+            _scheduleCheck(retryInterval);
           },
           onDone: () {
             if (generation == _generation) _positions = null;
@@ -193,13 +232,24 @@ class ProviderLocationService extends ChangeNotifier {
         (!manual && position.accuracy > 25) ||
         age > const Duration(seconds: 60) ||
         age < const Duration(seconds: -10)) {
+      // Bỏ mẫu tự động nhiễu, giữ mốc vừa lưu; không gửi tọa độ kém chất lượng.
+      final syncAge = _lastSentAt == null
+          ? null
+          : _now().difference(_lastSentAt!);
+      if (!manual &&
+          syncAge != null &&
+          !syncAge.isNegative &&
+          syncAge <= noisySampleGrace) {
+        return;
+      }
       throw const ApiException(
         'Vị trí chưa đủ chính xác hoặc đã cũ. Vui lòng ra nơi thoáng và thử lại.',
       );
     }
     if (!allowed() || _disposed) return;
+    _currentPosition = position;
+    notifyListeners();
     _lastSampleAt = _now();
-    _scheduleCheck();
     final previous = _anchor;
     final moved =
         manual ||
@@ -215,10 +265,14 @@ class ProviderLocationService extends ChangeNotifier {
     final elapsed = _lastSentAt == null
         ? checkInterval
         : _now().difference(_lastSentAt!);
+    // Mốc đang lưu có sai số lớn thì cho phép thay bằng mẫu chính xác ngay.
+    final upgradesCoarseAnchor = previous != null && previous.accuracy > 25;
+    // Gửi tự động tối đa mỗi 5 phút, kể cả khi đang di chuyển, để vị trí trên hệ thống ổn định.
     if (!force &&
-        ((!moved && elapsed < checkInterval) ||
-            elapsed < const Duration(seconds: 5))) {
+        (elapsed < const Duration(seconds: 5) ||
+            (!upgradesCoarseAnchor && elapsed < checkInterval))) {
       _clearError();
+      _scheduleCheck(_nextCheckDelay());
       return;
     }
     final target = moved ? position : previous;
@@ -238,7 +292,9 @@ class ProviderLocationService extends ChangeNotifier {
     if (_disposed || generation != _generation || !allowed()) return;
     if (moved) _anchor = position;
     _lastSentAt = _now();
+    if (moved && error == null) notifyListeners();
     _clearError();
+    _scheduleCheck(_nextCheckDelay());
   }
 
   Future<void> _run(

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const startOrderSchema = z.object({ workConfirmationEnabled: z.boolean().optional() }).optional();
+
 const orderStatusSchema = z.enum([
   "created",
   "accepted",

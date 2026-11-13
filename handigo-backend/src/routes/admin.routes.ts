@@ -47,7 +47,8 @@ import {
   violationIdSchema,
   violationListQuerySchema,
 } from "../validations/violation.validator";
-import { adminFeedbackListQuerySchema } from "../validations/feedback.validator";
+import { adminFeedbackListQuerySchema, moderationReportQuerySchema } from "../validations/feedback.validator";
+import { getModerationReport } from "../controllers/feedback.controller";
 
 const router = Router();
 
@@ -73,6 +74,8 @@ router.patch(
   validate(updateUserStatusSchema),
   adminController.updateUserStatus,
 );
+
+router.get("/feedbacks/moderation-report", validate(moderationReportQuerySchema, "query"), getModerationReport);
 
 router.get(
   "/feedbacks/:id",

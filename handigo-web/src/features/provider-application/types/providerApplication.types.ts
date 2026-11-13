@@ -144,6 +144,7 @@ export interface ApplicationActor {
 }
 
 export interface ProviderApplicationReviewHistory {
+  actorType?: 'user' | 'system';
   action: 'submitted' | 'rejected' | 'resubmitted' | 'approved';
   status: ProviderApplication['status'];
   actorId: ApplicationActor | string | null;

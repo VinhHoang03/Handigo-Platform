@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { SupportResponseNotice } from "@/features/case-management/components/SupportResponseNotice";
 
 /**
  * Lối vào tạo yêu cầu hỗ trợ cho khách chưa đăng nhập.
@@ -24,6 +25,9 @@ export function PublicSupportCta() {
         Đăng nhập để tạo yêu cầu có mã theo dõi. Bạn xem được tiến độ xử lý và
         trao đổi trực tiếp với bộ phận hỗ trợ ngay trong ứng dụng.
       </p>
+      <div className="mt-4">
+        <SupportResponseNotice />
+      </div>
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row">
         <Link

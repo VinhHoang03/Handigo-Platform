@@ -4,6 +4,7 @@ import { extname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { loadKnowledgeConfig } from "../ai/knowledge/knowledge.config";
 import { builtinKnowledgeSources } from "../ai/knowledge/ingestion/builtin-sources";
+import { repairKnowledgeSources } from "../ai/knowledge/repair-cases";
 import { prepareKnowledgeSource } from "../ai/knowledge/ingestion/chunker";
 import { KnowledgeRepository } from "../ai/knowledge/knowledge.repository";
 import { createEmbeddingProvider } from "../ai/knowledge/embeddings/embedding-provider";
@@ -18,10 +19,17 @@ class KnowledgeCommandError extends Error {}
 async function run() {
   const command = process.argv[2];
   const argument = (name: string) => process.argv.find((value) => value.startsWith(`--${name}=`))?.slice(name.length + 3);
-  const commands = ["indexes", "setup", "create-indexes", "enqueue-builtins", "enqueue-file", "worker", "status", "retry", "revoke", "evaluate"];
-  if (!command || !commands.includes(command)) throw new KnowledgeCommandError("Dùng lệnh indexes, setup, create-indexes, enqueue-builtins, enqueue-file, worker, status, retry, revoke hoặc evaluate.");
+  const commands = ["indexes", "setup", "create-indexes", "validate-repairs", "enqueue-builtins", "enqueue-repairs", "enqueue-file", "worker", "status", "retry", "revoke", "evaluate"];
+  if (!command || !commands.includes(command)) throw new KnowledgeCommandError("Dùng lệnh indexes, setup, create-indexes, validate-repairs, enqueue-builtins, enqueue-repairs, enqueue-file, worker, status, retry, revoke hoặc evaluate.");
   const config = loadKnowledgeConfig();
   const definitions = knowledgeIndexDefinitions(config);
+  if (command === "validate-repairs") {
+    const prepared = repairKnowledgeSources().map((source) => prepareKnowledgeSource(source, config));
+    console.log(JSON.stringify({ message: "Dữ liệu tư vấn hợp lệ; chưa kết nối hoặc ghi database.",
+      sources: prepared.length, chunks: prepared.reduce((count, item) => count + item.chunks.length, 0),
+      titles: prepared.map((item) => item.source.title) }, null, 2));
+    return;
+  }
   if (command === "indexes") {
     console.log(JSON.stringify({ collection: "ai_knowledge_chunks", generation: config.generation, definitions }, null, 2));
     return;
@@ -43,12 +51,14 @@ async function run() {
         console.log(`Đã yêu cầu tạo index: ${definition.name}.`);
       }
     }
-  } else if (command === "enqueue-builtins" || command === "enqueue-file") {
+  } else if (command === "enqueue-builtins" || command === "enqueue-repairs" || command === "enqueue-file") {
     const approvedBy = argument("approved-by");
     if (!approvedBy) throw new KnowledgeCommandError("Cần --approved-by để ghi nhận người duyệt nguồn công khai; không nhập dữ liệu riêng của khách.");
     let sources: unknown[];
     if (command === "enqueue-builtins") {
       sources = builtinKnowledgeSources();
+    } else if (command === "enqueue-repairs") {
+      sources = repairKnowledgeSources();
     } else {
       const file = argument("file");
       if (!file) throw new KnowledgeCommandError("Cần --file trỏ tới tệp JSON nguồn đã duyệt.");

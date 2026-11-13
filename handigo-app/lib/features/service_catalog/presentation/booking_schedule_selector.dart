@@ -15,7 +15,9 @@ DateTime _nextMorning(DateTime now) =>
     DateTime(now.year, now.month, now.day + 1, 8);
 
 class BookingScheduleButton extends ConsumerStatefulWidget {
-  const BookingScheduleButton({super.key});
+  const BookingScheduleButton({this.requiresSchedule = false, super.key});
+
+  final bool requiresSchedule;
 
   @override
   ConsumerState<BookingScheduleButton> createState() =>
@@ -55,7 +57,7 @@ class _BookingScheduleButtonState extends ConsumerState<BookingScheduleButton> {
   void _resetSchedule() {
     final now = ref.read(bookingScheduleClockProvider)();
     final controller = ref.read(bookingDraftProvider.notifier);
-    if (isImmediateBookingAvailable(now)) {
+    if (widget.requiresSchedule || isImmediateBookingAvailable(now)) {
       controller.clearSchedule();
     } else {
       controller.setScheduledAt(_nextMorning(now));
@@ -66,9 +68,13 @@ class _BookingScheduleButtonState extends ConsumerState<BookingScheduleButton> {
     if (_pickerOpen) return;
     setState(() => _pickerOpen = true);
     try {
+      final container = ProviderScope.containerOf(context, listen: false);
       await showDialog<void>(
         context: context,
-        builder: (_) => const BookingScheduleSelector(),
+        builder: (_) => UncontrolledProviderScope(
+          container: container,
+          child: const BookingScheduleSelector(),
+        ),
       );
     } finally {
       if (mounted) setState(() => _pickerOpen = false);
@@ -80,7 +86,7 @@ class _BookingScheduleButtonState extends ConsumerState<BookingScheduleButton> {
     final selected = ref.watch(bookingDraftProvider).scheduledAt;
     final now = ref.watch(bookingScheduleClockProvider)();
     final immediateAvailable = isImmediateBookingAvailable(now);
-    if (!immediateAvailable && selected == null) {
+    if (!widget.requiresSchedule && !immediateAvailable && selected == null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _ensureDefaultSchedule(),
       );
@@ -93,7 +99,9 @@ class _BookingScheduleButtonState extends ConsumerState<BookingScheduleButton> {
           children: [
             Flexible(
               child: Text(
-                immediateAvailable
+                widget.requiresSchedule
+                    ? 'Chọn ngày và giờ mới cho đơn đặt lại.'
+                    : immediateAvailable
                     ? 'Nếu không chọn ngày giờ, đơn sẽ được tính là đặt ngay'
                     : 'Đã ngoài khung giờ làm việc, đơn của bạn sẽ được xử lý vào ngày mai.',
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -102,43 +110,47 @@ class _BookingScheduleButtonState extends ConsumerState<BookingScheduleButton> {
                 ),
               ),
             ),
-            Tooltip(
-              key: _scheduleHelpKey,
-              triggerMode: TooltipTriggerMode.manual,
-              showDuration: const Duration(seconds: 12),
-              preferBelow: true,
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width - 48,
-              ),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.inverseSurface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              textStyle: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onInverseSurface,
-                height: 1.5,
-              ),
-              message: immediateAvailable
-                  ? 'Đặt ngay: đơn được gửi để tìm thợ sau khi bạn xác nhận đặt đơn. '
-                        'Nếu muốn thực hiện vào thời điểm khác, bấm “Hẹn lịch”, chọn ngày giờ và xác nhận. '
-                        'Bạn có thể bấm dấu × trong nút hẹn lịch để bỏ thời gian đã chọn.'
-                  : 'Đặt ngay chỉ khả dụng từ 08:00 đến 21:00. '
-                        'Ngoài khung giờ này, lịch mặc định là 08:00 ngày mai. '
-                        'Bạn có thể bấm “Hẹn lịch” để chọn thời gian khác. '
-                        'Dấu × sẽ đưa lịch về 08:00 ngày mai.',
-              child: IconButton(
-                onPressed: () =>
-                    _scheduleHelpKey.currentState?.ensureTooltipVisible(),
-                icon: const Icon(Icons.error_outline_rounded, size: 18),
-                color: theme.colorScheme.primary,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                style: IconButton.styleFrom(
-                  padding: const EdgeInsets.all(4),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            if (!widget.requiresSchedule)
+              Tooltip(
+                key: _scheduleHelpKey,
+                triggerMode: TooltipTriggerMode.manual,
+                showDuration: const Duration(seconds: 12),
+                preferBelow: true,
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width - 48,
+                ),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.inverseSurface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onInverseSurface,
+                  height: 1.5,
+                ),
+                message: immediateAvailable
+                    ? 'Đặt ngay: đơn được gửi để tìm thợ sau khi bạn xác nhận đặt đơn. '
+                          'Nếu muốn thực hiện vào thời điểm khác, bấm “Hẹn lịch”, chọn ngày giờ và xác nhận. '
+                          'Bạn có thể bấm dấu × trong nút hẹn lịch để bỏ thời gian đã chọn.'
+                    : 'Đặt ngay chỉ khả dụng từ 08:00 đến 21:00. '
+                          'Ngoài khung giờ này, lịch mặc định là 08:00 ngày mai. '
+                          'Bạn có thể bấm “Hẹn lịch” để chọn thời gian khác. '
+                          'Dấu × sẽ đưa lịch về 08:00 ngày mai.',
+                child: IconButton(
+                  onPressed: () =>
+                      _scheduleHelpKey.currentState?.ensureTooltipVisible(),
+                  icon: const Icon(Icons.error_outline_rounded, size: 18),
+                  color: theme.colorScheme.primary,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -388,7 +400,7 @@ class _BookingScheduleSelectorState
     final theme = Theme.of(context);
     final error = _confirmationError ?? _validate(_chosen());
     return AlertDialog(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 8),

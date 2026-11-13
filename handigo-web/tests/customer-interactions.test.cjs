@@ -165,10 +165,11 @@ const customerPolicies = {
 
 test('Modal có đủ chính sách hai loại dịch vụ, lịch hẹn và dùng số liệu cấu hình đang có', () => {
   const { BookingPolicyContent } = load('features/booking/components/BookingPolicyContent.tsx');
-  const text = textContent(BookingPolicyContent({ policies: customerPolicies, depositAmount: 40000, payableDeposit: 20000 }));
-  for (const phrase of ['giá cố định', 'khảo sát và báo giá', 'đặt ngay', 'hẹn giờ', 'định kỳ',
+  const text = textContent(BookingPolicyContent({ policies: customerPolicies, depositAmount: 40000, payableDeposit: 20000 })).replace(/\s+/g, ' ');
+  for (const phrase of ['giá cố định', 'khảo sát và báo giá', 'đặt ngay', 'hẹn giờ',
     'giữ nguyên cọc', 'Khách hủy khi chưa có thợ nhận', 'Khách hủy khi thợ đã nhận đơn',
-    'Thợ hủy sau khi đã báo giá', 'đã bắt đầu thực hiện', 'sau ưu đãi']) assert.ok(text.includes(phrase), phrase);
+    'thợ hủy sau khi đã báo giá', 'đã bắt đầu thực hiện', 'sau ưu đãi']) assert.ok(text.includes(phrase), phrase);
+  assert.doesNotMatch(text, /định kỳ|định kì|từng buổi|các buổi còn lại/i);
   assert.match(text, /5 phút/);
   assert.match(text, /100% khoản đã thanh toán về ví Handigo/);
   assert.doesNotMatch(text, /60%|95%|48 giờ/);
@@ -532,8 +533,11 @@ test('Lỗi API lưu hồ sơ không lặp lại thông báo trong form và gi�
 
 test('Lỗi lưu hồ sơ provider không thay toàn bộ trang bằng khung báo lỗi', () => {
   const data = { profile: { provider: { certificates: [] } }, profileView: {}, error: 'Không thể cập nhật hồ sơ.' };
+  const effects = [], scrolls = [];
+  const location = { hash: '', key: 'profile' };
   const modules = {
-    react: { useRef: () => ({ current: null }), useState: (value) => [value, () => {}] },
+    react: { useRef: () => ({ current: null }), useState: (value) => [value, () => {}], useEffect: effect => effects.push(effect) },
+    'react-router-dom': { useLocation: () => location },
     '@/components/common/DashboardShell': { DashboardShell: 'dashboard' },
     '@/features/auth/store/auth.store': { useAuthStore: (select) => select({ user: { providerOnboardingStatus: 'APPROVED' } }) },
     '../store/providerAvailability.store': { useProviderAvailabilityStore: (select) => select({ availabilityStatus: 'online' }) },
@@ -546,9 +550,21 @@ test('Lỗi lưu hồ sơ provider không thay toàn bộ trang bằng khung bá
   for (const name of ['useProviderIdentityFlow', 'useProviderCertificateFlow', 'useProviderPasswordFlow', 'useProviderProfileUiState']) {
     modules[`../components/profile/${name}`] = { [name]: () => ({}) };
   }
-  const { default: ProviderProfilePage } = load('features/provider/pages/ProviderProfilePage.tsx', modules);
+  const { default: ProviderProfilePage } = load('features/provider/pages/ProviderProfilePage.tsx', modules, {
+    window: { requestAnimationFrame: callback => { callback(); return 1; }, cancelAnimationFrame() {} },
+    document: { getElementById: id => ({ scrollIntoView: options => scrolls.push([id, options.block]) }) },
+  });
   const render = () => ProviderProfilePage().type();
   assert.ok(find(render(), (node) => node.type === 'profile-grid'));
+  effects.shift()();
+  assert.equal(scrolls.length, 0);
+  location.hash = '#application-history';
+  data.isLoading = true;
+  render(); effects.shift()();
+  assert.equal(scrolls.length, 0, 'Chờ hồ sơ tải xong mới cuộn.');
+  data.isLoading = false;
+  render(); effects.shift()();
+  assert.deepEqual(scrolls, [['application-history', 'start']]);
   data.profile = null;
   data.profileView = null;
   assert.equal(find(render(), (node) => node.type === 'p').props.children, data.error);

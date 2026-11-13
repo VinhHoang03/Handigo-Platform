@@ -5,6 +5,12 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
+const addressFormatting = {};
+const formattingFile = path.join(__dirname, '../src/utils/agentAddressFormatting.ts');
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(formattingFile, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText, { exports: addressFormatting }, { filename: formattingFile });
+
 const address = { fullAddress: 'abc, Phường Bến Nghé, Thành phố Hồ Chí Minh', ward: 'Phường Bến Nghé', province: 'Thành phố Hồ Chí Minh' };
 const area = { fullAddress: 'Bến Nghé, Hồ Chí Minh, Việt Nam', province: 'Hồ Chí Minh',
   administrativeNames: ['Bến Nghé'], wardNames: ['Bến Nghé'], category: 'boundary', latitude: 10.78, longitude: 106.7 };
@@ -16,6 +22,7 @@ function setup(results) {
   const exports = {};
   class AppError extends Error { constructor(message, statusCode) { super(message); this.statusCode = statusCode; } }
   const modules = {
+    '../utils/agentAddressFormatting': addressFormatting,
     './vietnamAddress.service': {}, '../utils/appError': { AppError },
     './reverseGeocoding.service': { searchAddressLocations: async query => {
       queries.push(query);

@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../../shared/widgets/booking_details_summary.dart';
-import '../../../shared/widgets/provider_avatar.dart';
+import '../../../shared/widgets/linked_provider_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/widgets/service_images.dart';
@@ -101,6 +101,7 @@ class OrderDetailOverview extends StatelessWidget {
               scheduledAt: order.scheduledAt,
               placedAt: order.createdAt,
               compact: true,
+              showAddress: !providerView,
             ),
             if (!providerView && contactName?.isNotEmpty == true) ...[
               const SizedBox(height: 12),
@@ -113,7 +114,9 @@ class OrderDetailOverview extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  ProviderAvatar(
+                  LinkedProviderAvatar(
+                    name: contactName!,
+                    providerId: order.providerId,
                     url: contactAvatar,
                     gender: providerView ? null : order.providerGender,
                     size: 44,
@@ -125,7 +128,7 @@ class OrderDetailOverview extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          contactName!,
+                          contactName,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
@@ -261,17 +264,68 @@ class OrderDetailOverview extends StatelessWidget {
               ),
             ],
             if (providerView &&
-                order.problemDescription?.isNotEmpty == true) ...[
+                (order.problemDescription?.trim().isNotEmpty == true ||
+                    order.customerAttachments.isNotEmpty)) ...[
               const SizedBox(height: 12),
-              Text('Mô tả yêu cầu', style: theme.textTheme.titleSmall),
-              const SizedBox(height: 4),
-              Text(order.problemDescription!),
+              OrderProblemDescription(order: order),
             ],
           ],
         ),
       ),
     );
   }
+}
+
+class OrderProblemDescription extends StatelessWidget {
+  const OrderProblemDescription({required this.order, super.key});
+
+  final OrderDetail order;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final description = order.problemDescription?.trim() ?? '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Mô tả đơn hàng', style: theme.textTheme.titleSmall),
+        if (description.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(description, style: theme.textTheme.bodyMedium),
+        ],
+        if (order.customerAttachments.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text('Ảnh sự cố', style: theme.textTheme.labelMedium),
+          const SizedBox(height: 4),
+          OrderImageGrid(urls: order.customerAttachments),
+        ],
+      ],
+    );
+  }
+}
+
+class OrderImageGrid extends StatelessWidget {
+  const OrderImageGrid({required this.urls, super.key});
+
+  final List<String> urls;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      for (final url in urls)
+        Image.network(
+          url,
+          width: 96,
+          height: 96,
+          fit: BoxFit.cover,
+          cacheWidth: 288,
+          errorBuilder: (_, error, stack) =>
+              const Icon(Icons.broken_image_outlined),
+        ),
+    ],
+  );
 }
 
 class OrderQuotationSection extends StatelessWidget {

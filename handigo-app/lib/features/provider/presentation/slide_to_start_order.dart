@@ -5,10 +5,14 @@ class SlideToStartOrder extends StatefulWidget {
     required this.onConfirmed,
     this.enabled = true,
     this.busy = false,
+    this.label = 'Trượt để bắt đầu xử lý',
+    this.semanticLabel,
     super.key,
   });
   final Future<void> Function() onConfirmed;
   final bool enabled, busy;
+  final String label;
+  final String? semanticLabel;
   @override
   State<SlideToStartOrder> createState() => _SlideToStartOrderState();
 }
@@ -51,10 +55,10 @@ class _SlideToStartOrderState extends State<SlideToStartOrder> {
             (MediaQuery.textScalerOf(context).scale(14) - 14).clamp(0, 28);
         return Semantics(
           excludeSemantics: true,
-          label: 'Trượt từ trái sang phải để bắt đầu xử lý đơn',
+          label: widget.semanticLabel ?? widget.label,
           value: '${(_progress * 100).round()}%',
-        increasedValue: '${((_progress + .25).clamp(0, 1) * 100).round()}%',
-        decreasedValue: '0%',
+          increasedValue: '${((_progress + .25).clamp(0, 1) * 100).round()}%',
+          decreasedValue: '0%',
           enabled: _enabled,
           onIncrease: !_enabled
               ? null
@@ -78,7 +82,7 @@ class _SlideToStartOrderState extends State<SlideToStartOrder> {
                     padding: const EdgeInsets.only(left: 58, right: 12),
                     child: Center(
                       child: Text(
-                        working ? 'Đang xử lý...' : 'Trượt để bắt đầu xử lý',
+                        working ? 'Đang xử lý...' : widget.label,
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(

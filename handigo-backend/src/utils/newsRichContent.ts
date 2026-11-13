@@ -6,6 +6,23 @@ export interface NewsRichNode {
   content?: NewsRichNode[];
 }
 
+/** Dùng nội dung định dạng mới nhất; không đọc lại bản thuần cũ khi cây định dạng lỗi. */
+export function newsContentToText(blocks: readonly { text?: string; items?: string[] }[], richContent?: unknown): string {
+  if (richContent !== undefined && richContent !== null) {
+    if (!isNewsRichContent(richContent)) return "";
+    const visit = (node: NewsRichNode): string => {
+      if (node.type === "hardBreak") return "\n";
+      if (node.type === "text") {
+        const link = node.marks?.find((mark) => mark.type === "link")?.attrs?.href;
+        return `${node.text ?? ""}${typeof link === "string" && /^https?:\/\//.test(link) && isSafeNewsLink(link) ? ` (${link})` : ""}`;
+      }
+      return (node.content ?? []).map(visit).join(["doc", "bulletList", "orderedList", "listItem", "blockquote"].includes(node.type) ? "\n" : "");
+    };
+    return visit(richContent).trim();
+  }
+  return blocks.map((block) => block.items?.join("\n") ?? block.text ?? "").join("\n").trim();
+}
+
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const keys = (value: Record<string, unknown>, allowed: string[]) => Object.keys(value).every(key => allowed.includes(key));
 const optional = (value: unknown, test: (value: unknown) => boolean) => value === undefined || value === null || test(value);

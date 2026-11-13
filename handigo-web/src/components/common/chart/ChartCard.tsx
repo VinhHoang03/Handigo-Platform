@@ -7,6 +7,8 @@ interface ChartCardProps {
   description?: string;
   /** Nút lọc, nút đổi kỳ... nằm bên phải tiêu đề. */
   action?: ReactNode;
+  /** Thanh điều khiển đặt dưới tiêu đề và luôn hiển thị khi biểu đồ đang tải. */
+  toolbar?: ReactNode;
   loading?: boolean;
   error?: string;
   onRetry?: () => void;
@@ -28,6 +30,7 @@ export function ChartCard({
   title,
   description,
   action,
+  toolbar,
   loading,
   error,
   onRetry,
@@ -48,6 +51,8 @@ export function ChartCard({
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
+
+      {toolbar}
 
       {loading ? (
         <Skeleton className="w-full" rounded="rounded-xl" style={{ height }} />

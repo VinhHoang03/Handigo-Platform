@@ -12,8 +12,40 @@ export interface Feedback {
   isVisible: boolean;
   providerReply?: { content: string; images?: string[]; repliedAt: string; updatedAt: string; repliedBy?: PersonRef } | null;
   createdAt: string;
+  updatedAt?: string;
 }
 export interface Pagination { page: number; limit: number; total: number; totalPages: number }
+export interface FeedbackModerationItem {
+  _id: string;
+  kind: 'comment' | 'reply';
+  resourceId: string;
+  content: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface FeedbackModerationList { items: FeedbackModerationItem[]; pagination: Pagination }
+export interface ModerationReportQuery {
+  days: '7' | '30' | '90' | 'all';
+  view: 'attention' | 'blocked' | 'all';
+  page: number;
+  limit: number;
+}
+export interface ModerationReport {
+  period: { start: string | null; end: string; days: ModerationReportQuery['days'] };
+  summary: { total: number; allowed: number; blocked: number; savedHidden: number; hidden: number;
+    needsReview: number; unavailable: number; approvedByAdmin: number; rulesBlocked: number };
+  items: Array<FeedbackModerationItem & {
+    decision: 'allow' | 'block' | 'review';
+    source: 'rules' | 'ai' | 'unavailable' | 'unknown';
+    needsReview: boolean;
+    isCurrent: boolean;
+    feedback?: { _id: string; isVisible: boolean; rating: number; updatedAt?: string };
+    reviewedAt?: string;
+  }>;
+  pagination: Pagination;
+}
 export interface FeedbackList {
   moderationStats?: {
     total: number; averageRating: number; visible: number; hidden: number;

@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { validateProductionConfig } from "./configs/production";
 import { createLogger } from "./utils/logger";
 import { startTemporaryLockMonitor, stopTemporaryLockMonitor } from "./services/penaltyPolicy.service";
+import { startViolationEmailMonitor, stopViolationEmailMonitor } from "./services/violationEmail.service";
 
 dotenv.config();
 
@@ -27,9 +28,10 @@ const startServer = async () => {
         startRefundReconciliationMonitor,
         stopRefundReconciliationMonitor,
       },
-      { startReassignmentMonitor, stopReassignmentMonitor },
+      { stopReassignmentMonitor },
       { startAgentOrderProgressMonitor, stopAgentOrderProgressMonitor },
       { startOrderRescheduleMonitor, stopOrderRescheduleMonitor },
+      { startProviderRewardsMonitor, stopProviderRewardsMonitor },
     ] = await Promise.all([
       import("./app"),
       import("./configs/db"),
@@ -39,9 +41,13 @@ const startServer = async () => {
       import("./services/orderReassignment.service"),
       import("./services/agentOrderProgress.service"),
       import("./services/orderReschedule.service"),
+      import("./services/providerRewards.service"),
     ]);
 
     await connectDB();
+    const { startAdminAIWorker, stopAdminAIWorker } = await import("./ai/admin/admin-ai.worker");
+    await startAdminAIWorker();
+    await startViolationEmailMonitor();
 
     const server = http.createServer(app);
     server.requestTimeout = REQUEST_TIMEOUT_MS;
@@ -50,12 +56,11 @@ const startServer = async () => {
     server.setTimeout(REQUEST_TIMEOUT_MS);
 
     const io = initSocket(server);
-    DispatchService.startTimeoutMonitor();
     startRefundReconciliationMonitor();
-    startReassignmentMonitor();
     startAgentOrderProgressMonitor();
     startOrderRescheduleMonitor();
     startTemporaryLockMonitor();
+    startProviderRewardsMonitor();
 
     server.listen(PORT, "0.0.0.0", () => {
       serverLogger.info("Máy chủ đang chạy.", { port: PORT });
@@ -83,7 +88,10 @@ const startServer = async () => {
       forceShutdownTimer.unref();
 
       try {
+        await stopViolationEmailMonitor();
+        await stopAdminAIWorker();
         await stopAgentOrderProgressMonitor();
+        await stopProviderRewardsMonitor();
         server.closeIdleConnections();
         await new Promise<void>((resolve, reject) => {
           server.close((error) => {

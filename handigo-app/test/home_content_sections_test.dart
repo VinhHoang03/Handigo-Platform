@@ -5,8 +5,68 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/features/home/domain/customer_home_data.dart';
 import 'package:handigo_app/features/home/presentation/customer_shell.dart';
+import 'package:handigo_app/features/home/presentation/customer_home_provider.dart';
+import 'package:handigo_app/features/services/domain/service_category.dart';
 
 void main() {
+  for (final (width, scale) in [(490.0, 1.0), (320.0, 2.0)]) {
+    testWidgets('Ô danh mục không tràn ở chiều rộng $width, cỡ chữ $scale', (
+      tester,
+    ) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 900);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      const names = [
+        'Nội Thất & Đồ Gỗ',
+        'Thiết Bị Gia Dụng',
+        'Điều hòa & Thông gió',
+        'Điện Nước & Hệ Thống Kỹ Thuật',
+        'Điện Tử & Nhà Thông Minh',
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            customerHomeRewardsProvider.overrideWith(
+              (ref) async => const HomeRewards(balance: 0, offers: []),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: CustomerHomeContent(
+                data: CustomerHomeData(
+                  categories: [
+                    for (final name in names)
+                      ServiceCategory(id: name, name: name, slug: name),
+                  ],
+                  services: const [],
+                  providers: const [],
+                  unreadNotificationCount: 0,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.scrollUntilVisible(
+        find.text(names.last),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(names.last), findsOneWidget);
+      expect(find.text('Tất cả'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   test('Model Trang chủ đọc được voucher và bài viết từ API', () {
     final voucher = HomeVoucher.fromJson({
       'code': 'HANDIGO20',
@@ -37,7 +97,7 @@ void main() {
     (tester) async {
       FlutterSecureStorage.setMockInitialValues({});
       tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(390, 900);
+      tester.view.physicalSize = const Size(320, 900);
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetPhysicalSize);
 
@@ -51,7 +111,12 @@ void main() {
         content: [HomeNewsBlock(type: 'heading', text: 'Chuẩn bị dụng cụ')],
       );
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
+          overrides: [
+            customerHomeRewardsProvider.overrideWith(
+              (ref) async => const HomeRewards(balance: 12, offers: []),
+            ),
+          ],
           child: MaterialApp(
             home: Scaffold(
               body: CustomerHomeContent(
@@ -62,7 +127,7 @@ void main() {
                   unreadNotificationCount: 0,
                   vouchers: [
                     HomeVoucher(
-                      code: 'HANDIGO20',
+                      code: 'HANDIGO-UU-DAI-DICH-VU-TAI-NHA-2026',
                       name: 'Ưu đãi dịch vụ tại nhà',
                       discountType: 'PERCENT',
                       discountValue: 20,
@@ -78,6 +143,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.text('Tin tức'),
+        200,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
+      );
       final labels = tester
           .widgetList<Text>(find.byType(Text))
           .map((widget) => widget.data)
@@ -87,8 +163,17 @@ void main() {
         labels.indexOf('Tin tức'),
         greaterThan(labels.indexOf('Voucher dành cho bạn')),
       );
-      expect(find.text('HANDIGO20'), findsOneWidget);
+      expect(find.text('HANDIGO-UU-DAI-DICH-VU-TAI-NHA-2026'), findsOneWidget);
       expect(find.text('Giảm 20%'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              (widget.axisDirection == AxisDirection.left ||
+                  widget.axisDirection == AxisDirection.right),
+        ),
+        findsNothing,
+      );
 
       final verticalList = find.byWidgetPredicate(
         (widget) =>
@@ -99,7 +184,10 @@ void main() {
       await tester.tap(find.text('Mẹo vệ sinh điều hòa').hitTestable());
       await tester.pumpAndSettle();
       expect(
-        find.text('Giữ thiết bị sạch và hoạt động ổn định.'),
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text('Giữ thiết bị sạch và hoạt động ổn định.'),
+        ),
         findsOneWidget,
       );
       expect(find.text('Chuẩn bị dụng cụ'), findsOneWidget);

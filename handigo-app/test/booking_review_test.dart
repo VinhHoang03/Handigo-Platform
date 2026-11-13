@@ -85,6 +85,65 @@ Future<void> openPolicy(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('Đặt lại hiện địa chỉ mặc định và giá trước khi chọn lịch', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    final container = ProviderContainer(
+      overrides: [
+        serviceCatalogRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(bookingDraftProvider.notifier).startService('service');
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.customerModals(AppTheme.light),
+          home: const BookingScreen(
+            rebookOrderCode: 'HDG-01',
+            detail: ServiceDetail(
+              service: Service(
+                id: 'service',
+                name: 'Sửa đường ống',
+                description: '',
+                serviceType: 'fixed_price',
+              ),
+              options: [],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(container.read(bookingDraftProvider).addressId, 'address');
+    expect(container.read(bookingDraftProvider).scheduledAt, isNull);
+    expect(find.text('Đặt lại từ đơn HDG-01'), findsNothing);
+    expect(find.text('Đổi'), findsOneWidget);
+    final next = find.widgetWithText(
+      FilledButton,
+      'Thanh toán · 270.000đ',
+    );
+    expect(next, findsOneWidget);
+    await tester.tap(next);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Vui lòng chọn ngày và giờ cho đơn đặt lại.'),
+      findsOneWidget,
+    );
+    final now = DateTime.now();
+    container
+        .read(bookingDraftProvider.notifier)
+        .setScheduledAt(DateTime(now.year, now.month, now.day + 1, 10));
+    await tester.pumpAndSettle();
+    await tester.tap(next);
+    await tester.pumpAndSettle();
+    expect(find.text('Xác nhận & Thanh toán'), findsOneWidget);
+  });
+
   for (final scale in [1.0, 2.0]) {
     testWidgets(
       'Xác nhận hiển thị đủ thông tin, chính sách tách riêng, chữ $scale',

@@ -169,6 +169,28 @@ function setup({ method = 'wallet', inspection = false, arrived = true, quotatio
       orders.OrderService.cancelOrder(order._id.toString(), actor, 'provider', reason) };
 }
 
+for (const method of ['wallet', 'payos']) {
+  for (const [kind, status] of [['provider_late', 'accepted'], ['work_confirmation_timeout', 'in_progress']]) {
+    test(`Hủy hệ thống ${kind} hoàn toàn bộ tiền ${method} đúng một lần`, async () => {
+      const ctx = setup({ method, status, arrived: false, amounts: [120000] });
+      ctx.order.updatedAt = new Date();
+      if (kind === 'work_confirmation_timeout') {
+        ctx.order.workConfirmation = { nextAt: new Date(0), expiresAt: new Date(1) };
+      }
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await ctx.cancellation.cancelSystemOrderWithSettlement(ctx.order._id.toString(),
+          'Đã hết thời hạn xử lý đơn.', kind, ctx.order.updatedAt);
+      }
+      assert.equal(ctx.order.status, 'cancelled');
+      assert.equal(ctx.order.cancellation.refundPolicy.refundAmount, 120000);
+      assert.equal(ctx.customerWallet.balance, 130000);
+      assert.equal(ctx.payments[0].status, 'refunded');
+      assert.equal(ctx.entries.filter(entry => entry.type === 'refund').length, 1);
+      assert.equal(ctx.reassignments(), 0);
+    });
+  }
+}
+
 for (const inspection of [false, true]) for (const method of ['wallet', 'payos']) for (const quotation of inspection ? [false, true] : [false]) {
   test(`${inspection ? 'Báo giá' : 'Giá cố định'} ${method}, đã có báo giá ${quotation}: hoàn đúng tiền trừ 5.000đ, cộng ví thợ một lần`, async () => {
     const ctx = setup({ inspection, method, quotation });

@@ -34,12 +34,16 @@ class _Tracker extends ProviderLocationService {
   }
 }
 
-AppUser _user(String id, {UserRole role = UserRole.provider}) => AppUser(
+AppUser _user(
+  String id, {
+  UserRole role = UserRole.provider,
+  String? onboardingStatus = 'APPROVED',
+}) => AppUser(
   id: id,
   fullName: 'Đối tác kiểm thử',
   email: 'test@example.test',
   role: role,
-  providerOnboardingStatus: 'APPROVED',
+  providerOnboardingStatus: onboardingStatus,
 );
 
 void main() {
@@ -50,7 +54,7 @@ void main() {
       final tracker = _Tracker(api);
       var online = true;
       final auth = AuthController(AuthRepository(api), api)
-        ..user = _user('provider')
+        ..user = _user('provider', onboardingStatus: null)
         ..status = AuthStatus.authenticated;
       final container = ProviderContainer(
         overrides: [

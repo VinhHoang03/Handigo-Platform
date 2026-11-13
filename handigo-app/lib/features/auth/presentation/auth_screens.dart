@@ -6,6 +6,8 @@ import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_feedback.dart';
+import '../../../shared/widgets/handigo_logo.dart';
+import '../data/social_sign_in.dart';
 import 'otp_code_input.dart';
 
 enum OtpMode { register, resetPassword }
@@ -24,6 +26,7 @@ class AuthScaffold extends StatelessWidget {
     this.showBackButton = true,
     this.showHeader = true,
     this.showCard = true,
+    this.showBrand = true,
     this.statusText = '',
     super.key,
   });
@@ -32,6 +35,7 @@ class AuthScaffold extends StatelessWidget {
   final bool showBackButton;
   final bool showHeader;
   final bool showCard;
+  final bool showBrand;
   final String statusText;
 
   void _goBack(BuildContext context) {
@@ -147,8 +151,10 @@ class AuthScaffold extends StatelessWidget {
   Widget _content(ThemeData theme) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const _HandigoMark(),
-      const SizedBox(height: 18),
+      if (showBrand) ...[
+        const HandigoLogo(height: 52),
+        const SizedBox(height: 18),
+      ],
       Text(
         title,
         textAlign: TextAlign.center,
@@ -186,46 +192,6 @@ class _RoundIconButton extends StatelessWidget {
         shape: const CircleBorder(),
       ),
     ),
-  );
-}
-
-class _HandigoMark extends StatelessWidget {
-  const _HandigoMark();
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: AppTheme.primary,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x333525CD),
-              blurRadius: 10,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.handyman_rounded,
-          color: Colors.white,
-          size: 27,
-        ),
-      ),
-      const SizedBox(width: 10),
-      Text(
-        'Handigo',
-        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.5,
-        ),
-      ),
-    ],
   );
 }
 
@@ -380,9 +346,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: _SocialButton(
                       label: 'Google',
                       icon: const _GoogleMark(),
-                      onPressed: _busy
+                      onPressed: _busy || !SocialProvider.google.isAvailable
                           ? null
-                          : () => _showSocialNotice('Google'),
+                          : () => _loginSocial(SocialProvider.google),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -394,9 +360,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         size: 20,
                         color: Color(0xFF1877F2),
                       ),
-                      onPressed: _busy
+                      onPressed: _busy || !SocialProvider.facebook.isAvailable
                           ? null
-                          : () => _showSocialNotice('Facebook'),
+                          : () => _loginSocial(SocialProvider.facebook),
                     ),
                   ),
                 ],
@@ -420,12 +386,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  void _showSocialNotice(
-    String provider,
-  ) => AppToast.show(
-    context,
-    'Đăng nhập $provider sẽ hoạt động sau khi cấu hình OAuth cho ứng dụng.',
-  );
+  Future<void> _loginSocial(SocialProvider provider) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(authControllerProvider).loginSocial(provider);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 }
 
 class _AuthDivider extends StatelessWidget {
@@ -451,19 +420,41 @@ class _AuthDivider extends StatelessWidget {
 }
 
 class _AuthFieldLabel extends StatelessWidget {
-  const _AuthFieldLabel(this.text);
+  const _AuthFieldLabel(this.text, {this.icon, this.note, this.action});
   final String text;
+  final IconData? icon;
+  final String? note;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: Text(
-      text,
-      textAlign: TextAlign.left,
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-        color: Theme.of(context).colorScheme.onSurface,
-        fontWeight: FontWeight.w600,
-      ),
+    child: Row(
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 18),
+          const SizedBox(width: 8),
+        ],
+        Flexible(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (note != null)
+          Tooltip(
+            message: note!,
+            triggerMode: TooltipTriggerMode.tap,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Icon(Icons.error_outline, size: 18),
+            ),
+          ),
+        if (action != null) ...[const Spacer(), action!],
+      ],
     ),
   );
 }
@@ -560,7 +551,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (RegExp(r'[A-Z]').hasMatch(value)) score++;
     if (RegExp(r'[0-9]').hasMatch(value)) score++;
     if (RegExp(r'[^a-zA-Z0-9]').hasMatch(value)) score++;
-    return score > 4 ? 4 : score;
+    return score.clamp(1, 4).toInt();
   }
 
   String get _passwordStrengthLabel => switch (_passwordStrength) {
@@ -621,71 +612,64 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) => AuthScaffold(
     title: 'Tạo tài khoản mới',
     showCard: false,
+    showBrand: false,
     child: Form(
       key: _form,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Trải nghiệm hơn 30+ dịch vụ sửa chữa và chăm sóc nhà cửa tận nơi',
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.outline),
-          ),
-          const SizedBox(height: 22),
-          const _AuthFieldLabel('Họ và tên'),
+          const SizedBox(height: 16),
+          const _AuthFieldLabel('Họ và tên', icon: Icons.person_outline),
           TextFormField(
             controller: _name,
             decoration: const InputDecoration(
-              hintText: 'Nguyễn Văn A',
-              prefixIcon: Icon(Icons.person_outline),
+              hintText: 'Ví dụ: Nguyễn Văn A',
             ),
             validator: (value) => value == null || value.trim().length < 2
                 ? 'Vui lòng nhập họ và tên'
                 : null,
           ),
           const SizedBox(height: 16),
-          const _AuthFieldLabel('Email'),
+          const _AuthFieldLabel('Email', icon: Icons.email_outlined),
           TextFormField(
             controller: _email,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
-              hintText: 'ban@vidu.com',
-              prefixIcon: Icon(Icons.email_outlined),
+              hintText: 'Ví dụ: ban@vidu.com',
             ),
             validator: _emailValidator,
           ),
           const SizedBox(height: 16),
-          const _AuthFieldLabel('Số điện thoại di động'),
+          const _AuthFieldLabel(
+            'Số điện thoại di động',
+            icon: Icons.phone_outlined,
+            note: 'Bắt buộc để thợ liên hệ khi đến nhà. Mã OTP được gửi qua email.',
+          ),
           TextFormField(
             controller: _phone,
             keyboardType: TextInputType.phone,
+            validator: (value) => (value ?? '').trim().isEmpty
+                ? 'Vui lòng nhập số điện thoại'
+                : null,
             decoration: const InputDecoration(
-              hintText: '0912 345 678',
-              prefixIcon: Icon(Icons.phone_outlined),
+              hintText: 'Ví dụ: 0912 345 678',
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Dùng để nhận mã OTP và thợ liên hệ khi đến nhà',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
-          ),
           const SizedBox(height: 16),
-          const _AuthFieldLabel('Mật khẩu'),
+          _AuthFieldLabel(
+            'Mật khẩu',
+            icon: Icons.lock_outline,
+            note: 'Tối thiểu 8 ký tự. $_passwordStrengthHint.',
+            action: IconButton(
+              tooltip: _obscure ? 'Hiện mật khẩu' : 'Ẩn mật khẩu',
+              onPressed: () => setState(() => _obscure = !_obscure),
+              icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+            ),
+          ),
           TextFormField(
             controller: _password,
             obscureText: _obscure,
-            decoration: InputDecoration(
-              hintText: 'Tối thiểu 8 ký tự, gồm chữ và số',
-              prefixIcon: const Icon(Icons.lock_outline),
-              suffixIcon: IconButton(
-                onPressed: () => setState(() => _obscure = !_obscure),
-                icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-              ),
-            ),
+            decoration: const InputDecoration(hintText: 'Ví dụ: MatKhau#123'),
             onChanged: (_) => setState(() {}),
             validator: _passwordValidator,
           ),
@@ -700,7 +684,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     margin: EdgeInsets.only(right: index == 3 ? 0 : 4),
                     decoration: BoxDecoration(
                       color: index < _passwordStrength
-                          ? AppTheme.primary
+                          ? const [
+                              AppTheme.error,
+                              Colors.deepOrange,
+                              Colors.amber,
+                              AppTheme.successGreen,
+                            ][index]
                           : AppTheme.outlineVariant,
                       borderRadius: BorderRadius.circular(4),
                     ),
@@ -710,27 +699,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Độ an toàn: $_passwordStrengthLabel',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              Text(
-                _passwordStrengthHint,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
+          Text(
+            'Độ an toàn: $_passwordStrengthLabel',
+            style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
-          const _AuthFieldLabel('Xác nhận mật khẩu'),
+          const _AuthFieldLabel(
+            'Xác nhận mật khẩu',
+            icon: Icons.lock_reset_outlined,
+          ),
           TextFormField(
             controller: _confirm,
             obscureText: true,
             decoration: const InputDecoration(
-              hintText: 'Nhập lại mật khẩu vừa đặt',
-              prefixIcon: Icon(Icons.lock_reset_outlined),
+              hintText: 'Ví dụ: MatKhau#123',
             ),
             validator: (value) =>
                 value != _password.text ? 'Mật khẩu xác nhận không khớp' : null,
@@ -755,9 +737,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 child: _SocialButton(
                   label: 'Google',
                   icon: const _GoogleMark(),
-                  onPressed: _busy
+                  onPressed: _busy || !SocialProvider.google.isAvailable
                       ? null
-                      : () => _showRegisterSocialNotice(context, 'Google'),
+                      : () => _loginSocial(SocialProvider.google),
                 ),
               ),
               const SizedBox(width: 10),
@@ -769,9 +751,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     size: 20,
                     color: Color(0xFF1877F2),
                   ),
-                  onPressed: _busy
+                  onPressed: _busy || !SocialProvider.facebook.isAvailable
                       ? null
-                      : () => _showRegisterSocialNotice(context, 'Facebook'),
+                      : () => _loginSocial(SocialProvider.facebook),
                 ),
               ),
             ],
@@ -785,10 +767,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     ),
   );
 
-  void _showRegisterSocialNotice(BuildContext context, String provider) => AppToast.show(
-    context,
-    'Đăng ký $provider sẽ hoạt động sau khi cấu hình OAuth.',
-  );
+  Future<void> _loginSocial(SocialProvider provider) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final auth = ref.read(authControllerProvider);
+      await auth.loginSocial(provider);
+      final message = auth.message;
+      if (mounted && message != null) _showError(message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 }
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {

@@ -3,6 +3,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../auth/domain/app_user.dart';
 import '../domain/order_summary.dart';
+import '../domain/order_reschedule.dart';
 
 class OrderRepository {
   const OrderRepository(this._api);
@@ -39,6 +40,68 @@ class OrderRepository {
   Future<OrderDetail> detail(String id) async {
     final response = await _api.request('/orders/$id', authenticated: true);
     return OrderDetail.fromJson(response['data'] as Map<String, dynamic>);
+  }
+
+  Future<OrderReschedulePreview> previewReschedule(
+    String orderId,
+    DateTime scheduledAt,
+  ) async {
+    final response = await _api.request(
+      '/orders/$orderId/reschedule-preview',
+      method: 'POST',
+      data: {'scheduledAt': scheduledAt.toUtc().toIso8601String()},
+      authenticated: true,
+    );
+    return OrderReschedulePreview.fromJson(
+      response['data'] as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> requestReschedule(
+    OrderDetail order,
+    DateTime scheduledAt,
+    String reason, {
+    bool warningAcknowledged = false,
+  }) async {
+    await _api.request(
+      '/orders/${order.id}/reschedule-requests',
+      method: 'POST',
+      data: {
+        'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+        'reason': reason,
+        if (warningAcknowledged) 'warningAcknowledged': true,
+        if (order.updatedAt != null)
+          'expectedOrderUpdatedAt': order.updatedAt!.toUtc().toIso8601String(),
+      },
+      authenticated: true,
+    );
+  }
+
+  Future<void> respondReschedule(
+    OrderDetail order,
+    String requestId, {
+    required bool accept,
+    String? reason,
+  }) async {
+    await _api.request(
+      '/orders/${order.id}/reschedule-requests/$requestId/respond',
+      method: 'PATCH',
+      data: {
+        'decision': accept ? 'accept' : 'reject',
+        'reason': ?reason,
+        if (order.updatedAt != null)
+          'expectedOrderUpdatedAt': order.updatedAt!.toUtc().toIso8601String(),
+      },
+      authenticated: true,
+    );
+  }
+
+  Future<void> withdrawReschedule(String orderId, String requestId) async {
+    await _api.request(
+      '/orders/$orderId/reschedule-requests/$requestId/cancel',
+      method: 'PATCH',
+      authenticated: true,
+    );
   }
 
   Future<CancellationPreview> cancellationPreview(

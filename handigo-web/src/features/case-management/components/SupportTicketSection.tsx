@@ -9,6 +9,7 @@ import {
 } from "../hooks/useSupportTickets";
 import { SupportTicketCard, TicketListSkeleton } from "./SupportTicketCard";
 import { SupportTicketFilters } from "./SupportTicketFilters";
+import { SupportResponseNotice } from "./SupportResponseNotice";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { Plus, RefreshCw } from "lucide-react";
 
@@ -39,10 +40,11 @@ function SupportTicketWorkspace({ role, initialCreate = false, initialOrderId, o
         className="scroll-mt-28 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-5 sm:p-7"
       >
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="space-y-3">
             <h2 id="tao-ho-tro-heading" className="font-headline-lg text-2xl font-bold tracking-[-0.02em] text-on-surface">
               Tạo yêu cầu
             </h2>
+            <SupportResponseNotice />
           </div>
           <button type="button" onClick={() => setCreateOpen(true)} className="btn-primary shrink-0">
             <Plus aria-hidden="true" size={18} />

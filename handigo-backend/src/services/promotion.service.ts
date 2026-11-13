@@ -37,7 +37,7 @@ export const claimPromotion = async (promotion: IPromotion, count: number, sessi
 
 export const releaseOrderPromotion = async (orderId: Types.ObjectId, session: ClientSession) => {
   const order = await Order.findOneAndUpdate({ _id: orderId, promotionUsedAt: { $ne: null }, promotionReleasedAt: null, "promotionSnapshot.promotionId": { $ne: null } },
-    { $set: { promotionReleasedAt: new Date() } }, { new: true, session, runValidators: true });
+    { $set: { promotionReleasedAt: new Date() } }, { returnDocument: "after", session, runValidators: true });
   if (order?.promotionSnapshot?.promotionId) await Promotion.updateOne({ _id: order.promotionSnapshot.promotionId, usedCount: { $gt: 0 } },
     { $inc: { usedCount: -1 } }, { session, runValidators: true });
 };
@@ -55,6 +55,6 @@ export const savePromotion = async (input: Record<string, unknown>, id?: string)
   Object.assign(current, fields); return current.save();
 };
 export const deletePromotion = async (id: string) => {
-  const result = await Promotion.findOneAndUpdate({ _id: id, applicationMode: "automatic", isDeleted: false }, { $set: { isDeleted: true, deletedAt: new Date(), isActive: false, status: "INACTIVE" } }, { new: true, runValidators: true });
+  const result = await Promotion.findOneAndUpdate({ _id: id, applicationMode: "automatic", isDeleted: false }, { $set: { isDeleted: true, deletedAt: new Date(), isActive: false, status: "INACTIVE" } }, { returnDocument: "after", runValidators: true });
   if (!result) throw new AppError("Không tìm thấy chương trình khuyến mãi.", 404);
 };

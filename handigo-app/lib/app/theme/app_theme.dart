@@ -25,6 +25,32 @@ abstract final class AppTheme {
   static ThemeData get light => _build(Brightness.light);
   static ThemeData get dark => _build(Brightness.dark);
 
+  static ThemeData customerModals(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    return theme.copyWith(
+      dialogTheme: theme.dialogTheme.copyWith(
+        backgroundColor: scheme.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      bottomSheetTheme: theme.bottomSheetTheme.copyWith(
+        backgroundColor: scheme.surfaceContainerLowest,
+        modalBackgroundColor: scheme.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+      datePickerTheme: theme.datePickerTheme.copyWith(
+        backgroundColor: scheme.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+      ),
+      timePickerTheme: theme.timePickerTheme.copyWith(
+        backgroundColor: scheme.surfaceContainerLowest,
+      ),
+    );
+  }
+
   static ThemeData _build(Brightness brightness) {
     final fontFamily = switch (defaultTargetPlatform) {
       TargetPlatform.iOS || TargetPlatform.macOS => '.SF Pro Text',
@@ -143,8 +169,8 @@ abstract final class AppTheme {
             (states) => states.contains(WidgetState.selected)
                 ? scheme.onPrimary
                 : brightness == Brightness.light
-                ? const Color(0xFF595665)
-                : scheme.onSurfaceVariant,
+                ? Colors.black
+                : scheme.onSurface,
           ),
           fontWeight: FontWeight.w500,
         ),

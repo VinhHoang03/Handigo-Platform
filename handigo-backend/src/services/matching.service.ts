@@ -8,10 +8,17 @@ import { createLogger } from "../utils/logger";
 import { getAvailableProviderIds } from "./providerSchedule.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { calculateDuration, ScheduleInterval } from "../utils/bookingPolicy";
+import { getOnlineUserIds } from "../sockets/socketServer";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 const matchingLogger = createLogger("MatchingService");
+
+/**
+ * Thời gian tối đa từ lần cập nhật vị trí gần nhất để thợ còn được ghép đơn.
+ * App thợ gửi vị trí định kỳ 5 phút/lần, nên giữ thêm khoảng dư cho GPS chậm và mạng yếu.
+ */
+const PROVIDER_LOCATION_FRESHNESS_MS = 7 * 60_000;
 
 export interface ProviderCandidate {
   providerId: Types.ObjectId;
@@ -94,7 +101,9 @@ export const MatchingService = {
 
     const serviceObjectId = new Types.ObjectId(serviceId);
     const excludeIds = excludeProviderIds.map((id) => id.toString());
-    const eligibleProviderUserIds = await getEligibleProviderUserIds();
+    const walletEligibleUserIds = await getEligibleProviderUserIds();
+    const connectedUserIds = requireOnline ? new Set(await getOnlineUserIds() ?? []) : null;
+    const eligibleProviderUserIds = walletEligibleUserIds.filter((id) => !connectedUserIds || connectedUserIds.has(id.toString()));
     const eligibleProviderUserIdSet = new Set(
       eligibleProviderUserIds.map((userId) => userId.toString()),
     );
@@ -115,6 +124,7 @@ export const MatchingService = {
         ownerType: "provider",
         isActive: true,
         isDeleted: false,
+        ...(requireOnline && { lastUpdatedAt: { $gte: new Date(Date.now() - PROVIDER_LOCATION_FRESHNESS_MS) } }),
         userId: { $in: eligibleProviderUserIds },
         coordinates: {
           $nearSphere: {

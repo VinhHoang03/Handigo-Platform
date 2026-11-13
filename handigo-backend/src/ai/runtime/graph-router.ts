@@ -2,6 +2,7 @@ import type { ReadOnlyGraphData } from "./graph-state";
 
 // Danh sách đóng cho G3; thêm tool cần kiểm tra cả service, không chỉ cờ mutates.
 export const READ_ONLY_GRAPH_TOOLS = Object.freeze([
+  "get_repair_advice",
   "search_customer_knowledge", "get_system_info", "search_services", "get_service_catalog", "get_service",
   "get_addresses", "get_booking", "get_my_bookings",
 ] as const);

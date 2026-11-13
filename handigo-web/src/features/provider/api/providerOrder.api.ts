@@ -9,6 +9,9 @@ import type {
 } from '../types/providerOrder.types';
 
 export const providerOrderApi = {
+  confirmWorking: async (orderId: string) => {
+    await api.post(`/orders/${orderId}/work-confirmation`);
+  },
   arrive: async (orderId: string) => {
     const response = await api.post<{ success: boolean; data: Order }>(`/orders/${orderId}/arrival`);
     return response.data.data;
@@ -100,6 +103,7 @@ export const providerOrderApi = {
   startOrder: async (orderId: string) => {
     const response = await api.post<{ success: boolean; data: Order }>(
       `/orders/${orderId}/start`,
+      { workConfirmationEnabled: true },
     );
     return response.data.data;
   },

@@ -39,11 +39,10 @@ test('Modal catalog giữ nút Lưu và quyền bật hiển thị mặc định
   assert.ok(!html.includes('Dịch vụ từ đề xuất được lưu'));
 });
 
-test('Modal đề xuất khóa hiển thị, giải thích tạm ngừng và dùng nhãn tạo/duyệt riêng', () => {
+test('Modal đề xuất khóa hiển thị và dùng nhãn tạo/duyệt riêng', () => {
   const html = render({ allowActivation: false, submitLabel: 'Tạo dịch vụ và duyệt' });
   const checkbox = html.match(/<input[^>]*name="service-active"[^>]*>/)[0];
   assert.ok(checkbox.includes('disabled'));
   assert.ok(!checkbox.includes('checked'));
-  assert.ok(html.includes('Dịch vụ từ đề xuất được lưu ở trạng thái tạm ngừng'));
   assert.match(html, />Tạo dịch vụ và duyệt<\/button>/);
 });

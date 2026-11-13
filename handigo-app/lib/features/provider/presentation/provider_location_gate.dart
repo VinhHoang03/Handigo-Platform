@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers/app_providers.dart';
-import '../../auth/domain/app_user.dart';
 import '../data/provider_location_service.dart';
 import 'provider_schedule_preview.dart';
 import 'provider_screens.dart';
@@ -18,8 +17,7 @@ class ProviderLocationGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     if (!auth.isAuthenticated ||
-        auth.user?.role != UserRole.provider ||
-        auth.user?.providerOnboardingStatus != 'APPROVED' ||
+        auth.user?.canAccessProvider != true ||
         ref.watch(providerUiPreviewProvider) != null) {
       return child;
     }
@@ -72,9 +70,7 @@ class _ProviderLocationGateState
       _online &&
       ref.read(authControllerProvider).isAuthenticated &&
       ref.read(authControllerProvider).user?.id == _userId &&
-      ref.read(authControllerProvider).user?.role == UserRole.provider &&
-      ref.read(authControllerProvider).user?.providerOnboardingStatus ==
-          'APPROVED';
+      ref.read(authControllerProvider).user?.canAccessProvider == true;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

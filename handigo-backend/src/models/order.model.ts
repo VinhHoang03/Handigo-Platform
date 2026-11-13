@@ -83,6 +83,14 @@ export interface IOrderReassignment {
 }
 
 export interface IOrder extends Document, IBaseDocument {
+  movementTracking?: {
+    providerId: Types.ObjectId;
+    latitude: number;
+    longitude: number;
+    lastSampleAt: Date;
+    confirmationStartedAt?: Date | null;
+    notifiedAt?: Date | null;
+  } | null;
   arrival?: { providerId: Types.ObjectId; arrivedAt: Date; latitude: number; longitude: number } | null;
   customerNoShow?: {
     reportId: Types.ObjectId; status: "pending" | "approved" | "rejected";
@@ -92,9 +100,11 @@ export interface IOrder extends Document, IBaseDocument {
   promotionUsedAt?: Date | null;
   promotionReleasedAt?: Date | null;
   statusVersion: number;
+  workConfirmation?: { nextAt: Date; expiresAt?: Date | null } | null;
   addressSnapshot?: {
     recipientName?: string; recipientPhone?: string; fullAddress: string;
-    province: string; ward: string; latitude?: number; longitude?: number;
+    province: string; ward: string; note?: string | null;
+    latitude?: number; longitude?: number;
   } | null;
   overdueReview?: {
     escalatedAt?: Date | null;
@@ -212,6 +222,14 @@ const DiscountSnapshotSchema = new Schema<IDiscountSnapshot>(
 
 const OrderSchema = new Schema<IOrder>(
   {
+    movementTracking: { type: new Schema({
+      providerId: { type: Schema.Types.ObjectId, ref: "Provider", required: true },
+      latitude: { type: Number, required: true, min: -90, max: 90 },
+      longitude: { type: Number, required: true, min: -180, max: 180 },
+      lastSampleAt: { type: Date, required: true },
+      confirmationStartedAt: { type: Date, default: null },
+      notifiedAt: { type: Date, default: null },
+    }, { _id: false }), default: null, select: false },
     arrival: { type: new Schema({
       providerId: { type: Schema.Types.ObjectId, ref: "Provider", required: true },
       arrivedAt: { type: Date, required: true },
@@ -228,6 +246,10 @@ const OrderSchema = new Schema<IOrder>(
       customerRepliedAt: { type: Date, default: null },
     }, { _id: false }), default: null },
     statusVersion: { type: Number, default: 0, min: 0 },
+    workConfirmation: { type: new Schema({
+      nextAt: { type: Date, required: true },
+      expiresAt: { type: Date, default: null },
+    }, { _id: false }), default: null },
     overdueReview: { type: new Schema({ escalatedAt: { type: Date, default: null } }, { _id: false }), default: null },
     schedule: { type: new Schema({
       durationMinutes: { type: Number, required: true, min: 1 },
@@ -260,6 +282,7 @@ const OrderSchema = new Schema<IOrder>(
     addressSnapshot: { type: new Schema({
       recipientName: String, recipientPhone: String, fullAddress: { type: String, required: true },
       province: { type: String, required: true }, ward: { type: String, required: true },
+      note: { type: String, default: null },
       latitude: Number, longitude: Number,
     }, { _id: false }), default: null },
     orderType: {

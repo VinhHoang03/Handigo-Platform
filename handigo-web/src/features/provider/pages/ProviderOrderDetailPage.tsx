@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { PendingAssignmentCard } from '../components/PendingAssignmentCard';
 import { getCustomer } from '../utils/providerOrder.utils';
@@ -45,6 +46,7 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
     handleAccept,
     handleReject,
     handleStart,
+    handleConfirmWorking,
     handleArrival,
     checkNoShow,
     handleNoShow,
@@ -56,6 +58,14 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
     handleCreateQuotation,
     reload,
   } = useProviderOrderDetail(orderId, navigate);
+  const workExpiresAt = order?.workConfirmation?.expiresAt;
+  const [expiredWorkWindow, setExpiredWorkWindow] = useState<string | null>(null);
+  useEffect(() => {
+    if (!workExpiresAt) return;
+    const timer = window.setTimeout(() => setExpiredWorkWindow(workExpiresAt),
+      Math.max(new Date(workExpiresAt).getTime() - Date.now(), 0));
+    return () => window.clearTimeout(timer);
+  }, [workExpiresAt]);
 
   if (loading) {
     return (
@@ -137,22 +147,34 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
           onChanged={() => reload(false)}
         />
 
-        <div className="grid grid-cols-1 items-start gap-gutter md:grid-cols-2 lg:grid-cols-3">
-          <CustomerInformationCard
-            order={order}
-            customer={customer}
-            addressLine={addressLine}
-            orderType={orderTypeLabels[order.orderType]}
-          />
-          <PaymentSummaryCard
-            order={order}
-            paymentStatus={getPaymentStatusLabel(order)}
-            quotation={quotation}
-          />
-          <OrderProgressCard order={order} />
+        <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-12">
+          <div className="min-w-0 lg:col-span-7">
+            <CustomerInformationCard
+              order={order}
+              customer={customer}
+              addressLine={addressLine}
+              orderType={orderTypeLabels[order.orderType]}
+            />
+          </div>
+          <div className="min-w-0 space-y-gutter lg:col-span-5">
+            <PaymentSummaryCard
+              order={order}
+              paymentStatus={getPaymentStatusLabel(order)}
+              quotation={quotation}
+            />
+            <OrderProgressCard order={order} />
+          </div>
         </div>
 
         <OrderTrackingMap order={order} viewerRole="PROVIDER" />
+        {order.status === 'in_progress' && workExpiresAt && expiredWorkWindow !== workExpiresAt && (
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning bg-warning-container p-4 text-on-warning-container">
+            <p role="status">Xác nhận bạn vẫn đang làm việc trước {new Date(workExpiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}.</p>
+            <button type="button" className="btn-primary" disabled={busy} onClick={() => void handleConfirmWorking()}>
+              Tôi vẫn đang làm việc
+            </button>
+          </section>
+        )}
         {!quotation && !order.currentQuotationId && <OrderArrivalPanel order={order} busy={busy} onArrival={handleArrival}
           onCancel={() => setCancelOpen(true)} checkNoShow={checkNoShow} onNoShow={handleNoShow} />}
 

@@ -23,7 +23,7 @@ import {
   normalizeExternalPersonName,
 } from "../utils/profileValidation";
 import { markProviderOffline } from "./providerPresence.service";
-import { disconnectUserSockets } from "../sockets/socketServer";
+import { disconnectUserSockets, disconnectSessionSockets } from "../sockets/socketServer";
 import { refreshAccountLock } from "./penaltyPolicy.service";
 import { getEffectiveUserRole } from "../utils/userRole";
 
@@ -171,7 +171,7 @@ const issueSessionTokens = async (
   );
 
   return {
-    token: signAccessToken(user),
+    token: signAccessToken(user, sessionObjectId.toString()),
     refreshToken,
     refreshTokenExpiresAt,
   };
@@ -221,7 +221,7 @@ const createAndSendRegisterOtp = async (
       passwordHash: user.passwordHash, registerOtp: user.registerOtp ?? null },
     { $set: { ...changes, registerOtp: hashOtp(otp), registerOtpExpire: getOtpExpireDate() },
       ...(Object.prototype.hasOwnProperty.call(changes, "phone") && changes.phone === undefined ? { $unset: { phone: 1 } } : {}) },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!updated) throw new AppError("Thông tin đăng ký đã thay đổi. Vui lòng thử lại.", 409);
 
@@ -232,7 +232,7 @@ export const register = async (payload: {
   email: string;
   password: string;
   fullName: string;
-  phone?: string;
+  phone: string;
   registrationType?: "CUSTOMER" | "PROVIDER";
 }): Promise<void> => {
   const existingUser = await User.findOne({ email: payload.email });
@@ -317,7 +317,7 @@ export const verifyRegisterOtp = async (
       providerOnboardingStatus: isProviderRegistration ? "PROFILE_INCOMPLETE" : null,
       providerOnboardingStep: isProviderRegistration ? 1 : null },
       $unset: { registrationIntent: 1, registerOtp: 1, registerOtpExpire: 1 } },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!verifiedUser) throw new AppError("Thông tin đăng ký đã thay đổi. Vui lòng yêu cầu mã mới.", 409);
 
@@ -370,9 +370,6 @@ export const login = async (
     throw new AppError("Email hoặc mật khẩu không đúng", 401);
   }
 
-  if (user.role === "PROVIDER") {
-    await markProviderOffline(user._id.toString());
-  }
   const tokens = await issueSessionTokens(user);
 
   return {
@@ -477,7 +474,7 @@ const linkOAuthAccount = async (
           resetPasswordTokenHash: 1, resetPasswordExpire: 1 },
         $inc: { tokenVersion: 1 },
       } : {}) },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
   if (!linked) throw new AppError("Thông tin tài khoản đã thay đổi. Vui lòng đăng nhập lại.", 409);
   return linked;
@@ -531,9 +528,6 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
 
   await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
 
-  if (authenticatedUser.role === "PROVIDER") {
-    await markProviderOffline(authenticatedUser._id.toString());
-  }
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
@@ -609,9 +603,6 @@ export const facebookLogin = async (accessToken: string) => {
 
   await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
 
-  if (authenticatedUser.role === "PROVIDER") {
-    await markProviderOffline(authenticatedUser._id.toString());
-  }
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
@@ -763,7 +754,10 @@ export const logout = async (refreshToken?: string): Promise<void> => {
     );
 
     if (revokedSession) {
-      await markProviderOffline(decoded.id);
+      disconnectSessionSockets(decoded.sessionId);
+      if (!await Session.exists({ userId: decoded.id, revokedAt: null, expiresAt: { $gt: new Date() }, isDeleted: false })) {
+        await markProviderOffline(decoded.id, true);
+      }
     }
   } catch (error) {
     return;

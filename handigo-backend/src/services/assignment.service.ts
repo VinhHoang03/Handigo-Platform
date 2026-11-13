@@ -19,6 +19,7 @@ import { assertProviderWalletEligible } from "./providerWalletEligibility.servic
 import type { UserRole } from "../models/user.model";
 import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
 import { requestDirectProviderReassignment } from "./orderReassignment.service";
+import { scheduleOrderDeadline } from "./orderDeadline.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
 import { calculateDuration } from "../utils/bookingPolicy";
@@ -336,6 +337,9 @@ export const AssignmentService = {
     try {
       result = await session.withTransaction(async () => {
         const lockedProvider = await lockProviderSchedule(provider._id as Types.ObjectId, session);
+        if (lockedProvider.availabilityStatus !== "online") {
+          throw new AppError("Trạng thái nhận việc đã thay đổi. Vui lòng kiểm tra lại trước khi nhận đơn.", 409);
+        }
         const order = await Order.findOne({
           _id: assignment.orderId,
           status: "created",
@@ -414,9 +418,11 @@ export const AssignmentService = {
     } catch (error) {
       assignmentLogger.error("Đã lưu lời chào nhưng chưa phát được tin nhắn trực tiếp.", error, { assignmentId });
     }
+    scheduleOrderDeadline(result.order);
     emitToUser(result.order.customerId.toString(), "order:updated", {
       orderId: result.order._id.toString(),
     });
+    emitToUser(providerUserId, "provider:availability", { availabilityStatus: isAppointment ? "online" : "busy" });
     try {
       await closeCompetingAssignments(result.order._id as Types.ObjectId, result.assignment._id as Types.ObjectId);
       emitToUser(providerUserId, "assignment:closed", { assignmentId, reason: "accepted" });
@@ -652,72 +658,6 @@ export const AssignmentService = {
     } finally {
       await session.endSession();
     }
-  },
-
-  /** Giữ xác nhận cho báo giá chờ duyệt cũ; báo giá đã lưu không cần khách xác nhận. */
-  async confirmRepairQuotation(
-    quotationId: string,
-    customerUserId: string,
-  ): Promise<InstanceType<typeof RepairQuotation>> {
-    const session = await mongoose.startSession();
-    let approvedQuotation: InstanceType<typeof RepairQuotation> | null = null;
-
-    try {
-      await session.withTransaction(async () => {
-        const quotation = await RepairQuotation.findById(quotationId).session(
-          session,
-        );
-        if (!quotation) throw new AppError("Báo giá không tồn tại.", 404);
-        if (
-          quotation.status !== "pending" &&
-          quotation.status !== "saved" &&
-          !(quotation.status === "approved" && quotation.customerConfirmed)
-        ) {
-          throw new AppError(
-            `Báo giá đã ở trạng thái "${quotation.status}".`,
-            400,
-          );
-        }
-
-        const order = await Order.findById(quotation.orderId).session(session);
-        if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
-        if (order.customerId.toString() !== customerUserId) {
-          throw new AppError("Bạn không có quyền xác nhận báo giá này.", 403);
-        }
-        if (order.currentQuotationId?.toString() !== quotation.id) {
-          throw new AppError("Báo giá này không còn là báo giá hiện tại.", 409);
-        }
-        if (quotation.status === "saved" || (quotation.status === "approved" && quotation.customerConfirmed)) {
-          approvedQuotation = quotation;
-          return;
-        }
-        if (!order.inspectionRequired || !["accepted", "in_progress"].includes(order.status)) {
-          throw new AppError(
-            "Không thể xác nhận báo giá ở trạng thái hiện tại của đơn hàng.",
-            409,
-          );
-        }
-
-        const confirmedAt = new Date();
-
-        quotation.status = "approved";
-        quotation.customerConfirmed = true;
-        quotation.approvedAt = confirmedAt;
-        await quotation.save({ session });
-
-        order.confirmation.customerConfirmedAt = confirmedAt;
-        await order.save({ session });
-
-        approvedQuotation = quotation;
-      });
-    } finally {
-      await session.endSession();
-    }
-
-    if (!approvedQuotation) {
-      throw new AppError("Không thể xác nhận báo giá.", 500);
-    }
-    return approvedQuotation;
   },
 
   /**

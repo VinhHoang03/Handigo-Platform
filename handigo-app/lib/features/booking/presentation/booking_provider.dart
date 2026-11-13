@@ -75,12 +75,28 @@ class BookingDraft {
   );
 }
 
+typedef RebookingSession = ({String owner, String orderId, BookingDraft draft});
+
 class BookingDraftController extends Notifier<BookingDraft> {
+  BookingDraftController();
+  BookingDraftController.rebooking(RebookingSession session)
+    : _rebooking = session;
+
+  RebookingSession? _rebooking;
   String? _owner;
   int _revision = 0;
   Timer? _debounce;
   @override
   BookingDraft build() {
+    final session = _rebooking;
+    if (session != null) {
+      final removeListener = listenSelf((_, next) {
+        if (_rebooking != null) unawaited(_saveRebooking(session, next));
+      });
+      ref.onDispose(removeListener);
+      unawaited(_saveRebooking(session, session.draft));
+      return session.draft;
+    }
     final removeListener = listenSelf((previous, next) {
       _revision++;
       _debounce?.cancel();
@@ -99,6 +115,35 @@ class BookingDraftController extends Notifier<BookingDraft> {
       removeListener();
     });
     return const BookingDraft();
+  }
+
+  Future<void> _saveRebooking(
+    RebookingSession session,
+    BookingDraft draft,
+  ) async {
+    try {
+      await const BookingDraftStore().saveRebooking(
+        session.owner,
+        session.orderId,
+        draft,
+      );
+    } catch (_) {
+      /* Giữ bản nháp trong phiên nếu thiết bị chưa lưu được. */
+    }
+  }
+
+  Future<void> finishRebooking() async {
+    final session = _rebooking;
+    if (session == null) return;
+    _rebooking = null;
+    try {
+      await const BookingDraftStore().clearRebooking(
+        session.owner,
+        session.orderId,
+      );
+    } catch (_) {
+      /* Đơn đã tạo vẫn tiếp tục được thanh toán nếu bộ nhớ cục bộ gặp lỗi. */
+    }
   }
 
   Future<void> attachOwner(String? id) async {
@@ -187,12 +232,16 @@ class BookingDraftController extends Notifier<BookingDraft> {
 final bookingDraftProvider =
     NotifierProvider<BookingDraftController, BookingDraft>(
       BookingDraftController.new,
+      dependencies: const [],
     );
 
-final bookingDraftPersistenceProvider = Provider<void>((ref) {
-  final id = ref.watch(authControllerProvider.select((auth) => auth.user?.id));
-  final controller = ref.read(bookingDraftProvider.notifier);
-  Future.microtask(() {
-    if (ref.mounted) controller.attachOwner(id);
-  });
-});
+final bookingDraftPersistenceProvider = Provider<void>(
+  (ref) {
+    final id = ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+    final controller = ref.read(bookingDraftProvider.notifier);
+    Future.microtask(() {
+      if (ref.mounted) controller.attachOwner(id);
+    });
+  },
+  dependencies: [bookingDraftProvider],
+);

@@ -1,4 +1,5 @@
 import '../../../shared/widgets/app_search_field.dart';
+import '../../../shared/widgets/handigo_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,9 +13,10 @@ import '../domain/provider_application_models.dart';
 final providerApplicationRepositoryProvider = Provider(
   (ref) => ProviderApplicationRepository(ref.watch(apiClientProvider)),
 );
-final providerApplicationProvider = FutureProvider<ProviderApplication?>(
-  (ref) => ref.watch(providerApplicationRepositoryProvider).mine(),
-);
+final providerApplicationProvider = FutureProvider<ProviderApplication?>((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerApplicationRepositoryProvider).mine();
+});
 
 enum _IdentityProcess { idle, uploading, reading }
 
@@ -578,7 +580,13 @@ class _ProviderOnboardingScreenState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
           children: const [
-            Text('HANDIGO · ĐỐI TÁC', style: _T.overline),
+            Row(
+              children: [
+                HandigoLogo(height: 30),
+                SizedBox(width: 8),
+                Text('ĐỐI TÁC', style: _T.overline),
+              ],
+            ),
             SizedBox(height: 9),
             Text('Chủ động công việc,\ntăng thêm thu nhập', style: _T.hero),
             SizedBox(height: 14),
@@ -1603,7 +1611,10 @@ class _ProviderOnboardingScreenState
     final approved = item.status == 'approved';
     return Column(
       children: [
-        _topBar(approved ? 'Hồ sơ đối tác' : 'Đăng ký đối tác'),
+        _topBar(
+          approved ? 'Hồ sơ đối tác' : 'Đăng ký đối tác',
+          onBack: _leaveStatusScreen,
+        ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 36, 20, 28),
@@ -1638,10 +1649,39 @@ class _ProviderOnboardingScreenState
         ),
         _ActionBar(
           label: 'Hoàn tất',
-          onPrimary: context.canPop() ? () => context.pop() : null,
+          saving: saving,
+          onPrimary: _leaveStatusScreen,
+          onSecondary: () => ref.read(authControllerProvider).logout(),
+          secondaryLabel: 'Đăng xuất',
         ),
       ],
     );
+  }
+
+  Future<void> _leaveStatusScreen() async {
+    if (saving) return;
+    final auth = ref.read(authControllerProvider);
+    if (current?.status == 'approved' && auth.user?.canAccessProvider != true) {
+      setState(() => saving = true);
+      final refreshed = await auth.refreshUser();
+      if (!mounted) return;
+      setState(() => saving = false);
+      if (!refreshed || auth.user?.canAccessProvider != true) {
+        _message(
+          auth.message ?? 'Chưa cập nhật được quyền đối tác. Vui lòng thử lại.',
+        );
+        return;
+      }
+    }
+    if (auth.user?.canAccessProvider == true) {
+      context.go('/provider');
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.go('/customer/account');
   }
 
   Widget _rejection(ProviderApplication item) => Container(
@@ -1725,6 +1765,7 @@ class _ProviderOnboardingScreenState
                       onTap: () => showAboutDialog(
                         context: context,
                         applicationName: 'Handigo Đối tác',
+                        applicationIcon: const HandigoLogo(height: 24),
                         applicationVersion: 'Hồ sơ đăng ký',
                       ),
                       child: const Column(
@@ -1816,12 +1857,14 @@ class _ActionBar extends StatelessWidget {
     required this.onPrimary,
     this.onSave,
     this.onSecondary,
+    this.secondaryLabel = 'Quay lại',
     this.saving = false,
   });
   final String label;
   final VoidCallback? onPrimary;
   final VoidCallback? onSave;
   final VoidCallback? onSecondary;
+  final String secondaryLabel;
   final bool saving;
 
   @override
@@ -1868,9 +1911,12 @@ class _ActionBar extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text(
-                    'Quay lại',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  child: Text(
+                    secondaryLabel,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
