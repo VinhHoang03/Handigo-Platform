@@ -19,6 +19,7 @@ import 'order_rebook_button.dart';
 import 'order_reschedule_panel.dart';
 import '../../../core/network/paged_result.dart';
 import '../../booking/data/pending_booking_store.dart';
+import '../../provider/presentation/provider_schedule_preview.dart';
 
 final orderRepositoryProvider = Provider<OrderRepository>(
   (ref) => OrderRepository(ref.watch(apiClientProvider)),
@@ -29,13 +30,24 @@ final orderListProvider = FutureProvider.autoDispose(
   ).list(ref.watch(authControllerProvider).user!),
 );
 final orderQuotationProvider = FutureProvider.autoDispose
-    .family<RepairQuotation?, String>(
-      (ref, id) => ref.watch(orderRepositoryProvider).quotation(id),
-    );
+    .family<RepairQuotation?, String>((ref, id) {
+      if (id.startsWith('preview-')) {
+        return Future<RepairQuotation?>.value(null);
+      }
+      return ref.watch(orderRepositoryProvider).quotation(id);
+    });
 final orderDetailProvider = FutureProvider.autoDispose
-    .family<OrderDetail, String>(
-      (ref, id) => ref.watch(orderRepositoryProvider).detail(id),
-    );
+    .family<OrderDetail, String>((ref, id) {
+      if (id.startsWith('preview-')) {
+        final preview = ref.watch(providerUiPreviewProvider);
+        final matches = preview?.where((order) => order.id == id);
+        if (matches != null && matches.isNotEmpty) {
+          return createPreviewOrderDetail(matches.first);
+        }
+        throw StateError('Không tìm thấy đơn xem thử.');
+      }
+      return ref.watch(orderRepositoryProvider).detail(id);
+    });
 
 final orderPageProvider = FutureProvider.autoDispose
     .family<PagedResult<OrderSummary>, (int, String, String)>(

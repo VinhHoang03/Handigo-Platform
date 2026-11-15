@@ -13,6 +13,7 @@ import '../../../core/network/paged_result.dart';
 import '../../../core/network/realtime_connection.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/account_overview_widgets.dart';
+import '../../../shared/widgets/customer_page_header.dart';
 import '../domain/provider_income.dart';
 import 'provider_account_screens.dart';
 import 'provider_screens.dart';
@@ -187,64 +188,91 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
       ],
     );
     if (widget.asTab) {
-      return AccountDetailScaffold(
-        title: _title,
-        showBackButton: false,
-        actions: [
-          IconButton(
-            tooltip: 'Tải lại',
-            onPressed: () => _refreshFinances(ref),
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: SizedBox(
-                width: double.infinity,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8EDF3),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: SegmentedButton<int>(
-                      style: SegmentedButton.styleFrom(
-                        foregroundColor: accountMuted,
-                        selectedForegroundColor: Colors.white,
-                        selectedBackgroundColor: accountPrimary,
-                        side: BorderSide.none,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      segments: const [
-                        ButtonSegment(value: 0, label: Text('Thu nhập')),
-                        ButtonSegment(value: 1, label: Text('Ví')),
-                        ButtonSegment(
-                          value: 2,
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Symbols.military_tech, fill: 1, size: 15),
-                              SizedBox(width: 4),
-                              Flexible(child: Text('Tiền thưởng')),
-                            ],
-                          ),
-                        ),
-                      ],
-                      showSelectedIcon: false,
-                      selected: {_tab},
-                      onSelectionChanged: (value) => _selectTab(value.single),
-                    ),
-                  ),
+      return Scaffold(
+        backgroundColor: accountBackground,
+        appBar: CustomerPageHeader(
+          toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
+          automaticallyImplyLeading: false,
+          backgroundColor: accountSurface,
+          title: _title,
+          titleColor: accountInk,
+          actions: [
+            IconButton(
+              tooltip: 'Tải lại',
+              onPressed: () => _refreshFinances(ref),
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              cardTheme: CardThemeData(
+                color: accountSurface,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                margin: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
                 ),
               ),
             ),
-            Expanded(child: content),
-          ],
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8EDF3),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: SegmentedButton<int>(
+                          style: SegmentedButton.styleFrom(
+                            foregroundColor: accountMuted,
+                            selectedForegroundColor: Colors.white,
+                            selectedBackgroundColor: accountPrimary,
+                            side: BorderSide.none,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          segments: const [
+                            ButtonSegment(value: 0, label: Text('Thu nhập')),
+                            ButtonSegment(value: 1, label: Text('Ví')),
+                            ButtonSegment(
+                              value: 2,
+                              label: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Symbols.military_tech,
+                                    fill: 1,
+                                    size: 15,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Flexible(child: Text('Tiền thưởng')),
+                                ],
+                              ),
+                            ),
+                          ],
+                          showSelectedIcon: false,
+                          selected: {_tab},
+                          onSelectionChanged: (value) =>
+                              _selectTab(value.single),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(child: content),
+              ],
+            ),
+          ),
         ),
       );
     }

@@ -16,6 +16,52 @@ class ProviderUiPreviewController extends Notifier<List<OrderSummary>?> {
       state = enabled ? createSchedulePreviewOrders(DateTime.now()) : null;
     }
   }
+
+  /// Hủy đơn xem thử trong bộ nhớ, không gọi API.
+  void cancelPreviewOrder(String id) {
+    final current = state;
+    if (!kDebugMode || current == null) return;
+    state = [
+      for (final order in current)
+        order.id == id ? _withStatus(order, 'cancelled') : order,
+    ];
+  }
+}
+
+OrderSummary _withStatus(OrderSummary order, String status) => OrderSummary(
+  id: order.id,
+  code: order.code,
+  serviceName: order.serviceName,
+  status: status,
+  scheduledAt: order.scheduledAt,
+  addressLabel: order.addressLabel,
+  customerName: order.customerName,
+  totalAmount: order.totalAmount,
+  providerAmount: order.providerAmount,
+  durationMinutes: order.durationMinutes,
+  problemDescription: order.problemDescription,
+);
+
+/// Chi tiết đơn xem thử, dựng từ dữ liệu xem thử trong bộ nhớ.
+OrderDetail createPreviewOrderDetail(OrderSummary order) {
+  final now = DateTime.now().toUtc().toIso8601String();
+  return OrderDetail.fromJson({
+    '_id': order.id,
+    'orderCode': order.code,
+    'serviceId': {'name': order.serviceName},
+    'status': order.status,
+    'paymentStatus': 'unpaid',
+    'paymentMethod': 'cash',
+    'orderType': 'scheduled',
+    'scheduledAt': order.scheduledAt?.toUtc().toIso8601String(),
+    'problemDescription': order.problemDescription,
+    'pricing': {'totalPaidAmount': order.totalAmount},
+    'customerId': {'fullName': order.customerName},
+    'schedule': {'durationMinutes': order.durationMinutes},
+    'statusHistory': const <Map<String, dynamic>>[],
+    'createdAt': now,
+    'updatedAt': now,
+  });
 }
 
 /// Dữ liệu xem thử chỉ được tạo trong bộ nhớ khi người dùng bật chế độ debug.
