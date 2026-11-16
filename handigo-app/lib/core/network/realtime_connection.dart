@@ -18,7 +18,7 @@ final realtimeConnectionProvider = Provider<RealtimeConnection?>((ref) {
     authControllerProvider.select((auth) => auth.user?.id),
   );
   if (userId == null) return null;
-  void refresh() {
+  void refreshOrders() {
     ref.invalidate(orderListProvider);
     ref.invalidate(orderPageProvider);
     ref.invalidate(orderDetailProvider);
@@ -29,6 +29,10 @@ final realtimeConnectionProvider = Provider<RealtimeConnection?>((ref) {
     ref.invalidate(providerOrderPageProvider);
     ref.invalidate(providerScheduleOrdersProvider);
     ref.invalidate(providerOverviewProvider);
+  }
+
+  void refresh() {
+    refreshOrders();
     ref.invalidate(notificationListProvider);
     ref.invalidate(conversationListProvider);
     ref.invalidate(providerNotificationBadgeProvider);
@@ -38,6 +42,7 @@ final realtimeConnectionProvider = Provider<RealtimeConnection?>((ref) {
   final connection = RealtimeConnection(
     ref.read(apiClientProvider),
     refresh,
+    reconcileOrders: refreshOrders,
     keepAliveInBackground: () =>
         !kIsWeb &&
         ref.read(authControllerProvider).user?.role == UserRole.provider &&
@@ -49,6 +54,7 @@ final realtimeConnectionProvider = Provider<RealtimeConnection?>((ref) {
   );
   final inboxEvents = connection.events.listen((event) {
     if (event.name == 'message:new' || event.name == 'message:seen') {
+      ref.invalidate(conversationListProvider);
       ref.invalidate(providerMessageBadgeProvider);
     }
   });
@@ -58,28 +64,51 @@ final realtimeConnectionProvider = Provider<RealtimeConnection?>((ref) {
 });
 
 class RealtimeConnection with WidgetsBindingObserver {
-  RealtimeConnection(this.api, this.refresh, {this.keepAliveInBackground}) {
+  RealtimeConnection(
+    this.api,
+    this.refresh, {
+    this.keepAliveInBackground,
+    this.reconcileOrders,
+    this.socketFactory,
+  }) {
     WidgetsBinding.instance.addObserver(this);
+    _foreground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     unawaited(connect());
     _fallback = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (!_disposed && _active && !connected) {
-        refresh();
-        unawaited(connect());
+      if (!_disposed && _foreground) {
+        // Đối soát qua HTTP cả khi socket còn kết nối nhưng bị lỡ sự kiện.
+        _scheduleRefresh(ordersOnly: connected);
+        if (!connected) unawaited(connect());
       }
     });
   }
   final ApiClient api;
   final VoidCallback refresh;
   final bool Function()? keepAliveInBackground;
+  final VoidCallback? reconcileOrders;
+  final io.Socket Function(String, Map<String, dynamic>)? socketFactory;
   final _events = StreamController<({String name, dynamic data})>.broadcast();
   Stream<({String name, dynamic data})> get events => _events.stream;
   io.Socket? _socket;
-  Timer? _fallback;
+  Timer? _fallback, _refreshTimer;
+  bool _foreground = true, _ordersOnly = true;
+  Future<void>? _connecting;
   bool _active = true;
   bool _disposed = false, _refreshing = false, _authRetried = false;
   bool get connected => _socket?.connected == true;
 
-  Future<void> connect() async {
+  Future<void> connect() {
+    if (_connecting != null) return _connecting!;
+    late final Future<void> operation;
+    operation = _connect().whenComplete(() {
+      if (identical(_connecting, operation)) _connecting = null;
+    });
+    return _connecting = operation;
+  }
+
+  Future<void> _connect() async {
     if (_disposed || !_active) return;
     try {
       final token = await api.socketAccessToken();
@@ -90,7 +119,7 @@ class RealtimeConnection with WidgetsBindingObserver {
         return;
       }
       final base = Uri.parse(AppConfig.apiBaseUrl);
-      final socket = io.io(base.origin, {
+      final io.Socket socket = (socketFactory ?? io.io)(base.origin, {
         'transports': ['websocket'],
         'autoConnect': false,
         'forceNew': true,
@@ -100,7 +129,7 @@ class RealtimeConnection with WidgetsBindingObserver {
       _socket = socket;
       socket.onConnect((_) {
         _authRetried = false;
-        refresh();
+        _scheduleRefresh();
         _emit('connect', null);
       });
       socket.onDisconnect((_) {
@@ -139,12 +168,17 @@ class RealtimeConnection with WidgetsBindingObserver {
       ]) {
         socket.on(event, (data) {
           if (!_disposed) {
-            refresh();
+            _scheduleRefresh();
             _emit(event, data);
           }
         });
       }
-      for (final event in ['message:new', 'message:seen', 'order:location']) {
+      for (final event in [
+        'message:new',
+        'message:seen',
+        'order:location',
+        'providers:changed',
+      ]) {
         socket.on(event, (data) {
           if (!_disposed) _emit(event, data);
         });
@@ -159,6 +193,22 @@ class RealtimeConnection with WidgetsBindingObserver {
     if (!_disposed) _events.add((name: name, data: data));
   }
 
+  void _scheduleRefresh({bool ordersOnly = false}) {
+    if (_disposed || !_foreground) return;
+    _ordersOnly = _ordersOnly && ordersOnly;
+    _refreshTimer ??= Timer(const Duration(milliseconds: 250), () {
+      _refreshTimer = null;
+      final onlyOrders = _ordersOnly;
+      _ordersOnly = true;
+      if (_disposed || !_foreground) return;
+      if (onlyOrders && reconcileOrders != null) {
+        reconcileOrders!();
+      } else {
+        refresh();
+      }
+    });
+  }
+
   void emit(
     String event,
     Map<String, dynamic> data, {
@@ -167,12 +217,13 @@ class RealtimeConnection with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
     _active =
         state == AppLifecycleState.resumed ||
         (state != AppLifecycleState.detached &&
             keepAliveInBackground?.call() == true);
     if (state == AppLifecycleState.resumed) {
-      refresh();
+      _scheduleRefresh();
       unawaited(connect());
     } else if (!_active &&
         (state == AppLifecycleState.paused ||
@@ -182,9 +233,11 @@ class RealtimeConnection with WidgetsBindingObserver {
   }
 
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
     _fallback?.cancel();
+    _refreshTimer?.cancel();
     _socket?.dispose();
     unawaited(_events.close());
   }

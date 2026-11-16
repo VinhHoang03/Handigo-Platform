@@ -138,7 +138,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final support = find.widgetWithText(ChoiceChip, 'Hỗ trợ');
+        final support = find.widgetWithText(ChoiceChip, 'Lịch sử cũ');
         await tester.ensureVisible(support);
         await tester.tap(support);
         await tester.pumpAndSettle();

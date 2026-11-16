@@ -12,13 +12,18 @@ const run = async () => {
     const oldIndex = indexes.find((index) => index.unique
       && Object.keys(index.key).length === 1 && index.key.orderId === 1);
     if (!process.argv.includes("--apply")) {
-      console.log("Xem trước: bỏ ràng buộc mỗi đơn chỉ có một chat và thêm index tìm chat theo khách–thợ.",
+      console.log("Xem trước: cập nhật index chat riêng theo đơn–khách–thợ; lịch sử cũ giữ nguyên và chỉ xem lại.",
         { oldIndex: oldIndex?.name ?? null });
       return;
     }
     if (oldIndex?.name) await Conversation.collection.dropIndex(oldIndex.name);
     await Conversation.collection.createIndex({ orderId: 1 });
     await Conversation.collection.createIndex({ customerId: 1, providerId: 1, isDeleted: 1, createdAt: 1, _id: 1 });
+    await Conversation.collection.createIndex({ orderId: 1, customerId: 1, providerId: 1 }, {
+      unique: true,
+      name: "order_conversation_participants_unique",
+      partialFilterExpression: { scope: "order", isDeleted: false },
+    });
     console.log("Đã cập nhật index trò chuyện; giữ nguyên toàn bộ cuộc trò chuyện và tin nhắn cũ.");
   } finally { await mongoose.disconnect(); }
 };

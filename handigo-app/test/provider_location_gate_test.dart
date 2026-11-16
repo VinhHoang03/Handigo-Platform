@@ -52,7 +52,7 @@ void main() {
     (tester) async {
       final api = ApiClient(Dio(), CookieJar());
       final tracker = _Tracker(api);
-      var online = true;
+      var availability = 'online';
       final auth = AuthController(AuthRepository(api), api)
         ..user = _user('provider', onboardingStatus: null)
         ..status = AuthStatus.authenticated;
@@ -61,9 +61,8 @@ void main() {
           authControllerProvider.overrideWith((ref) => auth),
           providerLocationServiceProvider.overrideWith((ref) => tracker),
           providerOverviewProvider.overrideWith(
-            (ref) async => ProviderOverview.fromJson({
-              'availabilityStatus': online ? 'online' : 'offline',
-            }),
+            (ref) async =>
+                ProviderOverview.fromJson({'availabilityStatus': availability}),
           ),
         ],
       );
@@ -88,12 +87,21 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
       expect(tracker.refreshes, 1);
-      online = false;
+      availability = 'busy';
+      container.invalidate(providerOverviewProvider);
+      await tester.pumpAndSettle();
+      expect(tracker.allowed!(), isTrue);
+      expect(
+        tracker.updateInterval,
+        ProviderLocationService.workingCheckInterval,
+      );
+      expect(tracker.stops, 0);
+      availability = 'offline';
       container.invalidate(providerOverviewProvider);
       await tester.pumpAndSettle();
       expect(tracker.stops, greaterThanOrEqualTo(1));
       expect(tracker.allowed!(), isFalse);
-      online = true;
+      availability = 'online';
       container.invalidate(providerOverviewProvider);
       await tester.pumpAndSettle();
       expect(tracker.allowed!(), isTrue);

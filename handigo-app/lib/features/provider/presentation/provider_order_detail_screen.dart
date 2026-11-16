@@ -46,11 +46,12 @@ class _ProviderOrderDetailScreenState
   Future<void> _loadQuotation() async {
     try {
       final value = await ref.refresh(orderQuotationProvider(orderId).future);
-      if (mounted)
+      if (mounted) {
         setState(() {
           quotation = value;
           quotationLoaded = true;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => quotationLoaded = false);
     }
@@ -60,16 +61,17 @@ class _ProviderOrderDetailScreenState
   Widget build(BuildContext context) {
     ref.listen(orderQuotationProvider(orderId), (_, next) {
       next.whenData((value) {
-        if (mounted)
+        if (mounted) {
           setState(() {
             quotation = value;
             quotationLoaded = true;
           });
+        }
       });
     });
     ref.watch(orderQuotationProvider(orderId));
     final state = ref.watch(orderDetailProvider(orderId));
-    final order = state.asData?.value;
+    final order = state.hasValue ? state.value : null;
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
@@ -120,6 +122,7 @@ class _ProviderOrderDetailScreenState
         ],
       ),
       body: state.when(
+        skipError: true,
         loading: () => const AppLoading(),
         error: (error, _) => AppMessage(
           message: _message(error),
@@ -294,6 +297,12 @@ class _ProviderOrderDetailScreenState
               _quotationSummary(order),
             const SizedBox(height: 12),
             OrderProgressTimeline(order: order),
+            if (state.hasError)
+              AppMessage(
+                message:
+                    'Chưa đồng bộ được đơn hàng. Đang hiển thị dữ liệu gần nhất.',
+                onRetry: () => ref.invalidate(orderDetailProvider(orderId)),
+              ),
           ],
         ),
       ),
@@ -396,166 +405,189 @@ class _ProviderOrderDetailScreenState
     }
   }
 
-  Future<void> _confirmCashPayment(OrderDetail order) async {
-    final amount = order.totalAmount;
-    if (busy || amount == null) return;
-    final owner = ref.read(authControllerProvider).user?.id;
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final scheme = Theme.of(context).colorScheme;
-        final buttonShape = RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        );
-        return AlertDialog(
-          backgroundColor: scheme.surfaceContainerLowest,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
-          ),
-          constraints: const BoxConstraints(maxWidth: 420),
-          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          title: Column(
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: .08),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  Icons.payments_outlined,
-                  color: scheme.primary,
-                  size: 30,
-                ),
+  Future<bool?> _showReceivedPaymentDialog(
+    double amount, {
+    RepairQuotation? current,
+    double appliedDeposit = 0,
+  }) => showDialog<bool>(
+    context: context,
+    builder: (context) {
+      final scheme = Theme.of(context).colorScheme;
+      final buttonShape = RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      );
+      return AlertDialog(
+        backgroundColor: scheme.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        constraints: const BoxConstraints(maxWidth: 420),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        title: Column(
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(20),
               ),
-              const SizedBox(height: 18),
+              child: Icon(
+                Icons.payments_outlined,
+                color: scheme.primary,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              current == null
+                  ? 'Xác nhận nhận tiền mặt'
+                  : 'Xác nhận đã nhận tiền',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.w700,
+                color: scheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Text(
-                'Xác nhận nhận tiền mặt',
+                'Vui lòng kiểm tra số tiền đã nhận từ khách trước khi xác nhận.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface,
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 14,
+                  height: 1.5,
                 ),
               ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Vui lòng kiểm tra số tiền đã nhận từ khách trước khi xác nhận.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
+              const SizedBox(height: 20),
+              if (current != null) ...[
+                Row(
+                  children: [
+                    const Expanded(child: Text('Tổng báo giá')),
+                    Text(_money(current.finalAmount)),
+                  ],
                 ),
-                const SizedBox(height: 20),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: .05),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: scheme.primary.withValues(alpha: .12),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Số tiền cần nhận',
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _money(amount),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: scheme.primary,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Expanded(child: Text('Cọc đã áp dụng')),
+                    Text(_money(appliedDeposit)),
+                  ],
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: .05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: scheme.primary.withValues(alpha: .12),
+                  ),
+                ),
+                child: Column(
                   children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      size: 18,
-                      color: scheme.onSurfaceVariant,
+                    Text(
+                      current == null
+                          ? 'Số tiền cần nhận'
+                          : 'Thu trực tiếp từ khách',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 13,
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Chỉ xác nhận khi bạn đã nhận đủ tiền mặt từ khách.',
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 13,
-                          height: 1.45,
-                        ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _money(amount),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      current == null
+                          ? 'Chỉ xác nhận khi bạn đã nhận đủ tiền mặt từ khách.'
+                          : 'Chỉ xác nhận khi bạn đã nhận đủ số tiền còn lại từ khách.',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          actions: [
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 50),
-                      shape: buttonShape,
-                      side: BorderSide(
-                        color: scheme.outlineVariant.withValues(alpha: .6),
-                      ),
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 50),
+                    shape: buttonShape,
+                    side: BorderSide(
+                      color: scheme.outlineVariant.withValues(alpha: .6),
                     ),
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Quay lại'),
                   ),
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Quay lại'),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 50),
-                      shape: buttonShape,
-                      textStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 50),
+                    shape: buttonShape,
+                    textStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                     ),
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Đã nhận đủ'),
                   ),
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Đã nhận đủ'),
                 ),
-              ],
-            ),
-          ],
-        );
-      },
-    );
+              ),
+            ],
+          ),
+        ],
+      );
+    },
+  );
+
+  Future<void> _confirmCashPayment(OrderDetail order) async {
+    final amount = order.totalAmount;
+    if (busy || amount == null) return;
+    final owner = ref.read(authControllerProvider).user?.id;
+    final accepted = await _showReceivedPaymentDialog(amount);
     if (accepted != true ||
         !mounted ||
         owner == null ||
@@ -653,6 +685,7 @@ class _ProviderOrderDetailScreenState
     await ref
         .read(providerLocationServiceProvider)
         .synchronize(
+          forArrival: true,
           shouldUpload: () =>
               mounted &&
               owner != null &&
@@ -725,7 +758,7 @@ class _ProviderOrderDetailScreenState
             (quotation == null || editingQuotation) &&
             (quotation == null || quotation!.usable)
         ? QuotationEditorScreen(
-            key: ValueKey((order.id, quotation?.id, quotation?.revision)),
+            key: ValueKey((order.id, quotation?.id)),
             order: order,
             quotation: quotation,
             embedded: true,
@@ -740,11 +773,12 @@ class _ProviderOrderDetailScreenState
                 ref.invalidate(orderDetailProvider(orderId));
                 await _loadQuotation();
               } finally {
-                if (mounted)
+                if (mounted) {
                   setState(() {
                     busy = false;
                     editingQuotation = false;
                   });
+                }
               }
             },
           )
@@ -811,26 +845,12 @@ class _ProviderOrderDetailScreenState
   Future<void> _confirmPayment(OrderDetail order) async {
     final current = quotation;
     if (current == null) return;
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận tiền đã nhận'),
-        content: Text(
-          'Bạn đã nhận đủ ${_money((current.finalAmount - order.appliedDeposit).clamp(0, double.infinity))} theo báo giá phiên bản ${current.revision}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Quay lại'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Đã nhận đủ'),
-          ),
-        ],
-      ),
+    final accepted = await _showReceivedPaymentDialog(
+      (current.finalAmount - order.appliedDeposit).clamp(0, double.infinity),
+      current: current,
+      appliedDeposit: order.appliedDeposit,
     );
-    if (accepted == true && mounted)
+    if (accepted == true && mounted) {
       await _run(
         context,
         ref,
@@ -839,6 +859,7 @@ class _ProviderOrderDetailScreenState
             .confirmQuotationPayment(orderId, current),
         'Đã xác nhận thanh toán báo giá.',
       );
+    }
   }
 
   Future<void> _cancelOrder(OrderDetail order) async {

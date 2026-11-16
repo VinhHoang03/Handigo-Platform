@@ -4,7 +4,7 @@ import { Server, Socket } from "socket.io";
 import User from "../models/user.model";
 import * as chatService from "../services/chat.service";
 import * as orderTrackingService from "../services/orderTracking.service";
-import { setSocketServer, emitToConversation } from "./socketServer";
+import { setSocketServer, emitToConversation, publishProviderDiscoveryChanged } from "./socketServer";
 import { isAllowedOrigin } from "../configs/cors";
 import {
   conversationIdParamSchema,
@@ -116,6 +116,19 @@ export const initSocket = (server: HttpServer) => {
     });
     const userRoom = `user:${socketUser.id}`;
     socket.join(userRoom);
+    if (socketUser.role === "PROVIDER") publishProviderDiscoveryChanged();
+    socket.on("disconnect", () => {
+      if (socketUser.role === "PROVIDER") publishProviderDiscoveryChanged();
+    });
+    socket.on("providers:watch", (_payload, callback) => {
+      if (socketUser.role !== "CUSTOMER") {
+        callback?.({ success: false, message: "Chỉ khách hàng được theo dõi danh sách thợ." });
+        return;
+      }
+      socket.join("provider-discovery");
+      callback?.({ success: true });
+    });
+    socket.on("providers:unwatch", () => socket.leave("provider-discovery"));
     if (socketUser.sessionId) socket.join(`session:${socketUser.sessionId}`);
     // Kiểm tra lại sau khi vào room để chặn phiên đổi mật khẩu giữa lúc bắt tay và kết nối.
     void User.findOne({ _id: socketUser.id, isDeleted: false })

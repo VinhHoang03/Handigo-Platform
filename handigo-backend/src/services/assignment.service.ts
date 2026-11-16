@@ -208,6 +208,7 @@ const saveRepairQuotation = async (
     if (!quotation) throw new AppError("Không thể lưu báo giá.", 409);
     if (notification) emitRealtimeNotification(notification);
     emitToUser(order.customerId.toString(), "quotation:updated", { orderId: order.id, revision: quotation.revision });
+    emitToUser(providerUserId, "quotation:updated", { orderId: order.id, revision: quotation.revision });
     return quotation;
   } finally {
     await session.endSession();
@@ -651,6 +652,7 @@ export const AssignmentService = {
       if (!result) throw new AppError("Không thể xác nhận thanh toán báo giá.", 500);
       try {
         emitToUser(result.customerId.toString(), "quotation:updated", { orderId, revision: result.revision });
+        emitToUser(providerUserId, "quotation:updated", { orderId, revision: result.revision });
       } catch {
         assignmentLogger.warn("Đã xác nhận thanh toán báo giá; chưa gửi được tín hiệu cập nhật cho khách.", { orderId });
       }

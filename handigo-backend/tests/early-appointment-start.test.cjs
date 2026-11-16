@@ -63,7 +63,9 @@ function setup(overrides = {}, { activeOrder = false, owned = true, otherOrders 
     mongoose: { __esModule: true, default: { startSession: async () => session }, Types },
     '../models/order.model': { Order: {
       findOne: () => query(owned ? order : null),
-      exists: () => query(activeOrder), find: () => query(otherOrders.map(other => ({ ...order, ...other, providerId: provider._id }))),
+      exists: () => query(activeOrder), find: filter => query(otherOrders
+        .map(other => ({ ...order, ...other, providerId: provider._id }))
+        .filter(other => filter.status.$in.includes(other.status))),
     } },
     '../models/provider.model': { Provider: {
       findOne: () => query(provider), findOneAndUpdate: (_filter, _update, options) => {
@@ -81,6 +83,7 @@ function setup(overrides = {}, { activeOrder = false, owned = true, otherOrders 
     '../sockets/socketServer': { emitToUser(userId, event, payload) { events.push({ userId, event, payload }); } },
     '../utils/bookingPolicy': booking, '../utils/providerSchedule': intervals,
     './systemConfig.service': { getBookingPolicy: async () => policy },
+    './orderDeadline.service': { scheduleOrderDeadline() {} },
   };
   modules['./providerSchedule.service'] = loadModule('services/providerSchedule.service.ts', modules);
   const { OrderService } = loadModule('services/order.service.ts', modules);
@@ -121,7 +124,7 @@ for (const [name, overrides, options, error] of [
   ['lịch chưa xác nhận', { bookingStatus: 'reserved' }, {}, /Lịch hẹn chưa được thanh toán và xác nhận/],
   ['chưa thanh toán trực tuyến', { paymentMethod: 'bank' }, {}, /Đơn chưa được thanh toán thành công/],
   ['chưa trả cọc khảo sát', { inspectionRequired: true }, {}, /Tiền cọc chưa được thanh toán/],
-  ['khảo sát trùng đơn đã nhận', { inspectionRequired: true, depositPaidAt: new Date(now) }, { otherOrders: [{ status: 'accepted', scheduledAt: new Date(now) }] }, /bị trùng với đơn khác/],
+  ['khảo sát trùng đơn đã nhận', { orderType: 'normal', inspectionRequired: true, depositPaidAt: new Date(now) }, { otherOrders: [{ status: 'accepted', scheduledAt: new Date(now) }] }, /bị trùng với đơn khác/],
 ]) {
   test(`Giữ điều kiện chặn khi ${name}`, async () => {
     const context = setup(overrides, options);
@@ -130,6 +133,31 @@ for (const [name, overrides, options, error] of [
     assert.equal(context.events.length, 0);
   });
 }
+
+for (const minutesAgo of [0, 10]) {
+  test(`Đơn báo giá bắt đầu ngay khi đơn trước đã hoàn tất ${minutesAgo} phút`, async () => {
+    const context = setup({
+      orderType: 'normal', scheduledAt: null, inspectionRequired: true,
+      depositPaidAt: new Date(now),
+    }, {
+      otherOrders: [{
+        status: 'completed', scheduledAt: new Date(now - 2 * 3600000),
+        confirmation: { providerConfirmedAt: new Date(now - minutesAgo * 60000) },
+      }],
+    });
+    assert.equal((await context.start()).status, 'in_progress');
+    assert.equal(context.saves(), 2);
+  });
+}
+
+test('Đơn báo giá vẫn bị chặn bởi lịch chưa hoàn tất sắp tới', async () => {
+  const context = setup({
+    orderType: 'normal', scheduledAt: null, inspectionRequired: true,
+    depositPaidAt: new Date(now),
+  }, { otherOrders: [{ status: 'accepted', scheduledAt: new Date(now + 90 * 60000) }] });
+  await assert.rejects(context.start, /bị trùng với đơn khác/);
+  assert.equal(context.saves(), 0);
+});
 
 for (const [name, overrides] of [
   ['khảo sát đã trả cọc và có báo giá', { inspectionRequired: true, depositPaidAt: new Date(now) }],

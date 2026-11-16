@@ -608,6 +608,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         ],
       ),
       body: state.when(
+        skipError: true,
         loading: () => const AppLoading(),
         error: (error, _) => AppMessage(
           message: _message(error),
@@ -671,6 +672,12 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 const SizedBox(height: 8),
                 const SizedBox(height: 16),
                 OrderProgressTimeline(order: order),
+                if (state.hasError)
+                  AppMessage(
+                    message:
+                        'Chưa đồng bộ được đơn hàng. Đang hiển thị dữ liệu gần nhất.',
+                    onRetry: () => ref.invalidate(orderDetailProvider(orderId)),
+                  ),
                 if (hasQuotation) ...[
                   const SizedBox(height: 16),
                   quotation.when(

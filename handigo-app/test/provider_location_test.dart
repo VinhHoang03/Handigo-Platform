@@ -106,6 +106,110 @@ void main() {
     expect(api.payload, {'latitude': 10.8, 'longitude': 106.7});
   });
 
+  for (final accuracy in [127.0, 300.0]) {
+    test('Cập nhật vị trí chấp nhận sai số $accuracy m', () async {
+      location.accuracy = accuracy;
+      await service.synchronize(shouldUpload: () => true);
+      expect(api.uploads.length, 1);
+      expect(service.synchronizedPosition?.accuracy, accuracy);
+    });
+    test('Đã đến nơi chấp nhận sai số $accuracy m', () async {
+      location.accuracy = accuracy;
+      await service.synchronize(shouldUpload: () => true, forArrival: true);
+      expect(api.uploads.length, 1);
+      expect(service.synchronizedPosition?.accuracy, accuracy);
+    });
+  }
+
+  for (final forArrival in [false, true]) {
+    testWidgets(
+      forArrival
+          ? 'Đã đến nơi từ chối sai số 301 m'
+          : 'Cập nhật vị trí từ chối sai số 301 m',
+      (tester) async {
+        location.accuracy = 301;
+        final result = expectLater(
+          service.synchronize(shouldUpload: () => true, forArrival: forArrival),
+          throwsA(isA<ApiException>()),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 12));
+        await result;
+        expect(api.uploads, isEmpty);
+      },
+    );
+  }
+
+  for (final stale in [false, true]) {
+    testWidgets('Chờ mẫu GPS tốt hơn khi mẫu đầu ${stale ? 'cũ' : 'nhiễu'}', (
+      tester,
+    ) async {
+      final first = Completer<Position>();
+      location.pendingPosition = first;
+      final result = service.synchronize(shouldUpload: () => true);
+      first.complete(
+        location.sample(
+          precision: stale ? 5 : 800,
+          timestamp: stale
+              ? DateTime.now().subtract(const Duration(minutes: 2))
+              : null,
+        ),
+      );
+      await tester.pump();
+      expect(api.payload, isNull);
+      location.positions.add(location.sample(lat: 10.9));
+      await tester.pump();
+      await result;
+      expect(api.payload!['latitude'], 10.9);
+      expect(location.positions.hasListener, isFalse);
+    });
+  }
+
+  testWidgets('Hết thời gian chờ báo sai số cụ thể và hủy luồng đo', (
+    tester,
+  ) async {
+    location.accuracy = 800;
+    final result = expectLater(
+      service.synchronize(shouldUpload: () => true),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.message,
+          'thông báo',
+          contains('800 m'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 12));
+    await result;
+    expect(api.payload, isNull);
+    expect(location.positions.hasListener, isFalse);
+  });
+
+  testWidgets('Sai lệch đồng hồ được phân biệt với sai số GPS', (tester) async {
+    final first = Completer<Position>();
+    location.pendingPosition = first;
+    final result = expectLater(
+      service.synchronize(shouldUpload: () => true),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.message,
+          'thông báo',
+          contains('ngày giờ tự động'),
+        ),
+      ),
+    );
+    first.complete(
+      location.sample(
+        timestamp: DateTime.now().add(const Duration(minutes: 2)),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 12));
+    await result;
+    expect(api.payload, isNull);
+  });
+
   test(
     'Bật nhận việc dùng lại mẫu GPS mới, còn tải lại thủ công vẫn lấy mẫu mới',
     () async {
@@ -218,7 +322,7 @@ void main() {
     expect(api.uploads.length, 2);
     expect(api.payload!['latitude'], 10.80005);
     now = now.add(const Duration(seconds: 5));
-    location.positions.add(location.sample(lat: 10.9, precision: 100));
+    location.positions.add(location.sample(lat: 10.9, precision: 301));
     await tester.pump();
     expect(api.uploads.length, 2);
     service.stop();
@@ -275,7 +379,7 @@ void main() {
     );
   });
 
-  testWidgets('Chỉ đổi tọa độ khi đi đủ 25m và đã qua chu kỳ gửi 5 phút', (
+  testWidgets('Giới hạn tần suất gửi GPS theo chu kỳ nhận việc', (
     tester,
   ) async {
     var now = DateTime.now();
@@ -293,7 +397,7 @@ void main() {
       await tester.pump();
     }
     expect(api.uploads.length, 1);
-    // Đi xa hơn 25m nhưng chưa đủ 5 phút thì chưa gửi.
+    // Chưa đến chu kỳ gửi thì chỉ cập nhật GPS trong bộ nhớ.
     now = now.add(const Duration(seconds: 5));
     location.positions.add(location.sample(lat: 10.8003));
     await tester.pump();
@@ -307,36 +411,39 @@ void main() {
     service.stop();
   });
 
-  testWidgets(
-    'Đứng yên 5 phút đo lại và gửi tín hiệu hoạt động, giữ mốc tọa độ',
-    (tester) async {
-      var now = DateTime.now();
-      location.now = () => now;
-      service.dispose();
-      service = ProviderLocationService(api, now: () => now);
-      service.start(shouldUpload: () => true);
-      await tester.pump();
-      expect(location.reads, 1);
-      now = now.add(const Duration(minutes: 4, seconds: 59));
-      await tester.pump(const Duration(minutes: 4, seconds: 59));
-      expect(location.reads, 1);
-      expect(api.uploads.length, 1);
-      now = now.add(const Duration(seconds: 1));
-      location.latitude = 10.8001;
-      await tester.pump(const Duration(seconds: 1));
-      expect(location.reads, 2);
-      expect(api.uploads.length, 2);
-      expect(api.payload!['latitude'], 10.8);
-      service.stop();
-    },
-  );
+  testWidgets('Đứng yên vẫn gửi mẫu GPS mới đúng chu kỳ nhận việc', (
+    tester,
+  ) async {
+    var now = DateTime.now();
+    location.now = () => now;
+    service.dispose();
+    service = ProviderLocationService(api, now: () => now);
+    service.start(shouldUpload: () => true);
+    await tester.pump();
+    expect(location.reads, 1);
+    now = now.add(
+      ProviderLocationService.checkInterval - const Duration(seconds: 1),
+    );
+    await tester.pump(
+      ProviderLocationService.checkInterval - const Duration(seconds: 1),
+    );
+    expect(location.reads, 1);
+    expect(api.uploads.length, 1);
+    now = now.add(const Duration(seconds: 1));
+    location.latitude = 10.8001;
+    await tester.pump(const Duration(seconds: 1));
+    expect(location.reads, 2);
+    expect(api.uploads.length, 2);
+    expect(api.payload!['latitude'], 10.8001);
+    service.stop();
+  });
 
   testWidgets('Không gửi mẫu sai số lớn hoặc đã cũ; phục hồi khi GPS tốt', (
     tester,
   ) async {
     service.start(shouldUpload: () => true);
     await tester.pump();
-    location.positions.add(location.sample(lat: 10.81, precision: 100));
+    location.positions.add(location.sample(lat: 10.81, precision: 301));
     await tester.pump();
     expect(api.uploads.length, 1);
     expect(service.error, isNull);
@@ -366,7 +473,7 @@ void main() {
     now = now.add(
       ProviderLocationService.noisySampleGrace + const Duration(seconds: 1),
     );
-    location.positions.add(location.sample(precision: 100));
+    location.positions.add(location.sample(precision: 301));
     await tester.pump();
     expect(api.uploads.length, 1);
     expect(service.error, isNotNull);
@@ -440,6 +547,41 @@ void main() {
       service.stop();
     },
   );
+
+  testWidgets('GPS sai số 300m vẫn tự cập nhật, không cần tải lại thủ công', (
+    tester,
+  ) async {
+    var now = DateTime.now();
+    location.now = () => now;
+    location.accuracy = 300;
+    service.dispose();
+    service = ProviderLocationService(api, now: () => now);
+    service.start(shouldUpload: () => true);
+    await tester.pump();
+    expect(api.uploads.length, 1);
+    now = now.add(ProviderLocationService.checkInterval);
+    location.positions.add(location.sample(lat: 10.801, precision: 80));
+    await tester.pump();
+    expect(api.uploads.length, 2);
+    expect(service.error, isNull);
+    service.stop();
+  });
+
+  testWidgets('Đang làm đơn tự gửi GPS mỗi 15 giây', (tester) async {
+    var now = DateTime.now();
+    location.now = () => now;
+    service.dispose();
+    service = ProviderLocationService(api, now: () => now);
+    service.setWorking(true);
+    service.start(shouldUpload: () => true);
+    await tester.pump();
+    now = now.add(ProviderLocationService.workingCheckInterval);
+    location.latitude = 10.802;
+    await tester.pump(ProviderLocationService.workingCheckInterval);
+    expect(api.uploads.length, 2);
+    expect(api.payload!['latitude'], 10.802);
+    service.stop();
+  });
 
   testWidgets('Mất luồng GPS tự kết nối lại sau 30 giây', (tester) async {
     var now = DateTime.now();

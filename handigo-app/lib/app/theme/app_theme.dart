@@ -214,7 +214,7 @@ abstract final class AppTheme {
         style: FilledButton.styleFrom(
           minimumSize: const Size(48, 52),
           backgroundColor: scheme.primaryContainer,
-          foregroundColor: scheme.onPrimaryContainer,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

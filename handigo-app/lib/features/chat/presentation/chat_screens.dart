@@ -94,8 +94,11 @@ class _ConversationListScreenState
           final filtered = page.items.where((item) {
             final matchesFilter =
                 _selectedFilter == 'ALL' ||
-                (_selectedFilter == 'ORDER' && item.orderCode.isNotEmpty) ||
-                (_selectedFilter == 'SUPPORT' && item.orderCode.isEmpty);
+                (_selectedFilter == 'ORDER' &&
+                    !item.isLegacy &&
+                    item.orderCode.isNotEmpty) ||
+                (_selectedFilter == 'SUPPORT' &&
+                    (item.isLegacy || item.orderCode.isEmpty));
             final matchesQuery =
                 query.isEmpty ||
                 item.title.toLowerCase().contains(query) ||
@@ -142,7 +145,7 @@ class _ConversationListScreenState
                         onSelected: _selectFilter,
                       ),
                       _ChatFilterChip(
-                        label: 'Hỗ trợ',
+                        label: 'Lịch sử cũ',
                         value: 'SUPPORT',
                         selected: _selectedFilter,
                         onSelected: _selectFilter,
@@ -189,6 +192,8 @@ class _ConversationListScreenState
                               title: item.title,
                               providerId: item.providerId,
                               avatar: item.avatar,
+                              orderCode: item.orderCode,
+                              isLegacy: item.isLegacy,
                             ),
                           ),
                         ),
@@ -320,7 +325,7 @@ class _ConversationCard extends StatelessWidget {
                             : FontWeight.w400,
                       ),
                     ),
-                    if (item.orderCode.isNotEmpty) ...[
+                    if (item.isLegacy || item.orderCode.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Row(
                         children: [
@@ -332,7 +337,9 @@ class _ConversationCard extends StatelessWidget {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              '#${item.orderCode}',
+                              item.isLegacy
+                                  ? 'Lịch sử trò chuyện cũ'
+                                  : '#${item.orderCode}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelSmall?.copyWith(
@@ -404,10 +411,14 @@ class ChatScreen extends ConsumerStatefulWidget {
     this.title = 'Tin nhắn',
     this.providerId,
     this.avatar,
+    this.orderCode = '',
+    this.isLegacy = false,
     super.key,
   });
   final String conversationId, title;
   final String? providerId, avatar;
+  final String orderCode;
+  final bool isLegacy;
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
@@ -431,6 +442,8 @@ class ChatByOrderScreen extends ConsumerWidget {
         title: conversation.title,
         providerId: conversation.providerId,
         avatar: conversation.avatar,
+        orderCode: conversation.orderCode,
+        isLegacy: conversation.isLegacy,
       );
     }
 
@@ -478,6 +491,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       realtime = connection?.events.listen((event) {
         if (event.name == 'connect') {
           join();
+          ref.invalidate(_chatMessagesProvider(widget.conversationId));
           unawaited(_refreshAvailability());
         }
         if (event.name == 'order:updated') {
@@ -497,9 +511,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final request = ++_availabilityRequest;
     bool? canSend;
     try {
-      canSend = await ref
-          .read(chatRepositoryProvider)
-          .canSend(widget.conversationId);
+      canSend =
+          !widget.isLegacy &&
+          await ref.read(chatRepositoryProvider).canSend(widget.conversationId);
     } catch (_) {
       // Chỉ hiện khung soạn khi máy chủ đã xác nhận quyền gửi.
     }
@@ -557,10 +571,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             const SizedBox(width: 9),
             Expanded(
-              child: Text(
-                widget.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (widget.isLegacy || widget.orderCode.isNotEmpty)
+                    Text(
+                      widget.isLegacy
+                          ? 'Lịch sử trò chuyện cũ'
+                          : 'Đơn #${widget.orderCode}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
               ),
             ),
           ],
