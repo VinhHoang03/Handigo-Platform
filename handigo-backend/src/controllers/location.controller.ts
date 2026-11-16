@@ -1,9 +1,12 @@
 import type { NextFunction, Request, Response } from "express";
 import { requireAuthenticatedUser } from "../middlewares/authContext";
 import * as locationService from "../services/location.service";
-import { reverseGeocode } from "../services/reverseGeocoding.service";
+import { reverseGeocode, suggestAddresses } from "../services/reverseGeocoding.service";
 import { suggestAddressMapLocation } from "../services/agentAddressResolver.service";
-import type { ReverseGeocodeQuery } from "../validations/location.validator";
+import type {
+  AddressSuggestQuery,
+  ReverseGeocodeQuery,
+} from "../validations/location.validator";
 
 export const getCurrentLocation = async (
   req: Request,
@@ -64,6 +67,14 @@ export const reverseGeocodeCurrentLocation = async (
   } catch (error) {
     return next(error);
   }
+};
+
+export const suggestAddressLines = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { q, province, ward } = req.query as unknown as AddressSuggestQuery;
+    const data = await suggestAddresses(q, { province, ward });
+    return res.json({ success: true, data });
+  } catch (error) { return next(error); }
 };
 
 export const geocodeAddress = async (req: Request, res: Response, next: NextFunction) => {

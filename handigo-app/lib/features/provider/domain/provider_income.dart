@@ -77,6 +77,7 @@ class ProviderFinanceEntry {
     this.balanceAfter,
     this.orderId,
     this.orderCode,
+    this.serviceName,
     this.transactionCode,
     this.grossAmount,
     this.platformFee,
@@ -115,6 +116,7 @@ class ProviderFinanceEntry {
           ? '${order['_id'] ?? order['id']}'
           : '$order',
       orderCode: metadata['orderCode'] as String?,
+      serviceName: metadata['serviceName'] as String?,
       transactionCode: json['transactionCode'] as String?,
       grossAmount: _number(settlement['grossAmount']),
       platformFee: _number(settlement['platformFee']),
@@ -154,6 +156,7 @@ class ProviderFinanceEntry {
   final String? description,
       orderId,
       orderCode,
+      serviceName,
       transactionCode,
       paymentMethod,
       bankLabel,

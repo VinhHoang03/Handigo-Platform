@@ -288,54 +288,155 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     final points = _routePoints;
     if (widget.embedded) {
       final display = _displayPoints;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (display.isNotEmpty)
-            _buildMap(
-              display,
-              hasRoute: points.isNotEmpty,
-              providerKnown:
-                  points.isNotEmpty ||
-                  _coordinate(coordinates?['provider']) != null,
-              destinationKnown: points.isNotEmpty || _destination != null,
-            )
-          else
-            SizedBox(
-              height: 240,
-              child: ColoredBox(
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                child: Center(
-                  child: loading
-                      ? const CircularProgressIndicator()
-                      : const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text(
-                            'Đang chờ vị trí chuyên gia và địa chỉ dịch vụ.',
-                            textAlign: TextAlign.center,
+      final theme = Theme.of(context);
+      final isProvider =
+          ref.watch(authControllerProvider).user?.role == UserRole.provider;
+      final distanceLabel = route == null
+          ? null
+          : '${((route!['distanceMeters'] as num) / 1000).toStringAsFixed(1)} km';
+      final etaLabel = route == null
+          ? null
+          : 'Dự kiến di chuyển: ${((route!['durationSeconds'] as num) / 60).ceil()} phút';
+      return Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.my_location,
+                              size: 22,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Vị trí theo thời gian thực',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isProvider
+                              ? 'Vị trí của bạn và khách hàng được cập nhật liên tục.'
+                              : 'Vị trí của bạn và chuyên gia được cập nhật liên tục.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
+                        if (etaLabel != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.schedule,
+                                size: 16,
+                                color: theme.colorScheme.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  etaLabel,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (distanceLabel != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: .1),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.straighten,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            distanceLabel,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (display.isNotEmpty)
+              _buildMap(
+                display,
+                hasRoute: points.isNotEmpty,
+                providerKnown:
+                    points.isNotEmpty ||
+                    _coordinate(coordinates?['provider']) != null,
+                destinationKnown: points.isNotEmpty || _destination != null,
+              )
+            else
+              SizedBox(
+                height: 240,
+                child: ColoredBox(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  child: Center(
+                    child: loading
+                        ? const CircularProgressIndicator()
+                        : const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              'Đang chờ vị trí chuyên gia và địa chỉ dịch vụ.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                  ),
                 ),
               ),
-            ),
-          if (error != null)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                error!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+            if (error != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  error!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-            ),
-          if (route != null)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                'Quãng đường: ${((route!['distanceMeters'] as num) / 1000).toStringAsFixed(1)} km · Dự kiến: ${((route!['durationSeconds'] as num) / 60).ceil()} phút',
-              ),
-            ),
-        ],
+          ],
+        ),
       );
     }
     return Scaffold(

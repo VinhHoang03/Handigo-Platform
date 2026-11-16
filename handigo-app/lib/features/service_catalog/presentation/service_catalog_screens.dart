@@ -1352,9 +1352,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                _StepIndicator(step: _step),
-                const SizedBox(height: 16),
-                if (_step == 0)
+                if (_payosOrderId == null) ...[
+                  _StepIndicator(step: _step),
+                  const SizedBox(height: 16),
+                ],
+                if (_payosOrderId != null)
+                  const SizedBox.shrink()
+                else if (_step == 0)
                   _BookingForm(
                     detail: widget.detail,
                     addresses: _addresses,
@@ -1378,7 +1382,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     providerName: _reviewProviderName,
                     quantity: _uniformQuantity ? draft.uniformQuantity : 1,
                   ),
-                if (_addresses.isEmpty && _step == 0)
+                if (_addresses.isEmpty && _step == 0 && _payosOrderId == null)
                   OutlinedButton(
                     onPressed: _loadAddresses,
                     child: const Text('Tải lại sổ địa chỉ'),
@@ -1392,7 +1396,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                           context.push('/customer/orders/$_pendingOrderId'),
                     ),
                   ),
-                if (_step == 0 && _uniformQuantity)
+                if (_step == 0 && _uniformQuantity && _payosOrderId == null)
                   Row(
                     children: [
                       const Expanded(child: Text('Số lượng máy')),

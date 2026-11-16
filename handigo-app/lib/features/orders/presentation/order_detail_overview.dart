@@ -195,7 +195,11 @@ class OrderDetailOverview extends StatelessWidget {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.person_outline_rounded, size: 20),
+                            Icon(
+                              Icons.person_outline_rounded,
+                              size: 20,
+                              color: theme.colorScheme.primary,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -212,7 +216,11 @@ class OrderDetailOverview extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.phone_outlined, size: 20),
+                            Icon(
+                              Icons.phone_outlined,
+                              size: 20,
+                              color: theme.colorScheme.primary,
+                            ),
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
@@ -288,17 +296,45 @@ class OrderProblemDescription extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Mô tả đơn hàng', style: theme.textTheme.titleSmall),
+        const _ProblemHeader(
+          icon: Icons.description_outlined,
+          title: 'Mô tả đơn hàng',
+        ),
         if (description.isNotEmpty) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(description, style: theme.textTheme.bodyMedium),
         ],
         if (order.customerAttachments.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text('Ảnh sự cố', style: theme.textTheme.labelMedium),
-          const SizedBox(height: 4),
+          const _ProblemHeader(icon: Icons.image_outlined, title: 'Ảnh sự cố'),
+          const SizedBox(height: 8),
           OrderImageGrid(urls: order.customerAttachments),
         ],
+      ],
+    );
+  }
+}
+
+class _ProblemHeader extends StatelessWidget {
+  const _ProblemHeader({required this.icon, required this.title});
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ],
     );
   }

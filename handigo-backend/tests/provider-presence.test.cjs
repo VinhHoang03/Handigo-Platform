@@ -30,7 +30,7 @@ function dashboard({ status = 'offline', conflict = false } = {}) {
   const service = load('services/dashboard.service.ts', {
     mongoose: { Types },
     '../models/order.model': {}, '../models/payment.model': {}, '../models/wallet.model': {},
-    '../models/walletTransaction.model': {}, '../models/withdrawRequest.model': {},
+    '../models/walletTransaction.model': {}, '../models/withdrawRequest.model': {}, '../models/service.model': {},
     '../utils/appError': { AppError },
     '../sockets/socketServer': { emitToUser: (...args) => events.push(args) },
     '../models/provider.model': { Provider: {

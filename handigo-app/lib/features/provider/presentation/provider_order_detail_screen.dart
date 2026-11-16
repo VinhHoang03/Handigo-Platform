@@ -19,7 +19,9 @@ import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../orders/presentation/order_screens.dart';
 import '../../orders/presentation/order_reschedule_panel.dart';
+import '../../orders/presentation/tracking_screen.dart';
 import 'provider_screens.dart';
+import 'provider_schedule_preview.dart';
 
 class ProviderOrderDetailScreen extends ConsumerStatefulWidget {
   const ProviderOrderDetailScreen({required this.orderId, super.key});
@@ -75,6 +77,12 @@ class _ProviderOrderDetailScreenState
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
+        bottom: _reloading
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(2),
+                child: LinearProgressIndicator(minHeight: 2),
+              )
+            : null,
         title: Text(
           order?.code.isNotEmpty == true
               ? 'Đơn ${order!.code}'
@@ -90,18 +98,26 @@ class _ProviderOrderDetailScreenState
             tooltip: 'Tác vụ đơn hàng',
             icon: const Icon(Icons.more_vert),
             enabled: !busy,
+            color: Colors.white,
+            surfaceTintColor: Colors.transparent,
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'reload', child: Text('Tải lại đơn')),
+              _orderMenuItem(
+                value: 'reload',
+                icon: Icons.refresh_rounded,
+                label: 'Tải lại đơn',
+              ),
               if (order != null)
-                const PopupMenuItem(
+                _orderMenuItem(
                   value: 'report',
-                  child: Text('Báo cáo đơn'),
+                  icon: Icons.flag_outlined,
+                  label: 'Báo cáo đơn',
                 ),
               if (order != null)
-                PopupMenuItem(
+                _orderMenuItem(
                   value: 'cancel',
+                  icon: Icons.cancel_outlined,
+                  label: 'Hủy đơn',
                   enabled: _canCancel(order),
-                  child: const Text('Hủy đơn'),
                 ),
             ],
             onSelected: (action) {
@@ -110,8 +126,7 @@ class _ProviderOrderDetailScreenState
                   .asData
                   ?.value;
               if (action == 'reload') {
-                ref.invalidate(orderDetailProvider(orderId));
-                _loadQuotation();
+                _reloadOrder();
               } else if (current != null && action == 'report') {
                 showOrderReport(context, current);
               } else if (current?.status == 'accepted' && action == 'cancel') {
@@ -192,6 +207,14 @@ class _ProviderOrderDetailScreenState
               ),
             ),
             const SizedBox(height: 12),
+            if (order.canTrack) ...[
+              OrderTrackingScreen(
+                key: ValueKey('tracking-${order.id}'),
+                orderId: order.id,
+                embedded: true,
+              ),
+              const SizedBox(height: 12),
+            ],
             OrderDetailOverview(order: order, providerView: true),
             if (order.orderType == 'scheduled' &&
                 !order.hasArrived &&
@@ -291,8 +314,14 @@ class _ProviderOrderDetailScreenState
             if (order.status == 'completed')
               ProviderOrderFeedbackPanel(orderId: orderId),
             if (order.completionEvidenceImages.isNotEmpty)
-              _images('Ảnh nghiệm thu', order.completionEvidenceImages),
-            if (order.completionNote != null) Text(order.completionNote!),
+              _images(
+                'Ảnh nghiệm thu',
+                order.completionEvidenceImages,
+                note: order.completionNote,
+              ),
+            if (order.completionEvidenceImages.isEmpty &&
+                order.completionNote != null)
+              Text(order.completionNote!),
             if (order.inspectionRequired && !order.noShowBlocksWork)
               _quotationSummary(order),
             const SizedBox(height: 12),
@@ -383,6 +412,14 @@ class _ProviderOrderDetailScreenState
     String success,
   ) async {
     if (busy || !mounted) return;
+    if (orderId.startsWith('preview-')) {
+      AppToast.show(
+        context,
+        'Chế độ xem thử: thao tác này không ghi vào hệ thống.',
+        type: AppToastType.warning,
+      );
+      return;
+    }
     setState(() => busy = true);
     try {
       await action();
@@ -724,29 +761,87 @@ class _ProviderOrderDetailScreenState
     }
   }
 
-  Widget _images(String title, List<String> urls) => _DetailSection(
-    title: title,
-    icon: Icons.image_outlined,
-    child: Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: urls
-          .map(
-            (url) => SizedBox(
-              width: 100,
-              height: 100,
-              child: Image.network(
-                url,
-                fit: BoxFit.cover,
-                cacheWidth: 300,
-                errorBuilder: (_, error, stack) =>
-                    const Icon(Icons.broken_image_outlined),
+  Widget _images(String title, List<String> urls, {String? note}) =>
+      _DetailSection(
+        title: title,
+        icon: Icons.image_outlined,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (note != null && note.trim().isNotEmpty) ...[
+              Text(note.trim(), style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 12),
+            ],
+            if (urls.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final (index, url) in urls.indexed)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _openImageViewer(urls, index),
+                      child: SizedBox(
+                        width: 100,
+                        height: 100,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            url,
+                            fit: BoxFit.cover,
+                            cacheWidth: 300,
+                            errorBuilder: (_, error, stack) =>
+                                const Icon(Icons.broken_image_outlined),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-          )
-          .toList(),
+          ],
+        ),
+      );
+
+  bool _reloading = false;
+
+  Future<void> _reloadOrder() async {
+    if (_reloading) return;
+    setState(() => _reloading = true);
+    try {
+      ref.invalidate(orderDetailProvider(orderId));
+      await ref.read(orderDetailProvider(orderId).future);
+      await _loadQuotation();
+    } catch (_) {
+      // Lỗi đã được hiển thị bởi trạng thái error của orderDetailProvider.
+    } finally {
+      if (mounted) setState(() => _reloading = false);
+    }
+  }
+
+  PopupMenuItem<String> _orderMenuItem({
+    required String value,
+    required IconData icon,
+    required String label,
+    bool enabled = true,
+  }) => PopupMenuItem<String>(
+    value: value,
+    enabled: enabled,
+    child: Row(
+      children: [
+        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 12),
+        Text(label),
+      ],
     ),
   );
+
+  void _openImageViewer(List<String> urls, int initialIndex) {
+    showDialog<void>(
+      context: context,
+      builder: (_) =>
+          _ImageViewerDialog(urls: urls, initialIndex: initialIndex),
+    );
+  }
 
   Widget _quotationSummary(OrderDetail order) => _DetailSection(
     title: 'Báo giá sửa chữa',
@@ -869,6 +964,15 @@ class _ProviderOrderDetailScreenState
       builder: (context) => ProviderCancelOrderDialog(order: order),
     );
     if (reason == null || !mounted) return;
+    if (order.id.startsWith('preview-')) {
+      ref.read(providerUiPreviewProvider.notifier).cancelPreviewOrder(order.id);
+      AppToast.show(
+        context,
+        'Đã hủy đơn xem thử (không ghi vào hệ thống).',
+        type: AppToastType.success,
+      );
+      return;
+    }
     final current = ref.read(orderDetailProvider(orderId)).asData?.value;
     if (current == null ||
         !_canCancel(current) ||
@@ -887,6 +991,80 @@ class _ProviderOrderDetailScreenState
       'Đã hủy nhận đơn.',
     );
   }
+}
+
+class _ImageViewerDialog extends StatefulWidget {
+  const _ImageViewerDialog({required this.urls, required this.initialIndex});
+  final List<String> urls;
+  final int initialIndex;
+
+  @override
+  State<_ImageViewerDialog> createState() => _ImageViewerDialogState();
+}
+
+class _ImageViewerDialogState extends State<_ImageViewerDialog> {
+  late final PageController _controller = PageController(
+    initialPage: widget.initialIndex,
+  );
+  late int _current = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Dialog.fullscreen(
+    backgroundColor: Colors.black,
+    child: Stack(
+      children: [
+        PageView.builder(
+          controller: _controller,
+          itemCount: widget.urls.length,
+          onPageChanged: (index) => setState(() => _current = index),
+          itemBuilder: (_, index) => InteractiveViewer(
+            minScale: 1,
+            maxScale: 4,
+            child: Center(
+              child: Image.network(
+                widget.urls[index],
+                fit: BoxFit.contain,
+                errorBuilder: (_, error, stack) => const Icon(
+                  Icons.broken_image_outlined,
+                  color: Colors.white70,
+                  size: 48,
+                ),
+              ),
+            ),
+          ),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 4, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${_current + 1}/${widget.urls.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Đóng',
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _DetailSection extends StatelessWidget {

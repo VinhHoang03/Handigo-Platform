@@ -153,7 +153,13 @@ class _Api extends ApiClient {
     }
     return {
       'data': {
-        'items': [if (query?['page'] == 2) _entry('page2', 'deposit', 100000)],
+        'items': [
+          _entry(
+            query?['page'] == 2 ? 'page2' : 'page1',
+            query?['page'] == 2 ? 'deposit' : 'provider_earning',
+            100000,
+          ),
+        ],
         'pagination': {'page': query?['page'] ?? 1, 'totalPages': 2},
       },
     };
@@ -227,6 +233,14 @@ Future<GoRouter> _show(
 
 Future<void> _wallet(WidgetTester tester) async {
   await tester.tap(find.text('Ví').last);
+  await tester.pumpAndSettle();
+}
+
+/// Mở dropdown kỳ thống kê và chọn một mục.
+Future<void> _period(WidgetTester tester, String label) async {
+  await tester.tap(find.byTooltip('Chọn kỳ thống kê'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label).last);
   await tester.pumpAndSettle();
 }
 
@@ -310,10 +324,9 @@ void main() {
     tester,
   ) async {
     await _show(tester, _Api(), asTab: true, textScale: 2);
-    expect(find.byType(SegmentedButton<int>), findsOneWidget);
+    expect(find.text('Tiền thưởng'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
-    await tester.tap(find.text('Tháng này'));
-    await tester.pumpAndSettle();
+    await _period(tester, 'Tháng này');
     await tester.scrollUntilVisible(
       find.text('Thu nhập dịch vụ sau phí'),
       150,
@@ -332,12 +345,7 @@ void main() {
       -150,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(
-      tester
-          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Tháng này'))
-          .selected,
-      isTrue,
-    );
+    expect(find.text('Tháng này'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -466,15 +474,9 @@ void main() {
     (tester) async {
       final api = _Api();
       final router = await _show(tester, api);
-      expect(
-        tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Hôm nay'))
-            .selected,
-        isTrue,
-      );
+      expect(find.text('Hôm nay'), findsOneWidget);
       expect(find.text('Thu nhập hôm nay'), findsOneWidget);
-      await tester.tap(find.text('Tuần này'));
-      await tester.pumpAndSettle();
+      await _period(tester, 'Tuần này');
       expect(
         api.calls
             .where((call) => call.path == '/dashboard/earnings')
@@ -484,10 +486,6 @@ void main() {
       );
       await _wallet(tester);
       expect(find.textContaining('500.000'), findsOneWidget);
-      expect(
-        find.text('Số dư hiện tại của ví, không phụ thuộc bộ lọc thu nhập.'),
-        findsOneWidget,
-      );
       await tester.tap(find.byTooltip('Quay lại'));
       await tester.pumpAndSettle();
       expect(router.routeInformationProvider.value.uri.path, '/provider');
@@ -501,7 +499,9 @@ void main() {
       final api = _Api();
       await _show(tester, api);
       expect(find.textContaining('đơn hoàn tất theo bộ lọc'), findsNothing);
-      await tester.tap(find.text('Theo năm'));
+      await tester.tap(find.byTooltip('Chọn kỳ thống kê'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Theo năm').last);
       await tester.pumpAndSettle();
       final requestsBeforeYearApply = api.calls.length;
       await tester.tap(
@@ -522,8 +522,10 @@ void main() {
         (query['fromDate'], query['toDate']),
         ('2025-01-01', '2025-12-31'),
       );
-      expect(find.text('Thu nhập theo tháng'), findsOneWidget);
-      await tester.tap(find.text('Khoảng thời gian'));
+      expect(find.text('Năm 2025'), findsOneWidget);
+      await tester.tap(find.byTooltip('Chọn kỳ thống kê'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Khoảng thời gian').last);
       await tester.pumpAndSettle();
       final requestsBeforeApply = api.calls.length;
       await _pickRangeDate(tester, 'income-range-start', '11/01/2026');
@@ -539,16 +541,20 @@ void main() {
         (query['fromDate'], query['toDate']),
         ('2026-11-01', '2026-11-05'),
       );
-      expect(find.text('Thu nhập theo ngày'), findsOneWidget);
+      expect(find.text('Thu nhập trong khoảng đã chọn'), findsOneWidget);
       final requests = api.calls.length;
-      await tester.tap(find.text('Khoảng thời gian'));
+      await tester.tap(find.byTooltip('Chọn kỳ thống kê'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Khoảng thời gian').last);
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Đóng'));
       await tester.pumpAndSettle();
       expect(api.calls.length, requests);
       expect(find.text('Thu nhập trong khoảng đã chọn'), findsOneWidget);
       expect(find.text('01/11/2026 – 05/11/2026'), findsOneWidget);
-      await tester.tap(find.text('Theo năm'));
+      await tester.tap(find.byTooltip('Chọn kỳ thống kê'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Theo năm').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Hủy'));
       await tester.pumpAndSettle();
@@ -567,7 +573,9 @@ void main() {
       ('30 ngày qua', '2026-10-04', '2026-11-02'),
       ('Tháng trước', '2026-10-01', '2026-10-31'),
     ]) {
-      await tester.tap(find.text('Khoảng thời gian'));
+      await tester.tap(find.byTooltip('Chọn kỳ thống kê'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Khoảng thời gian').last);
       await tester.pumpAndSettle();
       final requests = api.calls.length;
       await tester.tap(find.text(label));
@@ -581,7 +589,9 @@ void main() {
           .query!;
       expect((query['fromDate'], query['toDate']), (from, to));
     }
-    await tester.tap(find.text('Khoảng thời gian'));
+    await tester.tap(find.byTooltip('Chọn kỳ thống kê'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Khoảng thời gian').last);
     await tester.pumpAndSettle();
     final requests = api.calls.length;
     await tester.tap(find.text('7 ngày qua'));
@@ -596,7 +606,9 @@ void main() {
   ) async {
     final api = _Api();
     await _show(tester, api, asTab: true, textScale: 2);
-    await tester.tap(find.text('Khoảng thời gian'));
+    await tester.tap(find.byTooltip('Chọn kỳ thống kê'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Khoảng thời gian').last);
     await tester.pumpAndSettle();
     await _pickRangeDate(tester, 'income-range-start', '11/03/2026');
     expect(
@@ -622,7 +634,7 @@ void main() {
       final api = _Api()..withdrawal = Completer<Map<String, dynamic>>();
       await _show(tester, api);
       await _wallet(tester);
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Yêu cầu rút tiền'));
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Rút tiền'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField), '600000');
       await tester.tap(find.text('Tiếp tục'));
@@ -700,12 +712,9 @@ void main() {
       final api = _Api();
       await _show(tester, api);
       await _wallet(tester);
-      await tester.scrollUntilVisible(
-        find.text('Giao dịch gần đây'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.text('Xem tất cả').first);
+      await tester.ensureVisible(find.text('Xem tất cả giao dịch'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Xem tất cả giao dịch'));
       await tester.pumpAndSettle();
       expect(find.text('Lịch sử giao dịch'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
@@ -723,17 +732,14 @@ void main() {
     },
   );
 
-  testWidgets('Mở ngân hàng từ Ví ở màn hình riêng và quay lại giữ tab Ví', (
-    tester,
-  ) async {
+  testWidgets('Tài khoản ngân hàng hiển thị ngay trong tab Ví', (tester) async {
     await _show(tester, _Api());
     await _wallet(tester);
+    await tester.ensureVisible(find.text('Tài khoản ngân hàng'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Tài khoản ngân hàng'));
     await tester.pumpAndSettle();
-    expect(find.byType(NavigationBar), findsNothing);
     expect(find.textContaining('Vietcombank'), findsOneWidget);
-    await tester.tap(find.byTooltip('Quay lại'));
-    await tester.pumpAndSettle();
     expect(find.text('Ví Handigo'), findsOneWidget);
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,

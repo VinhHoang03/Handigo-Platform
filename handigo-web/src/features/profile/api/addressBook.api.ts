@@ -1,6 +1,5 @@
 import api from "@/api/client";
 import type { UserAddress, UserAddressPayload } from "../types/profile.types";
-import { geocodeSavedAddress } from "@/features/customer/utils/googlePlacesAutocomplete";
 
 interface BackendAddress {
   _id?: string;
@@ -67,7 +66,19 @@ export const getUserAddresses = async (): Promise<UserAddress[]> => {
       }
 
       try {
-        const coordinates = await geocodeSavedAddress(address.fullAddress);
+        // Tra tọa độ qua backend (LocationIQ), không cần khóa Google ở trình duyệt.
+        const geocoded = await api.post<{
+          success: boolean;
+          data: { latitude: number; longitude: number };
+        }>("/locations/geocode", {
+          fullAddress: address.fullAddress,
+          province: address.province,
+          ward: address.ward,
+        });
+        const coordinates = {
+          latitude: geocoded.data.data.latitude,
+          longitude: geocoded.data.data.longitude,
+        };
         const id = address.id || address._id;
         if (id) {
           await api.put(`/addresses/${id}`, coordinates);

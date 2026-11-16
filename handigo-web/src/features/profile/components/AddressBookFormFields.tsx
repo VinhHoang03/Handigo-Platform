@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Building2, House, LocateFixed, MapPin, RefreshCw } from "lucide-react";
 import { LocationPickerMap } from "@/components/common/LocationPickerMap";
+import { AddressLineSuggestInput } from "./AddressLineSuggestInput";
 import {
   SearchableSelect,
   type SearchableSelectOption,
@@ -168,14 +169,11 @@ export function AddressBookFormFields({
         <span className="ml-1 block text-label-sm font-medium text-on-surface-variant">
           Địa chỉ cụ thể
         </span>
-        <input
-          type="text"
+        <AddressLineSuggestInput
           value={addressForm.addressLine}
-          minLength={2}
-          required
-          placeholder="Nhập số nhà, tên đường, tòa nhà..."
-          className="form-field__input pb-2 pt-2"
-          onChange={(event) => onInputChange("addressLine", event.target.value)}
+          province={addressForm.province}
+          ward={addressForm.ward}
+          onChange={(value) => onInputChange("addressLine", value)}
         />
       </label>
 

@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../chat/presentation/order_chat_button.dart';
+import '../../../shared/widgets/account_overview_widgets.dart';
+import '../../../shared/widgets/customer_page_header.dart';
 import '../../orders/domain/order_summary.dart';
 
 enum ProviderScheduleMode { month, week }
@@ -86,94 +88,16 @@ class _ProviderScheduleViewState extends State<ProviderScheduleView> {
   void _moveWeek(int offset) =>
       _select(weekStart.add(Duration(days: offset * 7)));
 
-  void _openOptions() {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Tùy chọn lịch',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                minTileHeight: 48,
-                leading: const Icon(Icons.calendar_view_month_outlined),
-                title: const Text('Xem theo tháng'),
-                trailing: mode == ProviderScheduleMode.month
-                    ? const Icon(Icons.check_rounded)
-                    : null,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  setState(() => mode = ProviderScheduleMode.month);
-                },
-              ),
-              ListTile(
-                minTileHeight: 48,
-                leading: const Icon(Icons.view_week_outlined),
-                title: const Text('Xem theo tuần'),
-                trailing: mode == ProviderScheduleMode.week
-                    ? const Icon(Icons.check_rounded)
-                    : null,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  setState(() => mode = ProviderScheduleMode.week);
-                },
-              ),
-              ListTile(
-                minTileHeight: 48,
-                leading: const Icon(Icons.today_outlined),
-                title: const Text('Về hôm nay'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _goToday();
-                },
-              ),
-              const Divider(),
-              const _StatusLegend(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
+      appBar: CustomerPageHeader(
+        toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
         automaticallyImplyLeading: false,
-        centerTitle: true,
-        title: const Text('Lịch làm việc'),
-        leading: Padding(
-          padding: const EdgeInsets.all(10),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.calendar_month_rounded,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Tùy chọn lịch',
-            onPressed: _openOptions,
-            icon: const Icon(Icons.tune_rounded),
-          ),
-        ],
+        backgroundColor: accountSurface,
+        title: 'Lịch làm việc',
+        titleColor: accountInk,
       ),
       body: widget.state.when(
         loading: () => const AppLoading(),
@@ -183,7 +107,9 @@ class _ProviderScheduleViewState extends State<ProviderScheduleView> {
         ),
         data: (page) {
           final orders = page.items;
-          final selectedOrders = _ordersOnDay(orders, selected);
+          final selectedOrders = _sortScheduleOrders(
+            _ordersOnDay(orders, selected),
+          );
           final periodOrders = mode == ProviderScheduleMode.month
               ? orders.where((order) {
                   final date = order.calendarAt?.toLocal();
@@ -216,13 +142,6 @@ class _ProviderScheduleViewState extends State<ProviderScheduleView> {
                         ),
                         const SizedBox(height: 10),
                       ],
-                      Text(
-                        'Tháng ${visibleMonth.month}, ${visibleMonth.year}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
                       _ScheduleStats(orders: periodOrders),
                       const SizedBox(height: 12),
                       _ScheduleModeSwitch(
@@ -241,7 +160,6 @@ class _ProviderScheduleViewState extends State<ProviderScheduleView> {
                                 onSelected: _selectAndReveal,
                                 onPrevious: () => _moveMonth(-1),
                                 onNext: () => _moveMonth(1),
-                                onToday: _goToday,
                               )
                             : _WeekCalendar(
                                 key: const ValueKey('week-calendar'),
@@ -251,7 +169,6 @@ class _ProviderScheduleViewState extends State<ProviderScheduleView> {
                                 onSelected: _selectAndReveal,
                                 onPrevious: () => _moveWeek(-1),
                                 onNext: () => _moveWeek(1),
-                                onToday: _goToday,
                               ),
                       ),
                       const SizedBox(height: 16),
@@ -350,7 +267,7 @@ class _ScheduleStat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: color,
             fontWeight: FontWeight.w800,
           ),
@@ -359,7 +276,7 @@ class _ScheduleStat extends StatelessWidget {
         Text(
           label,
           maxLines: 2,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
@@ -442,7 +359,6 @@ class _MonthCalendar extends StatelessWidget {
     required this.onSelected,
     required this.onPrevious,
     required this.onNext,
-    required this.onToday,
     super.key,
   });
 
@@ -452,7 +368,6 @@ class _MonthCalendar extends StatelessWidget {
   final ValueChanged<DateTime> onSelected;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
-  final VoidCallback onToday;
 
   @override
   Widget build(BuildContext context) {
@@ -463,10 +378,8 @@ class _MonthCalendar extends StatelessWidget {
     final dayCount = end.difference(start).inDays + 1;
     return _CalendarCard(
       title: 'Tháng ${month.month}, ${month.year}',
-      subtitle: 'Chọn ngày để xem công việc',
       onPrevious: onPrevious,
       onNext: onNext,
-      onToday: onToday,
       child: Column(
         children: [
           const _WeekdayHeader(),
@@ -476,7 +389,7 @@ class _MonthCalendar extends StatelessWidget {
             itemCount: dayCount,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
-              mainAxisExtent: 58,
+              mainAxisExtent: 52,
             ),
             itemBuilder: (context, index) {
               final day = start.add(Duration(days: index));
@@ -505,7 +418,6 @@ class _WeekCalendar extends StatelessWidget {
     required this.onSelected,
     required this.onPrevious,
     required this.onNext,
-    required this.onToday,
     super.key,
   });
 
@@ -515,7 +427,6 @@ class _WeekCalendar extends StatelessWidget {
   final ValueChanged<DateTime> onSelected;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
-  final VoidCallback onToday;
 
   @override
   Widget build(BuildContext context) {
@@ -531,7 +442,6 @@ class _WeekCalendar extends StatelessWidget {
       subtitle: 'Tuần ${_isoWeek(start)} • $weekOrders công việc',
       onPrevious: onPrevious,
       onNext: onNext,
-      onToday: onToday,
       child: Column(
         children: [
           const _WeekdayHeader(),
@@ -565,18 +475,16 @@ class _WeekCalendar extends StatelessWidget {
 class _CalendarCard extends StatelessWidget {
   const _CalendarCard({
     required this.title,
-    required this.subtitle,
     required this.onPrevious,
     required this.onNext,
-    required this.onToday,
     required this.child,
+    this.subtitle,
   });
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
-  final VoidCallback onToday;
   final Widget child;
 
   @override
@@ -593,9 +501,9 @@ class _CalendarCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               IconButton(
@@ -610,19 +518,13 @@ class _CalendarCard extends StatelessWidget {
               ),
             ],
           ),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
+          if (subtitle case final text?)
+            Text(
+              text,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              TextButton(onPressed: onToday, child: const Text('Hôm nay')),
-            ],
-          ),
+            ),
           child,
         ],
       ),
@@ -634,22 +536,37 @@ class _WeekdayHeader extends StatelessWidget {
   const _WeekdayHeader();
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      for (final label in ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'])
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              textScaler: TextScaler.noScaling,
-              style: const TextStyle(fontSize: 11),
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          for (final label in ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'])
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  textScaler: TextScaler.noScaling,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: scheme.primary,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-    ],
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _CalendarDay extends StatelessWidget {
@@ -685,8 +602,8 @@ class _CalendarDay extends StatelessWidget {
         child: AnimatedContainer(
           key: ValueKey('schedule-day-${DateFormat('yyyy-MM-dd').format(day)}'),
           duration: const Duration(milliseconds: 160),
-          constraints: const BoxConstraints(minHeight: 58),
-          margin: const EdgeInsets.all(2),
+          constraints: const BoxConstraints(minHeight: 50),
+          margin: const EdgeInsets.all(1),
           padding: const EdgeInsets.symmetric(vertical: 2),
           decoration: BoxDecoration(
             color: selected ? scheme.primary : Colors.transparent,
@@ -753,7 +670,7 @@ class _CalendarDay extends StatelessWidget {
                     color: selected
                         ? scheme.onPrimary
                         : const Color(0xFFB05A00),
-                    fontSize: 8,
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
                     height: 1,
                   ),
@@ -810,37 +727,29 @@ class _DayScheduleHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final confirmed = orders
-        .where((order) => ['accepted', 'in_progress'].contains(order.status))
-        .length;
+    final scheme = Theme.of(context).colorScheme;
     final pending = orders.where((order) => order.status == 'created').length;
+    final weekdayLabel = date.weekday == DateTime.sunday
+        ? 'Chủ Nhật'
+        : 'Thứ ${date.weekday + 1}';
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Lịch ngày ${date.day}/${date.month}',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${_weekday(date.weekday)} • $confirmed đã xác nhận${pending > 0 ? ', $pending chờ xác nhận' : ''}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+          child: Text(
+            '$weekdayLabel, ${DateFormat('dd/MM/yyyy').format(date)}',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
         Text(
-          '${orders.length} công việc',
+          '$pending đơn chờ, cần xử lý',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: pending > 0
+                ? const Color(0xFFC76B13)
+                : scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -856,129 +765,121 @@ class _ScheduleOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Đơn hẹn lịch: giờ khách yêu cầu; đơn đặt ngay: giờ đặt.
     final start = order.calendarAt?.toLocal();
-    final end =
-        order.expectedEndAt?.toLocal() ??
-        (start != null && order.durationMinutes != null
-            ? start.add(Duration(minutes: order.durationMinutes!))
-            : null);
     final amount = order.providerAmount;
     final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                start == null
-                    ? 'Chưa chọn thời gian'
-                    : '${DateFormat('HH:mm').format(start)}${end == null ? '' : ' – ${DateFormat('HH:mm').format(end)}'}',
-                style: TextStyle(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            if (order.durationMinutes != null)
-              Text(
-                '${order.durationMinutes} phút',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-          ],
+        Text(
+          start == null
+              ? 'Chưa chọn thời gian'
+              : DateFormat('HH:mm').format(start),
+          style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
         Card(
           margin: EdgeInsets.zero,
           elevation: 0,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '#${order.code}',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: isPreview
+                ? null
+                : () => context.push('/provider/orders/${order.id}'),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          order.serviceName,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _ScheduleStatus(status: order.status),
+                    ],
+                  ),
+                  if (order.customerName?.isNotEmpty == true) ...[
+                    const SizedBox(height: 8),
+                    _ScheduleMeta(
+                      icon: Icons.person_outline_rounded,
+                      text: order.customerName!,
+                    ),
+                  ],
+                  if (order.addressLabel?.isNotEmpty == true) ...[
+                    const SizedBox(height: 5),
+                    _ScheduleMeta(
+                      icon: Icons.location_on_outlined,
+                      text: order.addressLabel!,
+                    ),
+                  ],
+                  if (order.problemDescription?.trim().isNotEmpty == true) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.description_outlined,
+                          size: 16,
                           color: scheme.onSurfaceVariant,
                         ),
-                      ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            order.problemDescription!.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
                     ),
-                    _ScheduleStatus(status: order.status),
                   ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  order.serviceName,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                if (order.customerName?.isNotEmpty == true) ...[
                   const SizedBox(height: 8),
-                  _ScheduleMeta(
-                    icon: Icons.person_outline_rounded,
-                    text: order.customerName!,
-                  ),
-                ],
-                if (order.addressLabel?.isNotEmpty == true) ...[
-                  const SizedBox(height: 5),
-                  _ScheduleMeta(
-                    icon: Icons.location_on_outlined,
-                    text: order.addressLabel!,
-                  ),
-                ],
-                if (order.problemDescription?.trim().isNotEmpty == true) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    order.problemDescription!.trim(),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Divider(color: scheme.outlineVariant.withValues(alpha: .45)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        amount != null
-                            ? _money(amount)
-                            : order.inspectionRequired
-                            ? 'Chưa báo giá'
-                            : _money(0),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: scheme.primary,
-                          fontWeight: FontWeight.w800,
+                  Divider(color: scheme.outlineVariant.withValues(alpha: .45)),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          amount != null
+                              ? _money(amount)
+                              : order.inspectionRequired
+                              ? 'Chưa báo giá'
+                              : _money(0),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: order.status == 'completed'
+                                    ? const Color(0xFF198754)
+                                    : scheme.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
                         ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: isPreview
-                          ? null
-                          : () => context.push('/provider/orders/${order.id}'),
-                      child: const Text('Xem chi tiết'),
-                    ),
-                    const SizedBox(width: 4),
-                    SizedBox.square(
-                      dimension: 44,
-                      child: OrderChatButton(
-                        orderId: order.id,
-                        status: order.status,
-                        hasProvider: true,
-                        providerView: true,
-                        iconOnly: true,
+                      SizedBox.square(
+                        dimension: 36,
+                        child: OrderChatButton(
+                          orderId: order.id,
+                          status: order.status,
+                          hasProvider: true,
+                          providerView: true,
+                          iconOnly: true,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1005,9 +906,9 @@ class _ScheduleStatus extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           _statusLabel(status),
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: color,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -1070,6 +971,25 @@ class _EmptySchedule extends StatelessWidget {
   );
 }
 
+/// Thứ tự hiển thị trong ngày: chờ xác nhận → đã xác nhận → đã kết thúc (hoàn thành/hủy),
+/// trong mỗi nhóm sắp theo thời gian.
+int _scheduleStatusRank(String status) => switch (status) {
+  'created' => 0,
+  'accepted' || 'in_progress' => 1,
+  _ => 2,
+};
+
+List<OrderSummary> _sortScheduleOrders(List<OrderSummary> orders) =>
+    [...orders]..sort((a, b) {
+      final byStatus = _scheduleStatusRank(
+        a.status,
+      ).compareTo(_scheduleStatusRank(b.status));
+      if (byStatus != 0) return byStatus;
+      return (a.calendarAt ?? DateTime(9999)).compareTo(
+        b.calendarAt ?? DateTime(9999),
+      );
+    });
+
 List<OrderSummary> _ordersOnDay(List<OrderSummary> orders, DateTime day) =>
     orders.where((order) {
       final date = order.calendarAt?.toLocal();
@@ -1091,16 +1011,6 @@ String _statusLabel(String status) => switch (status) {
   'cancelled' => 'Đã hủy',
   _ => status,
 };
-
-String _weekday(int weekday) => const [
-  'Thứ Hai',
-  'Thứ Ba',
-  'Thứ Tư',
-  'Thứ Năm',
-  'Thứ Sáu',
-  'Thứ Bảy',
-  'Chủ Nhật',
-][weekday - 1];
 
 int _isoWeek(DateTime date) {
   final thursday = date.add(Duration(days: 4 - date.weekday));

@@ -112,7 +112,7 @@ OrderSummary _order() => OrderSummary.fromJson({
 
 void main() {
   testWidgets(
-    'Tự lấy GPS trước nhận đơn và cho thử lại khi GPS ban đầu bị tắt',
+    'Khi GPS ban đầu bị tắt thì ẩn khoảng cách, không hiện cảnh báo hay nút thử lại',
     (tester) async {
       final api = _Api();
       addTearDown(api.close);
@@ -134,12 +134,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Hãy bật GPS để xem khoảng cách.'), findsOneWidget);
-      tracker.failGps = false;
-      await tester.tap(find.text('Thử lại khoảng cách'));
-      await tester.pumpAndSettle();
-      expect(find.text('Cách bạn khoảng 1,1 km'), findsOneWidget);
-      expect(tracker.reads, 2);
+      expect(find.textContaining('Cách bạn khoảng'), findsNothing);
+      expect(find.text('Hãy bật GPS để xem khoảng cách.'), findsNothing);
+      expect(find.text('Thử lại khoảng cách'), findsNothing);
       expect(api.calls, 0);
       expect(tester.takeException(), isNull);
     },
@@ -211,15 +208,15 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Khách hàng: Chưa có tên khách hàng'), findsOneWidget);
-    expect(find.text('Bật GPS để xem khoảng cách.'), findsOneWidget);
-    expect(find.text('Thử lại khoảng cách'), findsOneWidget);
+    expect(find.text('Bật GPS để xem khoảng cách.'), findsNothing);
+    expect(find.text('Thử lại khoảng cách'), findsNothing);
     expect(find.textContaining('0 m'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
   for (final orderType in ['immediate', 'scheduled']) {
     testWidgets(
-      'Đơn $orderType ngoài 20 đơn gần nhất vẫn tính khoảng cách trước nhận và thử lại được',
+      'Đơn $orderType ngoài 20 đơn gần nhất không hiện cảnh báo khi chưa đo được khoảng cách',
       (tester) async {
         final api = _Api()..fail = true;
         addTearDown(api.close);
@@ -257,12 +254,9 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Không thể tra tọa độ.'), findsOneWidget);
-        api.fail = false;
-        await tester.tap(find.text('Thử lại khoảng cách'));
-        await tester.pumpAndSettle();
-        expect(find.text('Cách bạn khoảng 1,1 km'), findsOneWidget);
-        expect(api.calls, 2);
+        expect(find.text('Không thể tra tọa độ.'), findsNothing);
+        expect(find.text('Thử lại khoảng cách'), findsNothing);
+        expect(find.textContaining('Cách bạn khoảng'), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
