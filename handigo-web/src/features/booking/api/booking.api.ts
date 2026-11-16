@@ -96,6 +96,18 @@ export const bookingApi = {
     return response.data.data;
   },
 
+  suggestAddresses: async (
+    q: string,
+    area: { province?: string; ward?: string },
+    signal?: AbortSignal,
+  ) => {
+    const response = await api.get<{
+      success: boolean;
+      data: Array<{ label: string; addressLine: string }>;
+    }>("/locations/autocomplete", { params: { q, ...area }, signal });
+    return response.data.data;
+  },
+
   geocodeAddress: async (address: Pick<CreateAddressPayload, 'fullAddress' | 'province' | 'ward'>) => {
     const response = await api.post<{ success: boolean; data: ReverseGeocodedAddress }>("/locations/geocode", address);
     return response.data.data;

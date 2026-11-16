@@ -1101,45 +1101,65 @@ class ProviderWalletScreen extends ConsumerWidget {
               data: (page) => page.items.isEmpty
                   ? const AppMessage(message: 'Chưa có giao dịch ví.')
                   : Column(
-                      children: page.items
-                          .map(
-                            (item) => Card(
-                              margin: const EdgeInsets.only(top: 8),
-                              child: ListTile(
-                                leading: Container(
-                                  width: 42,
-                                  height: 42,
-                                  decoration: BoxDecoration(
-                                    color: accountPrimarySoft,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(
-                                    item.direction == 'in'
-                                        ? Icons.south_west_rounded
-                                        : Icons.north_east_rounded,
-                                    color: accountPrimary,
-                                  ),
-                                ),
-                                title: Text(
-                                  item.description ??
-                                      _transactionType(item.type),
-                                ),
-                                subtitle: Text(
-                                  '${_transactionStatus(item.status)}${item.createdAt == null ? '' : ' • ${_date(item.createdAt)}'}',
-                                ),
-                                trailing: Text(
-                                  '${item.direction == 'in' ? '+' : '-'}${_money(item.amount)}',
-                                  style: TextStyle(
-                                    color: item.direction == 'in'
-                                        ? const Color(0xFF16805B)
-                                        : accountInk,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
+                      children: page.items.map((item) {
+                        final isOut = item.direction != 'in';
+                        final color = isOut
+                            ? Theme.of(context).colorScheme.error
+                            : const Color(0xFF198754);
+                        return Card(
+                          margin: const EdgeInsets.only(top: 10),
+                          color: accountSurface,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: const BorderSide(color: accountDivider),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.fromLTRB(
+                              12,
+                              8,
+                              16,
+                              8,
+                            ),
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: .12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                isOut
+                                    ? Icons.arrow_downward_rounded
+                                    : Icons.arrow_upward_rounded,
+                                color: color,
                               ),
                             ),
-                          )
-                          .toList(),
+                            title: Text(
+                              item.description ?? _transactionType(item.type),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              item.createdAt == null
+                                  ? ''
+                                  : _date(item.createdAt),
+                              style: const TextStyle(color: accountMuted),
+                            ),
+                            trailing: Text(
+                              '${isOut ? '-' : ''}${_money(item.amount)}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: color,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     ),
             ),
         const SizedBox(height: 24),
@@ -1201,8 +1221,10 @@ class ProviderWalletBalanceCard extends StatelessWidget {
     this.summary,
     this.summaryLoading = false,
     this.onBankAccounts,
+    this.showBankButton = true,
     super.key,
   });
+  final bool showBankButton;
   final WalletInfo wallet;
   final WalletSummary? summary;
   final bool summaryLoading;
@@ -1252,16 +1274,18 @@ class ProviderWalletBalanceCard extends StatelessWidget {
             );
           },
         ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            foregroundColor: scheme.primary,
+        if (showBankButton) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              foregroundColor: scheme.primary,
+            ),
+            onPressed: onBankAccounts ?? () => context.push('/provider/banks'),
+            icon: const Icon(Icons.account_balance_outlined, size: 20),
+            label: const Text('Tài khoản ngân hàng'),
           ),
-          onPressed: onBankAccounts ?? () => context.push('/provider/banks'),
-          icon: const Icon(Icons.account_balance_outlined, size: 20),
-          label: const Text('Tài khoản ngân hàng'),
-        ),
+        ],
       ],
     );
   }
@@ -1293,41 +1317,7 @@ class ProviderBankAccountsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   itemCount: items.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (_, index) {
-                    final item = items[index];
-                    final id = '${item['id'] ?? item['_id']}';
-                    return Card(
-                      child: ListTile(
-                        title: Text(
-                          '${item['bankName'] ?? ''} • ${item['bankCode'] ?? ''}',
-                        ),
-                        subtitle: Text(
-                          '${item['accountHolderName'] ?? ''}\n${item['accountNumber'] ?? ''}',
-                        ),
-                        isThreeLine: true,
-                        leading: Icon(
-                          item['isDefault'] == true
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
-                        ),
-                        onTap: () async {
-                          await ref
-                              .read(providerRepositoryProvider)
-                              .setDefaultBankAccount(id);
-                          ref.invalidate(providerBanksProvider);
-                        },
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () async {
-                            await ref
-                                .read(providerRepositoryProvider)
-                                .deleteBankAccount(id);
-                            ref.invalidate(providerBanksProvider);
-                          },
-                        ),
-                      ),
-                    );
-                  },
+                  itemBuilder: (_, index) => _bankTile(ref, items[index]),
                 ),
         ),
   );
@@ -1399,6 +1389,73 @@ class ProviderBankAccountsScreen extends ConsumerWidget {
     number.dispose();
     holder.dispose();
   }
+}
+
+/// Thẻ một tài khoản ngân hàng, dùng chung cho màn riêng và tab Ví.
+Widget _bankTile(WidgetRef ref, Map<String, dynamic> item) {
+  final id = '${item['id'] ?? item['_id']}';
+  return Card(
+    margin: EdgeInsets.zero,
+    child: ListTile(
+      title: Text('${item['bankName'] ?? ''} • ${item['bankCode'] ?? ''}'),
+      subtitle: Text(
+        '${item['accountHolderName'] ?? ''}\n${item['accountNumber'] ?? ''}',
+      ),
+      isThreeLine: true,
+      leading: Icon(
+        item['isDefault'] == true
+            ? Icons.radio_button_checked
+            : Icons.radio_button_unchecked,
+      ),
+      onTap: () async {
+        await ref.read(providerRepositoryProvider).setDefaultBankAccount(id);
+        ref.invalidate(providerBanksProvider);
+      },
+      trailing: IconButton(
+        icon: const Icon(Icons.delete_outline),
+        onPressed: () async {
+          await ref.read(providerRepositoryProvider).deleteBankAccount(id);
+          ref.invalidate(providerBanksProvider);
+        },
+      ),
+    ),
+  );
+}
+
+/// Danh sách tài khoản ngân hàng nhúng trong tab Ví.
+class ProviderBankAccountsPanel extends ConsumerWidget {
+  const ProviderBankAccountsPanel({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(providerBanksProvider)
+      .when(
+        loading: () => const AppLoading(),
+        error: (error, _) => AppMessage(
+          message: _message(error),
+          onRetry: () => ref.invalidate(providerBanksProvider),
+        ),
+        data: (items) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (items.isEmpty)
+              const AppMessage(message: 'Chưa có tài khoản ngân hàng.'),
+            for (final item in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _bankTile(ref, item),
+              ),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: () =>
+                  const ProviderBankAccountsScreen()._add(context, ref),
+              icon: const Icon(Icons.add),
+              label: const Text('Thêm tài khoản ngân hàng'),
+            ),
+          ],
+        ),
+      );
 }
 
 enum _FeedbackQuickFilter { all, pending, replied, images, five, four, low }

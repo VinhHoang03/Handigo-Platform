@@ -3,6 +3,7 @@ import type { RequestUser } from "../middlewares/authContext";
 import { Order } from "../models/order.model";
 import { Payment } from "../models/payment.model";
 import { Provider } from "../models/provider.model";
+import { Service } from "../models/service.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { WithdrawRequest } from "../models/withdrawRequest.model";
@@ -590,6 +591,36 @@ export const updateProviderAvailability = async (
   };
 };
 
+type EarningTransactionItem = {
+  relatedOrderId?: unknown;
+  metadata?: Record<string, unknown> | null;
+  [key: string]: unknown;
+};
+
+// Bổ sung metadata.serviceName cho giao dịch thu nhập theo đơn (dữ liệu cũ chưa có tên dịch vụ).
+const attachServiceNames = async (items: EarningTransactionItem[]) => {
+  const orderIds = [...new Set(
+    items
+      .filter((item) => item.relatedOrderId && !item.metadata?.serviceName)
+      .map((item) => String(item.relatedOrderId)),
+  )];
+  if (!orderIds.length) return items;
+
+  const orders = await Order.find({ _id: { $in: orderIds } }).select("serviceId").lean();
+  const serviceIds = [...new Set(orders.map((order) => String(order.serviceId)))];
+  const services = await Service.find({ _id: { $in: serviceIds } }).select("name").lean();
+  const serviceNameById = new Map(services.map((service) => [String(service._id), service.name]));
+  const serviceNameByOrderId = new Map(
+    orders.map((order) => [String(order._id), serviceNameById.get(String(order.serviceId))]),
+  );
+
+  return items.map((item) => {
+    const serviceName = item.relatedOrderId ? serviceNameByOrderId.get(String(item.relatedOrderId)) : undefined;
+    if (!serviceName || item.metadata?.serviceName) return item;
+    return { ...item, metadata: { ...(item.metadata ?? {}), serviceName } };
+  });
+};
+
 export const getProviderEarnings = async (user: RequestUser, query: DashboardQuery) => {
   const provider = await getProviderForUser(user.id);
   const providerUserId = new Types.ObjectId(user.id);
@@ -661,6 +692,7 @@ export const getProviderEarnings = async (user: RequestUser, query: DashboardQue
 
   const recentTransactions = recentTransactionsResult[0] || { items: [], total: [] };
   const total = recentTransactions.total[0]?.count || 0;
+  const items = await attachServiceNames(recentTransactions.items);
 
   return {
     earningsByDay,
@@ -671,7 +703,7 @@ export const getProviderEarnings = async (user: RequestUser, query: DashboardQue
       amount: completedOrderAmount,
     },
     recentTransactions: {
-      items: recentTransactions.items,
+      items,
       pagination: pagination(query.page, query.limit, total),
     },
   };

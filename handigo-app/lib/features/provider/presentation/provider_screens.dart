@@ -475,6 +475,12 @@ class ProviderDashboardScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        centerTitle: false,
+        toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
+        backgroundColor: accountSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         title: const HandigoLogo(),
         actions: [
           IconButton(
@@ -993,11 +999,12 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 12),
               ),
-            if (location?.isLoading != true &&
-                locationFailed &&
-                _lastAddress == null)
+            if (location?.isLoading != true && locationFailed)
               Text(
-                'Chưa lấy được vị trí hiện tại.',
+                trackingError?.message ??
+                    (location?.error is ApiException
+                        ? (location!.error as ApiException).message
+                        : 'Chưa cập nhật được vị trí. Hệ thống sẽ thử lại.'),
                 style: TextStyle(
                   fontSize: 13,
                   color: Theme.of(context).colorScheme.error,
@@ -1551,35 +1558,12 @@ class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
     final assignments = ref.watch(providerAssignmentsProvider);
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: scheme.primaryFixed,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.receipt_long_outlined,
-                color: scheme.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Lịch sử đơn hàng',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
+      appBar: CustomerPageHeader(
+        toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
+        automaticallyImplyLeading: false,
+        backgroundColor: accountSurface,
+        title: 'Lịch sử đơn hàng',
+        titleColor: accountInk,
         actions: [
           IconButton(
             tooltip: 'Tải lại đơn hàng',
@@ -2051,7 +2035,6 @@ class ProviderAccountScreen extends ConsumerWidget {
                 }
               },
             ),
-            const AccountVersionFooter(),
           ],
         ),
       ),

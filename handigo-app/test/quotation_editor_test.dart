@@ -8,9 +8,11 @@ import 'package:image_picker/image_picker.dart';
 // ignore: depend_on_referenced_packages
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart'
     as picker;
+import 'package:handigo_app/app/providers/app_providers.dart';
 import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/core/network/api_client.dart';
 import 'package:handigo_app/core/network/api_exception.dart';
+import 'package:handigo_app/core/network/realtime_connection.dart';
 import 'package:handigo_app/features/orders/domain/order_summary.dart';
 import 'package:handigo_app/features/provider/data/provider_repository.dart';
 import 'package:handigo_app/features/provider/presentation/provider_screens.dart';
@@ -192,11 +194,26 @@ void main() {
       find.widgetWithText(TextFormField, 'Tên hạng mục'),
       'Công sửa chữa',
     );
-    await tester.enterText(find.widgetWithText(TextFormField, 'Số lượng'), '2');
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is IconButton && widget.tooltip == 'Giảm số lượng',
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tap(tester, find.byTooltip('Tăng số lượng'));
+    await tap(tester, find.byTooltip('Tăng số lượng'));
+    await tap(tester, find.byTooltip('Giảm số lượng'));
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Đơn giá (đ)'),
       '100000',
     );
+    await tester.pump();
+    expect(find.text('200.000 đ'), findsOneWidget);
     await tap(tester, find.text('Xác nhận hạng mục'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Công sửa chữa'), findsOneWidget);
@@ -209,6 +226,156 @@ void main() {
     expect(find.byType(QuotationEditorScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('Số lượng giới hạn 1–1000 và đóng form giữ hạng mục cũ', (
+    tester,
+  ) async {
+    await open(tester, _Repository(), scale: 2);
+    await tap(tester, find.text('Thay tụ điện'));
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Số lượng'),
+      '1000',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is IconButton && widget.tooltip == 'Tăng số lượng',
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tap(tester, find.byTooltip('Giảm số lượng'));
+    expect(
+      tester
+          .widget<TextFormField>(find.widgetWithText(TextFormField, 'Số lượng'))
+          .controller!
+          .text,
+      '999',
+    );
+    await tester.enterText(find.widgetWithText(TextFormField, 'Số lượng'), '0');
+    await tap(tester, find.text('Xác nhận hạng mục'));
+    expect(find.text('Nhập số nguyên từ 1 đến 1000.'), findsOneWidget);
+    await tap(tester, find.byTooltip('Đóng form hạng mục'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      find.textContaining('Số lượng 2 × 180.000 đ = 360.000 đ'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('Nhập số hạng mục tạo ba phần riêng và lưu đúng từng dòng', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    await open(tester, repository, initial: null);
+    await tap(tester, find.text('Thêm hạng mục báo giá'));
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Số hạng mục báo giá'),
+      '3',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.widgetWithText(TextFormField, 'Tên hạng mục'),
+      findsNWidgets(3),
+    );
+    expect(find.text('Hạng mục 3'), findsOneWidget);
+    await tap(tester, find.text('Xác nhận 3 hạng mục'));
+    expect(find.text('Nhập tên hạng mục.'), findsNWidgets(3));
+    expect(repository.saved, isNull);
+    const titles = ['Thay gas', 'Thay vỏ', 'Dây điện'];
+    for (var i = 0; i < titles.length; i++) {
+      for (final entry in [
+        ('Tên hạng mục', titles[i]),
+        ('Số lượng', '${i + 1}'),
+        ('Đơn giá (đ)', '${(i + 1) * 100000}'),
+      ]) {
+        final field = find.widgetWithText(TextFormField, entry.$1).at(i);
+        await tester.ensureVisible(field);
+        await tester.enterText(field, entry.$2);
+        await tester.pumpAndSettle();
+      }
+    }
+    await tap(tester, find.text('Xác nhận 3 hạng mục'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Hạng mục báo giá (3)'), findsOneWidget);
+    await tap(tester, find.text('Lưu báo giá'));
+    final savedItems = repository.saved!['items'] as List;
+    expect(savedItems.map((item) => item['title']), titles);
+    expect(savedItems.map((item) => item['quantity']), [1, 2, 3]);
+    expect(savedItems.map((item) => item['unitPrice']), [
+      100000,
+      200000,
+      300000,
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('Đổi số phần giữ bản nháp và hủy không thêm hạng mục', (
+    tester,
+  ) async {
+    await open(tester, _Repository());
+    await tap(tester, find.text('Thêm hạng mục báo giá'));
+    final count = find.widgetWithText(TextFormField, 'Số hạng mục báo giá');
+    await tester.enterText(count, '3');
+    await tester.pumpAndSettle();
+    final thirdTitle = find.widgetWithText(TextFormField, 'Tên hạng mục').at(2);
+    await tester.ensureVisible(thirdTitle);
+    await tester.enterText(thirdTitle, 'Dây điện');
+    await tester.ensureVisible(count);
+    await tester.enterText(count, '2');
+    await tester.pumpAndSettle();
+    expect(
+      find.widgetWithText(TextFormField, 'Tên hạng mục'),
+      findsNWidgets(2),
+    );
+    await tester.enterText(count, '3');
+    await tester.pumpAndSettle();
+    expect(find.text('Dây điện'), findsOneWidget);
+    await tester.enterText(count, '100');
+    await tester.pumpAndSettle();
+    expect(find.text('Nhập số nguyên từ 1 đến 99.'), findsOneWidget);
+    await tap(tester, find.byTooltip('Đóng form hạng mục'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Hạng mục báo giá (1)'), findsOneWidget);
+    expect(find.text('Thay tụ điện'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+    'Báo giá cập nhật từ xa giữ bản nháp và phiên bản lúc bắt đầu sửa',
+    (tester) async {
+      final repository = _Repository();
+      await open(tester, repository);
+      await voice(tester);
+      await open(
+        tester,
+        repository,
+        initial: const RepairQuotation(
+          id: 'quote',
+          revision: 4,
+          status: 'saved',
+          finalAmount: 500000,
+          items: [
+            QuotationItem(
+              title: 'Vật tư từ thiết bị khác',
+              quantity: 1,
+              unitPrice: 500000,
+            ),
+          ],
+        ),
+      );
+      expect(find.text('Vật tư từ thiết bị khác'), findsNothing);
+      expect(
+        find.textContaining('Số lượng 2 × 200.000 đ = 400.000 đ'),
+        findsOneWidget,
+      );
+      await tap(tester, find.text('Lưu báo giá'));
+      expect(repository.current!.revision, 3);
+    },
+  );
+
   testWidgets('AI cập nhật đúng dòng, giữ số lượng, ghi chú và chưa tự lưu', (
     tester,
   ) async {
@@ -290,6 +457,8 @@ void main() {
         ProviderScope(
           overrides: [
             providerRepositoryProvider.overrideWithValue(repository),
+            apiClientProvider.overrideWithValue(_OfflineApi()),
+            realtimeConnectionProvider.overrideWithValue(null),
             orderDetailProvider.overrideWith((ref, id) async => detail),
             orderQuotationProvider.overrideWith((ref, id) async => quotation),
           ],
@@ -326,6 +495,13 @@ void main() {
       expect(find.text('Chỉnh sửa báo giá'), findsNothing);
       expect(find.text('Hạng mục báo giá (1)'), findsOneWidget);
       await voice(tester);
+      await tap(tester, find.byTooltip('Tác vụ đơn hàng'));
+      await tap(tester, find.text('Tải lại đơn'));
+      expect(find.byType(QuotationEditorScreen), findsOneWidget);
+      expect(
+        find.textContaining('Số lượng 2 × 200.000 đ = 400.000 đ'),
+        findsOneWidget,
+      );
       await tap(tester, find.text('Hủy chỉnh sửa'));
       expect(repository.saved, isNull);
       expect(find.byType(QuotationEditorScreen), findsNothing);
@@ -353,4 +529,18 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+/// API giả báo lỗi ngay để khối theo dõi vị trí không giữ trạng thái tải vô hạn.
+class _OfflineApi extends ApiClient {
+  _OfflineApi() : super(Dio(), CookieJar());
+  @override
+  Future<Map<String, dynamic>> request(
+    String path, {
+    String method = 'GET',
+    Map<String, dynamic>? data,
+    Map<String, dynamic>? query,
+    bool authenticated = false,
+    Duration? receiveTimeout,
+  }) async => throw const ApiException('Chưa có dữ liệu.');
 }

@@ -2,6 +2,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useRef } from "react";
 import { MapPin } from "lucide-react";
+import { addBaseTileLayer } from "@/config/map-tiles";
 
 interface LocationPickerMapProps {
   latitude?: number;
@@ -55,11 +56,10 @@ export function LocationPickerMap({
       attributionControl: true,
     });
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> | Search by <a href="https://locationiq.com/">LocationIQ.com</a>',
-    }).addTo(map);
+    addBaseTileLayer(map, { maxZoom: 19 });
+    map.attributionControl.addAttribution(
+      'Search by <a href="https://locationiq.com/">LocationIQ.com</a>',
+    );
     lastCenterRef.current = map.getCenter();
 
     const handleMoveEnd = () => {

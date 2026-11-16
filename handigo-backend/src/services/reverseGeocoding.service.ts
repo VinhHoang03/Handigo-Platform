@@ -417,6 +417,80 @@ export const searchAddressLocations = async (query: string): Promise<AddressSear
   return request;
 };
 
+export interface AddressSuggestion {
+  label: string;
+  addressLine: string;
+  latitude: number;
+  longitude: number;
+  placeId?: string;
+}
+
+const suggestionCache = new Map<string, CacheEntry<AddressSuggestion[]>>();
+
+/** Gợi ý địa chỉ khi khách đang gõ (LocationIQ Autocomplete), giới hạn trong Việt Nam. */
+export const suggestAddresses = async (
+  text: string,
+  area?: { province?: string; ward?: string },
+): Promise<AddressSuggestion[]> => {
+  const query = [text.trim(), area?.ward?.trim(), area?.province?.trim()]
+    .filter(Boolean)
+    .join(", ");
+  const key = query.toLocaleLowerCase("vi-VN");
+  const cached = suggestionCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  return enqueueLocationIqRequest(async () => {
+    try {
+      const response = await axios.get<Array<LocationIqResponse & {
+        lat?: string;
+        lon?: string;
+      }>>("https://us1.locationiq.com/v1/autocomplete", {
+        params: {
+          key: getLocationIqApiKey(),
+          q: query,
+          countrycodes: "vn",
+          limit: 5,
+          dedupe: 1,
+          normalizecity: 1,
+          "accept-language": "vi",
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      const suggestions = (Array.isArray(response.data) ? response.data : []).flatMap((item) => {
+        const latitude = item.lat?.trim() ? Number(item.lat) : NaN;
+        const longitude = item.lon?.trim() ? Number(item.lon) : NaN;
+        if (
+          !item.display_name ||
+          !Number.isFinite(latitude) || Math.abs(latitude) > 90 ||
+          !Number.isFinite(longitude) || Math.abs(longitude) > 180
+        ) return [];
+        const street = [item.address?.house_number, item.address?.road]
+          .filter((part): part is string => Boolean(part?.trim()))
+          .join(" ");
+        return [{
+          label: item.display_name,
+          addressLine: street || item.display_name.split(",")[0].trim(),
+          latitude,
+          longitude,
+          placeId: item.osm_type && item.osm_id
+            ? `osm:${item.osm_type}:${item.osm_id}`
+            : item.place_id ? `locationiq:${item.place_id}` : undefined,
+        }];
+      });
+      if (suggestionCache.size >= MAX_CACHE_ENTRIES) {
+        const oldestKey = suggestionCache.keys().next().value;
+        if (oldestKey) suggestionCache.delete(oldestKey);
+      }
+      suggestionCache.set(key, { data: suggestions, expiresAt: Date.now() + CACHE_TTL_MS });
+      return suggestions;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (axios.isAxiosError(error) && error.response?.status === 404) return [];
+      throw new AppError("Chưa thể gợi ý địa chỉ lúc này. Vui lòng thử lại sau.", 503);
+    }
+  });
+};
+
 // Tra cứu địa chỉ đã lưu; không lấy tâm phường/tỉnh làm vị trí thực hiện dịch vụ.
 export const geocodeSavedAddress = async (
   address: { fullAddress: string; ward: string; province: string },

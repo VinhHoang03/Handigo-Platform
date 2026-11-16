@@ -241,7 +241,7 @@ void main() {
     await tester.tap(_tab('Thu nhập'));
     await tester.pumpAndSettle();
     expect(find.text('Thời gian thống kê'), findsOneWidget);
-    expect(find.byType(SegmentedButton<int>), findsOneWidget);
+    expect(find.byTooltip('Chọn kỳ thống kê'), findsOneWidget);
     await tester.tap(find.text('Ví'));
     await tester.pumpAndSettle();
     expect(find.text('Ví Handigo'), findsOneWidget);

@@ -13,14 +13,15 @@ export { getOrderInterval, isWithinWorkingCalendar } from '../utils/providerSche
 export const getAvailableProviderIds = async (
   providerIds: Types.ObjectId[],
   intervals: ScheduleInterval[],
-  options: { policy?: BookingPolicy; excludeOrderIds?: Types.ObjectId[]; session?: ClientSession; checkWorkingCalendar?: boolean } = {},
+  options: { policy?: BookingPolicy; excludeOrderIds?: Types.ObjectId[]; session?: ClientSession; checkWorkingCalendar?: boolean; includeCompletedOrders?: boolean } = {},
 ) => {
   const policy = options.policy ?? await getBookingPolicy();
   if (intervals.some((interval, index) => intervals.slice(index + 1).some((other) => intervalsConflict(interval, other)))) return new Set<string>();
   const orders = await Order.find({
     providerId: { $in: providerIds },
     _id: { $nin: options.excludeOrderIds ?? [] },
-    status: { $in: ["accepted", "in_progress", "completed"] },
+    status: { $in: options.includeCompletedOrders === false
+      ? ["accepted", "in_progress"] : ["accepted", "in_progress", "completed"] },
     $nor: [{ status: "accepted", "customerNoShow.status": "pending" }],
     isDeleted: false,
   }).session(options.session ?? null);
@@ -56,7 +57,7 @@ export const lockProviderSchedule = async (providerId: Types.ObjectId, session: 
 };
 
 export const assertProviderSchedule = async (providerId: Types.ObjectId, orders: IOrder[], session: ClientSession, policy: BookingPolicy,
-  options: { checkWorkingCalendar?: boolean } = {}) => {
+  options: { checkWorkingCalendar?: boolean; includeCompletedOrders?: boolean } = {}) => {
   const intervals = orders.map((order) => getOrderInterval({ ...order.toObject(), status: "created" }, policy));
   const available = await getAvailableProviderIds([providerId], intervals, { policy, session, ...options, excludeOrderIds: orders.map((order) => order._id as Types.ObjectId) });
   if (!available.has(providerId.toString())) throw new AppError(options.checkWorkingCalendar === false

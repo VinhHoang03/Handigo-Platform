@@ -17,11 +17,12 @@ function load(file, modules) {
 }
 function setup() {
   const session = {}, messages = new Map(), calls = [], events = [];
-  const conversation = { _id: new Types.ObjectId(), providerId: new Types.ObjectId(),
+  const conversation = { _id: new Types.ObjectId(),
     async save(options) { assert.equal(options.session, session); calls.push('save-conversation'); } };
-  const chain = value => ({ select() { return this; }, session(actual) { assert.equal(actual, session); return Promise.resolve(value); }, populate: async () => value });
+  const chain = value => ({ select() { return this; }, sort() { return this; }, session(actual) { assert.equal(actual, session); return Promise.resolve(value); }, populate: async () => value });
   const service = load('chat.service.ts', {
     mongoose: { Types },
+    '../models/provider.model': { Provider: { updateOne: async () => ({ matchedCount: 1 }) } },
     '../models/message.model': { Message: {
       findById: id => chain(messages.get(id.toString())),
       create: async (values, options) => {
@@ -33,7 +34,13 @@ function setup() {
       },
     } },
     '../models/conversation.model': { Conversation: {
-      findOne: () => chain(conversation),
+      findOne: filter => chain(conversation.orderId && String(conversation.orderId) === String(filter.orderId)
+        && String(conversation.providerId) === String(filter.providerId) ? conversation : null),
+      create: async ([payload], options) => {
+        assert.equal(options.session, session);
+        Object.assign(conversation, { customerLastSeenAt: null, providerLastSeenAt: null }, payload);
+        return [conversation];
+      },
       findOneAndUpdate: async (filter, update, options) => {
         assert.equal(options.session, session);
         assert.equal(options.upsert, true);
@@ -118,6 +125,7 @@ function acceptance(failCommit = false) {
     '../utils/logger': { createLogger: () => ({ error() {} }) },
     '../sockets/socketServer': { emitToUser: () => events.push('emit') },
     './notification.service': { createNotificationRecord: async () => {} },
+    './orderDeadline.service': { scheduleOrderDeadline() {} },
     '../utils/appError': { AppError: class extends Error {} },
   }).AssignmentService;
   return { service, events, assignment, provider };

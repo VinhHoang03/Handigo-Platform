@@ -30,11 +30,15 @@ void main() {
   Future<ProviderContainer> open(
     WidgetTester tester, {
     FutureOr<List<Map<String, dynamic>>> Function()? load,
+    Stream<({String name, dynamic data})>? events,
     bool withAddress = true,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          bookingProviderEvents.overrideWith(
+            (ref) => events ?? const Stream.empty(),
+          ),
           bookingNearbyProviders.overrideWith(
             (ref, query) async => load == null ? providers : await load(),
           ),
@@ -62,6 +66,50 @@ void main() {
     await tester.tap(find.text('Chọn thợ từ danh sách'));
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'Sự kiện thay đổi thợ tải lại nhưng giữ danh sách trong lúc chờ',
+    (tester) async {
+      final events =
+          StreamController<({String name, dynamic data})>.broadcast();
+      addTearDown(events.close);
+      final pending = Completer<List<Map<String, dynamic>>>();
+      var requests = 0;
+      await open(
+        tester,
+        events: events.stream,
+        load: () {
+          requests++;
+          return requests == 1 ? providers : pending.future;
+        },
+      );
+      events.add((name: 'providers:changed', data: null));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(requests, 2);
+      expect(find.text('Nguyễn Văn An'), findsOneWidget);
+      pending.complete([]);
+      await tester.pumpAndSettle();
+      expect(find.text('Nguyễn Văn An'), findsNothing);
+      expect(
+        find.text('Hiện tại chưa có thợ phù hợp, vui lòng đặt lịch lại sau'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('Danh sách rỗng tự phục hồi sau 30 giây, không cần tải lại app', (
+    tester,
+  ) async {
+    var requests = 0;
+    await open(tester, load: () => ++requests == 1 ? [] : providers);
+    expect(find.text('Nguyễn Văn An'), findsNothing);
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+    expect(requests, 2);
+    expect(find.text('Nguyễn Văn An'), findsOneWidget);
+  });
 
   for (final width in [320.0, 390.0]) {
     testWidgets('Chọn thợ rồi đổi về điều phối tự động ở $width px', (
@@ -199,6 +247,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            bookingProviderEvents.overrideWith((ref) => const Stream.empty()),
             bookingNearbyProviders.overrideWith((ref, query) => pending.future),
           ],
           child: MaterialApp(

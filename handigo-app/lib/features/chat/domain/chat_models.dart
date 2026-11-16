@@ -12,6 +12,7 @@ class Conversation {
     this.lastMessageAt,
     this.lastMessageSenderId,
     this.providerId,
+    this.isLegacy = false,
   });
   factory Conversation.fromJson(
     Map<String, dynamic> json, {
@@ -37,6 +38,7 @@ class Conversation {
         ? sender['_id'] ?? sender['id']
         : sender;
     return Conversation(
+      isLegacy: json['scope'] != 'order',
       id: (json['_id'] ?? json['id']) as String,
       orderId: order is Map<String, dynamic>
           ? (order['_id'] ?? order['id']) as String
@@ -62,6 +64,7 @@ class Conversation {
     );
   }
   final String id, orderId, orderCode, title;
+  final bool isLegacy;
   final String? lastMessage;
   final DateTime? updatedAt;
   final String? avatar, providerId;
