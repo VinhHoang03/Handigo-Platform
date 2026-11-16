@@ -8,9 +8,11 @@ import 'package:image_picker/image_picker.dart';
 // ignore: depend_on_referenced_packages
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart'
     as picker;
+import 'package:handigo_app/app/providers/app_providers.dart';
 import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/core/network/api_client.dart';
 import 'package:handigo_app/core/network/api_exception.dart';
+import 'package:handigo_app/core/network/realtime_connection.dart';
 import 'package:handigo_app/features/orders/domain/order_summary.dart';
 import 'package:handigo_app/features/provider/data/provider_repository.dart';
 import 'package:handigo_app/features/provider/presentation/provider_screens.dart';
@@ -290,6 +292,8 @@ void main() {
         ProviderScope(
           overrides: [
             providerRepositoryProvider.overrideWithValue(repository),
+            apiClientProvider.overrideWithValue(_OfflineApi()),
+            realtimeConnectionProvider.overrideWithValue(null),
             orderDetailProvider.overrideWith((ref, id) async => detail),
             orderQuotationProvider.overrideWith((ref, id) async => quotation),
           ],
@@ -353,4 +357,18 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+/// API giả báo lỗi ngay để khối theo dõi vị trí không giữ trạng thái tải vô hạn.
+class _OfflineApi extends ApiClient {
+  _OfflineApi() : super(Dio(), CookieJar());
+  @override
+  Future<Map<String, dynamic>> request(
+    String path, {
+    String method = 'GET',
+    Map<String, dynamic>? data,
+    Map<String, dynamic>? query,
+    bool authenticated = false,
+    Duration? receiveTimeout,
+  }) async => throw const ApiException('Chưa có dữ liệu.');
 }

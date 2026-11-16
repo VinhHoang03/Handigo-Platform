@@ -6,6 +6,7 @@ import { validate } from "../middlewares/validate.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { geocodeAddressSchema } from "../validations/address.validator";
 import {
+  addressSuggestQuerySchema,
   currentLocationSchema,
   reverseGeocodeQuerySchema,
 } from "../validations/location.validator";
@@ -18,6 +19,12 @@ router.get(
   "/reverse-geocode",
   validate(reverseGeocodeQuerySchema, "query"),
   locationController.reverseGeocodeCurrentLocation,
+);
+router.get(
+  "/autocomplete",
+  routingRateLimit,
+  validate(addressSuggestQuerySchema, "query"),
+  locationController.suggestAddressLines,
 );
 router.get("/me", locationController.getCurrentLocation);
 router.put(

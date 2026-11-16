@@ -19,6 +19,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../orders/presentation/order_screens.dart';
 import '../../orders/presentation/order_reschedule_panel.dart';
+import '../../orders/presentation/tracking_screen.dart';
 import 'provider_screens.dart';
 import 'provider_schedule_preview.dart';
 
@@ -202,6 +203,14 @@ class _ProviderOrderDetailScreenState
                     ),
                   ),
                   const SizedBox(height: 12),
+                  if (order.canTrack) ...[
+                    OrderTrackingScreen(
+                      key: ValueKey('tracking-${order.id}'),
+                      orderId: order.id,
+                      embedded: true,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   OrderDetailOverview(order: order, providerView: true),
                   if (order.orderType == 'scheduled' &&
                       !order.hasArrived &&

@@ -1,6 +1,7 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
+import { addBaseTileLayer, BASE_MAP_ATTRIBUTION } from "@/config/map-tiles";
 import { TRACKING_COLORS } from "./constants";
 import { toLatLng } from "./geo-helpers";
 import { createTechnicianIcon, createPopupContent, createServiceAddressIcon, injectTrackingMapStyles } from "./leaflet-marker-factory";
@@ -53,13 +54,11 @@ export function useLeafletMapView({
       });
 
       // Dùng cùng nguồn bản đồ với màn hình chọn địa chỉ.
-      L.tileLayer(
-        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        {
-          maxNativeZoom: 19,
-          maxZoom: 20,
-        },
-      ).addTo(mapRef.current);
+      addBaseTileLayer(mapRef.current, {
+        maxNativeZoom: 19,
+        maxZoom: 20,
+        withAttribution: false,
+      });
 
       // Custom zoom control position
       L.control.zoom({ position: "bottomright" }).addTo(mapRef.current);
@@ -67,7 +66,7 @@ export function useLeafletMapView({
       // Subtle attribution
       L.control
         .attribution({ position: "bottomleft", prefix: false })
-        .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>')
+        .addAttribution(BASE_MAP_ATTRIBUTION)
         .addTo(mapRef.current);
     }
 

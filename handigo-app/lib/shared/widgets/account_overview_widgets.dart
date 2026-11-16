@@ -20,6 +20,7 @@ class AccountFinancialStatCard extends StatelessWidget {
     required this.icon,
     this.primary = false,
     this.subtitle,
+    this.footer,
     super.key,
   });
 
@@ -27,6 +28,7 @@ class AccountFinancialStatCard extends StatelessWidget {
   final IconData icon;
   final bool primary;
   final String? subtitle;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -80,6 +82,7 @@ class AccountFinancialStatCard extends StatelessWidget {
             ),
           ),
         ],
+        if (footer != null) ...[const SizedBox(height: 10), footer!],
       ],
     ),
   );

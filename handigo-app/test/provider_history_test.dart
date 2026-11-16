@@ -108,7 +108,6 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Nguyễn Văn An'), findsOneWidget);
       expect(find.text('Nhắn tin'), findsOneWidget);
       expect(find.text('Chưa chọn thời gian'), findsNothing);
       expect(find.textContaining('30/10/2026'), findsOneWidget);

@@ -765,38 +765,18 @@ class _ScheduleOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Đơn hẹn lịch: giờ khách yêu cầu; đơn đặt ngay: giờ đặt.
     final start = order.calendarAt?.toLocal();
-    final end =
-        order.expectedEndAt?.toLocal() ??
-        (start != null && order.durationMinutes != null
-            ? start.add(Duration(minutes: order.durationMinutes!))
-            : null);
     final amount = order.providerAmount;
     final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                start == null
-                    ? 'Chưa chọn thời gian'
-                    : '${DateFormat('HH:mm').format(start)}${end == null ? '' : ' – ${DateFormat('HH:mm').format(end)}'}',
-                style: TextStyle(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            if (order.durationMinutes != null)
-              Text(
-                '${order.durationMinutes} phút',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-          ],
+        Text(
+          start == null
+              ? 'Chưa chọn thời gian'
+              : DateFormat('HH:mm').format(start),
+          style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
         Card(
@@ -812,16 +792,22 @@ class _ScheduleOrderCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _ScheduleStatus(status: order.status),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    order.serviceName,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          order.serviceName,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _ScheduleStatus(status: order.status),
+                    ],
                   ),
                   if (order.customerName?.isNotEmpty == true) ...[
                     const SizedBox(height: 8),

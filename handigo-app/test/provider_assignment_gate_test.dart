@@ -265,7 +265,7 @@ void main() {
   });
 
   testWidgets(
-    'Đơn báo giá hiển thị tên khách và trạng thái khoảng cách khi thiếu GPS',
+    'Đơn báo giá hiển thị tên khách và ẩn khoảng cách khi thiếu GPS',
     (tester) async {
       final h = _Harness();
       h.repository.pending.add(
@@ -291,7 +291,8 @@ void main() {
       ];
       await h.show(tester, scale: 2);
       expect(find.text('Khách hàng: Nguyễn An'), findsOneWidget);
-      expect(find.text('Bật GPS để xem khoảng cách.'), findsOneWidget);
+      // Không đo được khoảng cách thì ẩn dòng khoảng cách.
+      expect(find.textContaining('Cách bạn'), findsNothing);
       expect(tester.takeException(), isNull);
       await h.clear(tester);
     },

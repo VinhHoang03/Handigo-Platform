@@ -178,11 +178,16 @@ void main() {
     'cancelled',
   ]) {
     testWidgets(
-      'Chi tiết $status hiển thị gọn và không nhúng bản đồ theo dõi',
+      'Chi tiết $status chỉ nhúng bản đồ theo dõi khi đơn đang có thợ',
       (tester) async {
         await _show(tester, () => _order(status));
         final tracking = find.byType(OrderTrackingScreen);
-        expect(tracking, findsNothing);
+        expect(
+          tracking,
+          ['accepted', 'in_progress'].contains(status)
+              ? findsOneWidget
+              : findsNothing,
+        );
         expect(find.byType(ServiceCoverImage), findsOneWidget);
         expect(
           find.text('Nhắn tin với thợ'),
@@ -209,7 +214,7 @@ void main() {
     current = _order('accepted');
     container.invalidate(orderDetailProvider('order'));
     await tester.pumpAndSettle();
-    expect(find.byType(OrderTrackingScreen), findsNothing);
+    expect(find.byType(OrderTrackingScreen), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Chuyên gia đã nhận đơn'), 300);
     await tester.pumpAndSettle();
     current = _order('cancelled');
@@ -341,7 +346,9 @@ void main() {
     },
   );
 
-  testWidgets('Ảnh sự cố nằm dưới mô tả, cùng thẻ chi tiết đơn', (tester) async {
+  testWidgets('Ảnh sự cố nằm dưới mô tả, cùng thẻ chi tiết đơn', (
+    tester,
+  ) async {
     const description = 'Điều hòa bị hư và không còn làm lạnh.';
     final order = OrderDetail.fromJson({
       '_id': 'order',
@@ -350,12 +357,7 @@ void main() {
       'customerAttachments': ['https://example.test/su-co.jpg'],
       'completionEvidenceImages': ['https://example.test/nghiem-thu.jpg'],
     });
-    await _show(
-      tester,
-      () => order,
-      size: const Size(320, 844),
-      scale: 2,
-    );
+    await _show(tester, () => order, size: const Size(320, 844), scale: 2);
     final section = find.byType(OrderProblemDescription);
     await tester.scrollUntilVisible(section, 200);
     final problemImage = find.descendant(

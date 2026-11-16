@@ -9,13 +9,13 @@ import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/customer_page_header.dart';
-import '../../../shared/utils/media_url.dart';
 import '../data/order_repository.dart';
 import '../domain/order_summary.dart';
 import 'order_payment_panel.dart';
 import 'order_followup_panel.dart';
 import 'order_detail_overview.dart';
 import 'order_rebook_button.dart';
+import 'tracking_screen.dart';
 import 'order_reschedule_panel.dart';
 import '../../../core/network/paged_result.dart';
 import '../../booking/data/pending_booking_store.dart';
@@ -272,11 +272,25 @@ class OrderSummaryCard extends StatelessWidget {
     required this.order,
     this.providerView = false,
     this.providerInfo,
+    this.statusLeading,
     super.key,
   });
   final bool providerView;
   final OrderSummary order;
   final Widget? providerInfo;
+  final Widget? statusLeading;
+
+  Widget _info(IconData icon, Widget child) => providerView
+      ? Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: child),
+          ],
+        )
+      : child;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -316,103 +330,140 @@ class OrderSummaryCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
+              Builder(
+                builder: (context) {
+                  final codeInfo = _info(
+                    Icons.receipt_long_outlined,
+                    Text(
                       'Mã đơn ${order.code}'
                       '${placedAtLabel == null ? '' : ' | $placedAtLabel'}',
                       style: theme.textTheme.labelMedium,
                     ),
-                  ),
-                  OrderStatusBadge(
+                  );
+                  final badge = OrderStatusBadge(
                     label: providerView
                         ? (order.status == 'created'
                               ? 'Chờ phản hồi'
                               : orderStatusLabel(order.status))
                         : customerOrderStatusLabel(order),
                     color: statusColor,
-                  ),
-                ],
+                  );
+                  // Chữ phóng lớn: xếp huy hiệu xuống dòng riêng để không tràn ngang.
+                  if (statusLeading != null &&
+                      MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        codeInfo,
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            statusLeading!,
+                            const SizedBox(width: 8),
+                            Flexible(child: badge),
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: codeInfo),
+                      if (statusLeading != null) ...[
+                        statusLeading!,
+                        const SizedBox(width: 8),
+                      ],
+                      badge,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 10),
               Stack(
                 children: [
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 96,
-                    child: providerView
-                        ? _CustomerAvatar(
-                            name: order.customerName,
-                            url: order.customerAvatar,
-                          )
-                        : ServiceCoverImage(
-                            url: order.serviceImage,
-                            name: order.serviceName,
-                            fit: BoxFit.cover,
-                          ),
-                  ),
+                  if (!providerView)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 96,
+                      child: ServiceCoverImage(
+                        url: order.serviceImage,
+                        name: order.serviceName,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   Padding(
-                    padding: const EdgeInsets.only(left: 106),
+                    padding: EdgeInsets.only(left: providerView ? 0 : 106),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(minHeight: 72),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            order.serviceName,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
+                          _info(
+                            Icons.handyman_outlined,
+                            Text(
+                              order.serviceName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 4),
-                          if (providerView && order.customerName != null)
+                          if (providerView)
+                            _info(
+                              Icons.event_outlined,
+                              Text(
+                                order.scheduledAt != null
+                                    ? 'Lịch hẹn: ${DateFormat('HH:mm, dd/MM/yyyy').format(order.scheduledAt!.toLocal())}'
+                                    : createdAt != null
+                                    ? 'Lịch hẹn: Ngay lúc đặt (${DateFormat('HH:mm, dd/MM/yyyy').format(createdAt.toLocal())})'
+                                    : 'Lịch hẹn: Chưa chọn thời gian',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            )
+                          else if (displayedAt != null)
                             Text(
-                              order.customerName!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          if (displayedAt != null)
-                            Text(
-                              '${providerView ? '' : 'Dự kiến thực hiện: '}${DateFormat(providerView ? 'HH:mm, dd/MM/yyyy' : 'dd/MM/yyyy, HH:mm').format(displayedAt.toLocal())}',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          if (providerView && displayedAt == null)
-                            Text(
-                              'Chưa chọn thời gian',
+                              'Dự kiến thực hiện: ${DateFormat('dd/MM/yyyy, HH:mm').format(displayedAt.toLocal())}',
                               style: theme.textTheme.bodySmall,
                             ),
                           if (order.addressLabel != null) ...[
                             const SizedBox(height: 3),
-                            Text(
-                              order.addressLabel!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall,
+                            _info(
+                              Icons.location_on_outlined,
+                              Text(
+                                order.addressLabel!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall,
+                              ),
                             ),
                           ],
                           if (displayedAmount != null) ...[
                             const SizedBox(height: 4),
-                            Text(
-                              _money(displayedAmount),
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w600,
+                            _info(
+                              Icons.payments_outlined,
+                              Text(
+                                _money(displayedAmount),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ] else if (providerView &&
                               order.inspectionRequired) ...[
                             const SizedBox(height: 4),
-                            Text(
-                              'Chưa báo giá',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w600,
+                            _info(
+                              Icons.request_quote_outlined,
+                              Text(
+                                'Chưa báo giá',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
@@ -459,40 +510,6 @@ class OrderSummaryCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _CustomerAvatar extends StatelessWidget {
-  const _CustomerAvatar({required this.name, required this.url});
-
-  final String? name;
-  final String? url;
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrl = usableMediaUrl(url);
-    final initial = name?.trim().isNotEmpty == true
-        ? name!.trim().characters.first.toUpperCase()
-        : 'K';
-    final fallback = ColoredBox(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: Center(
-        child: Text(
-          initial,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-    if (imageUrl == null) return fallback;
-    return Image.network(
-      imageUrl,
-      fit: BoxFit.cover,
-      semanticLabel: 'Ảnh đại diện khách hàng',
-      errorBuilder: (context, error, stackTrace) => fallback,
     );
   }
 }
@@ -570,6 +587,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chi tiết đơn hàng'),
+        leading: Navigator.of(context).canPop()
+            ? null
+            : IconButton(
+                tooltip: 'Về trang chủ',
+                onPressed: () => context.go('/customer'),
+                icon: const Icon(Icons.home_outlined),
+              ),
         actions: [
           if (state.asData?.value != null)
             PopupMenuButton<String>(
@@ -646,6 +670,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
+                if (order.canTrack) ...[
+                  OrderTrackingScreen(
+                    key: ValueKey('tracking-${order.id}'),
+                    orderId: order.id,
+                    embedded: true,
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 OrderDetailOverview(order: order),
                 if (canRebookOrder(order.status) &&
                     order.serviceId != null) ...[
