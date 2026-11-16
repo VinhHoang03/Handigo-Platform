@@ -27,10 +27,12 @@ interface SendMessagePayload {
 const chatEnabledStatuses: IOrder["status"][] = ["accepted", "in_progress"];
 const chatClosedMessage = "Chỉ có thể nhắn tin khi có đơn đã được thợ nhận hoặc đang thực hiện.";
 
-const activeChatOrders = ({ customerId, providerId }: {
+const activeChatOrders = ({ orderId, customerId, providerId }: {
+  orderId: Types.ObjectId;
   customerId: Types.ObjectId;
   providerId: Types.ObjectId;
 }) => ({
+  _id: orderId,
   customerId,
   providerId,
   status: { $in: chatEnabledStatuses },
@@ -41,6 +43,9 @@ const assertConversationCanSend = async (
   conversation: InstanceType<typeof Conversation>,
   session?: ClientSession,
 ) => {
+  if (conversation.scope !== "order") {
+    throw new AppError("Lịch sử trò chuyện cũ chỉ được xem lại. Vui lòng mở chat từ đơn hàng.", 400, "CHAT_ORDER_INACTIVE");
+  }
   const filter = activeChatOrders(conversation);
   // Khóa đơn trong giao dịch gửi để thay đổi trạng thái đồng thời buộc kiểm tra lại.
   const order = session
@@ -51,24 +56,18 @@ const assertConversationCanSend = async (
   if (!order) throw new AppError(chatClosedMessage, 400, "CHAT_ORDER_INACTIVE");
 };
 
-const getOrCreateParticipantConversation = async (
-  order: IOrder, providerId: Types.ObjectId, session: ClientSession, updateOrder = false,
+const getOrCreateOrderConversation = async (
+  order: IOrder, providerId: Types.ObjectId, session: ClientSession,
 ) => {
-  // Khóa cùng hồ sơ thợ để hai đơn đồng thời không tạo hai chat cho cùng một cặp.
+  // Khóa hồ sơ thợ để các lượt mở cùng chat đồng thời không tạo bản ghi trùng.
   const lock = await Provider.updateOne(
     { _id: providerId, isDeleted: false }, { $inc: { __v: 1 } }, { session, runValidators: true },
   );
   if (!lock.matchedCount) throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
-  const filter = { customerId: order.customerId, providerId, isDeleted: false };
+  const filter = { scope: "order" as const, orderId: order._id, customerId: order.customerId, providerId, isDeleted: false };
   const previous = await Conversation.findOne(filter).sort({ createdAt: 1, _id: 1 }).session(session);
-  if (previous) {
-    if (updateOrder) {
-      previous.orderId = order._id as Types.ObjectId;
-      await previous.save({ session });
-    }
-    return previous;
-  }
-  const [conversation] = await Conversation.create([{ ...filter, orderId: order._id }], { session });
+  if (previous) return previous;
+  const [conversation] = await Conversation.create([filter], { session });
   return conversation!;
 };
 
@@ -102,7 +101,7 @@ export const createAssignmentWelcome = async (
   const existing = await Message.findById(assignmentId).session(session);
   if (existing) return;
   const user = await User.findById(providerUserId).select("fullName").session(session);
-  const conversation = await getOrCreateParticipantConversation(order, providerId, session, true);
+  const conversation = await getOrCreateOrderConversation(order, providerId, session);
   const content = buildAssignmentWelcomeContent(user?.fullName ?? "", order);
   const [message] = await Message.create([{
     _id: assignmentId, conversationId: conversation._id,
@@ -236,6 +235,7 @@ const getConversationForParticipant = async (
 
 export const getConversationAvailability = async (userId: string, role: UserRole, conversationId: string) => {
   const { conversation } = await getConversationForParticipant(userId, role, conversationId);
+  if (conversation.scope !== "order") return { activeOrder: null };
   const activeOrder = await Order.findOne(activeChatOrders(conversation))
     .sort({ createdAt: -1, _id: -1 })
     .select("_id orderCode")
@@ -302,7 +302,7 @@ export const getOrCreateConversationByOrder = async (
   try {
     conversationId = await withTransactionRetry(session, async () => {
       const order = await assertOrderCanChat(userId, role, orderId, true, session);
-      const conversation = await getOrCreateParticipantConversation(order, order.providerId!, session);
+      const conversation = await getOrCreateOrderConversation(order, order.providerId!, session);
       return conversation._id as Types.ObjectId;
     });
   } finally { await session.endSession(); }
@@ -371,7 +371,7 @@ export const sendMessage = async (
     await assertConversationCanSend(current, session);
     if (participant.senderRole === "customer") {
       // Ghi cùng giao dịch để tự duyệt phát hiện phản hồi đồng thời và thử lại.
-      await Order.updateMany({ customerId: conversation.customerId, providerId: conversation.providerId,
+      await Order.updateMany({ _id: conversation.orderId, customerId: conversation.customerId, providerId: conversation.providerId,
         status: "accepted", "customerNoShow.status": "pending", isDeleted: false },
         { $set: { "customerNoShow.customerRepliedAt": new Date() } }, { session, runValidators: true });
     }

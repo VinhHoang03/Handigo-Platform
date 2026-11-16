@@ -56,7 +56,8 @@ class _ProviderLocationGateState
     ref.listenManual(providerOverviewProvider, (_, next) {
       final data = next.asData?.value;
       if (data == null) return;
-      _online = data.availabilityStatus == 'online';
+      _online = ['online', 'busy'].contains(data.availabilityStatus);
+      _service.setWorking(data.availabilityStatus == 'busy');
       if (_online && _foreground) {
         _service.start(shouldUpload: _canUpload);
       } else if (!_online || kIsWeb) {

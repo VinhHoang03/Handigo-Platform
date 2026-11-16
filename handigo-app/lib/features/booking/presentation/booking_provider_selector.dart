@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/widgets/provider_avatar.dart';
+import '../../../core/network/realtime_connection.dart';
 import '../../service_catalog/presentation/service_catalog_provider.dart';
 import '../../booking/domain/booking_models.dart';
 import 'booking_provider.dart';
@@ -12,6 +14,21 @@ final bookingNearbyProviders = FutureProvider.autoDispose
           .watch(serviceCatalogRepositoryProvider)
           .nearbyProviders(Map<String, dynamic>.from(jsonDecode(query) as Map)),
     );
+
+final bookingProviderEvents =
+    StreamProvider.autoDispose<({String name, dynamic data})>((ref) {
+      final connection = ref.watch(realtimeConnectionProvider);
+      void subscribe() => connection?.emit('providers:watch', {});
+      subscribe();
+      final subscription = connection?.events.listen((event) {
+        if (event.name == 'connect') subscribe();
+      });
+      ref.onDispose(() {
+        unawaited(subscription?.cancel());
+        connection?.emit('providers:unwatch', {});
+      });
+      return connection?.events ?? const Stream.empty();
+    });
 
 String? bookingProviderQuery(BookingDraft draft) {
   if (draft.serviceId == null ||
@@ -48,7 +65,56 @@ class BookingProviderSelector extends ConsumerStatefulWidget {
 }
 
 class _BookingProviderSelectorState
-    extends ConsumerState<BookingProviderSelector> {
+    extends ConsumerState<BookingProviderSelector>
+    with WidgetsBindingObserver {
+  Timer? _poll, _refreshTimer;
+  bool _active = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _active =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    ref.listenManual(bookingProviderEvents, (_, next) {
+      final event = next.asData?.value;
+      if (!_active ||
+          event == null ||
+          !['connect', 'providers:changed'].contains(event.name)) {
+        return;
+      }
+      // Gộp các thay đổi liên tiếp, không dồn request theo từng thợ.
+      _refreshTimer ??= Timer(const Duration(seconds: 1), () {
+        _refreshTimer = null;
+        _refresh();
+      });
+    });
+    _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
+  }
+
+  void _refresh() {
+    if (!mounted || !_active) return;
+    final query = bookingProviderQuery(ref.read(bookingDraftProvider));
+    if (query != null && !ref.read(bookingNearbyProviders(query)).isLoading) {
+      ref.invalidate(bookingNearbyProviders(query));
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _active = state == AppLifecycleState.resumed;
+    if (_active) _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _poll?.cancel();
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
   void _chooseProvider(String id) {
     ref.read(bookingDraftProvider.notifier).setPreferredProvider(id);
   }
@@ -60,16 +126,12 @@ class _BookingProviderSelectorState
     final result = query == null
         ? null
         : ref.watch(bookingNearbyProviders(query));
-    final providers = result?.asData?.value
-        .where((item) => bookingProviderId(item).isNotEmpty)
+    final providers = (result?.hasValue == true ? result?.value : null)
+        ?.where((item) => bookingProviderId(item).isNotEmpty)
         .toList();
     final manual = draft.preferredProviderId != null;
     final loading = result?.isLoading ?? false;
-    final hasProviders =
-        !loading &&
-        result?.hasError != true &&
-        providers != null &&
-        providers.isNotEmpty;
+    final hasProviders = providers != null && providers.isNotEmpty;
     final theme = Theme.of(context);
     final note = query == null
         ? 'Vui lòng chọn địa chỉ và thời gian thực hiện để xem danh sách thợ phù hợp.'
@@ -123,7 +185,10 @@ class _BookingProviderSelectorState
           showArrow: hasProviders,
           expanded: true,
           loading: loading,
-          retry: query != null && !loading && !hasProviders
+          retry:
+              query != null &&
+                  !loading &&
+                  (!hasProviders || result?.hasError == true)
               ? () => ref.invalidate(bookingNearbyProviders(query))
               : null,
           retryLabel: result?.hasError == true ? 'Thử lại' : 'Tải lại',
@@ -265,6 +330,8 @@ class _ProviderDropdownState extends ConsumerState<_ProviderDropdown> {
     return ref
         .watch(bookingNearbyProviders(query))
         .when(
+          skipLoadingOnRefresh: true,
+          skipError: true,
           loading: () => const Padding(
             padding: EdgeInsets.all(24),
             child: Column(

@@ -1004,7 +1004,10 @@ export const OrderService = {
         order.schedule = { durationMinutes: duration, bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes, expectedStartAt: now, expectedEndAt: new Date(now.getTime() + duration * 60000) };
         // Đơn báo giá có lịch hẹn đã nhận được bắt đầu theo thời gian thực tế.
         if (order.inspectionRequired && !["scheduled", "recurring"].includes(order.orderType)) {
-          await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy, { checkWorkingCalendar: false });
+          await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy, {
+            checkWorkingCalendar: false,
+            includeCompletedOrders: false,
+          });
         }
         order.status = "in_progress";
         if (enableWorkConfirmation) order.workConfirmation = { nextAt: new Date(now.getTime() + 2 * 3_600_000) };
