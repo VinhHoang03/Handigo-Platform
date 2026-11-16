@@ -76,6 +76,11 @@ const overview = ProviderOverview(
   pendingBalance: 350000,
 );
 final today = DateUtils.dateOnly(DateTime.now());
+
+/// Tiêu đề lịch của ngày đang chọn, ví dụ "Thứ 2, 02/11/2026".
+String scheduleDayLabel(DateTime day) =>
+    '${day.weekday == DateTime.sunday ? 'Chủ Nhật' : 'Thứ ${day.weekday + 1}'}, '
+    '${day.day.toString().padLeft(2, '0')}/${day.month.toString().padLeft(2, '0')}/${day.year}';
 final orders = [
   OrderSummary(
     id: 'accepted',
@@ -959,7 +964,7 @@ Future<void> main() async {
           .first,
     );
     expect(body.bottom, lessThanOrEqualTo(navigation.top));
-    expect(find.byType(SegmentedButton<int>), findsOneWidget);
+    expect(find.byTooltip('Chọn kỳ thống kê'), findsOneWidget);
     expect(find.text('Thời gian thống kê'), findsOneWidget);
     await tester.tap(find.text('Ví'));
     await tester.pumpAndSettle();
@@ -1231,12 +1236,12 @@ Future<void> main() async {
     await tester.ensureVisible(nextDay);
     await tester.tap(nextDay);
     await tester.pumpAndSettle();
-    expect(find.text('1 công việc'), findsOneWidget);
+    expect(find.text(scheduleDayLabel(next)), findsOneWidget);
     await tester.tap(find.text('Tổng quan').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
-    expect(find.text('3 công việc'), findsOneWidget);
+    expect(find.text(scheduleDayLabel(today)), findsOneWidget);
     expect(
       find.byKey(
         ValueKey(
@@ -1246,7 +1251,6 @@ Future<void> main() async {
       findsWidgets,
     );
     expect(find.byIcon(Icons.science_outlined), findsNothing);
-    expect(find.text('Hôm nay'), findsOneWidget);
   });
 
   testWidgets('Lịch tháng chuyển được sang tháng khác', (tester) async {
@@ -1256,7 +1260,6 @@ Future<void> main() async {
 
     final next = DateTime(today.year, today.month + 1);
     expect(find.text('Tháng ${next.month}, ${next.year}'), findsWidgets);
-    expect(find.text('0 công việc'), findsOneWidget);
     expect(find.text('Ngày này chưa có lịch hẹn.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -1283,7 +1286,7 @@ Future<void> main() async {
 
   testWidgets('Lịch chọn đúng ngày và loại đơn hủy', (tester) async {
     await _showScreen(tester, const ProviderScheduleScreen());
-    expect(find.text('3 công việc'), findsOneWidget);
+    expect(find.text(scheduleDayLabel(today)), findsOneWidget);
     await savePreview(tester, 'schedule-top');
     final next = today.add(const Duration(days: 1));
     final dot = find.byKey(
@@ -1300,9 +1303,9 @@ Future<void> main() async {
     await tester.ensureVisible(day);
     await tester.tap(day);
     await tester.pumpAndSettle();
-    expect(find.text('1 công việc'), findsOneWidget);
+    expect(find.text(scheduleDayLabel(next)), findsOneWidget);
     expect(
-      find.text('Lịch ngày ${next.day}/${next.month}').hitTestable(),
+      find.text(scheduleDayLabel(next)).hitTestable(),
       findsOneWidget,
     );
     expect(find.text('Bảo dưỡng máy giặt'), findsOneWidget);
@@ -1315,7 +1318,7 @@ Future<void> main() async {
     await tester.ensureVisible(todayDay);
     await tester.tap(todayDay);
     await tester.pumpAndSettle();
-    expect(find.text('3 công việc'), findsOneWidget);
+    expect(find.text(scheduleDayLabel(today)), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Đơn đã hủy'),
       300,

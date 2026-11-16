@@ -57,16 +57,62 @@ class ProviderHistoryFilter extends StatelessWidget {
   }
 }
 
-class ProviderHistoryOrderCard extends StatelessWidget {
+class ProviderHistoryOrderCard extends StatefulWidget {
   const ProviderHistoryOrderCard({required this.order, super.key});
   final OrderSummary order;
 
   @override
-  Widget build(BuildContext context) => OrderSummaryCard(
-    order: order,
-    providerView: true,
-    providerInfo: order.serviceType == 'variable_price'
-        ? ProviderAssignmentCustomerInfo(orderId: order.id, order: order)
-        : null,
-  );
+  State<ProviderHistoryOrderCard> createState() =>
+      _ProviderHistoryOrderCardState();
+}
+
+class _ProviderHistoryOrderCardState extends State<ProviderHistoryOrderCard> {
+  bool _noticeOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final order = widget.order;
+    final measures = order.serviceType == 'variable_price';
+    final immediateActive =
+        order.scheduledAt == null &&
+        !const {'completed', 'cancelled'}.contains(order.status);
+    final amber = Colors.amber.shade800;
+    final infoChildren = <Widget>[
+      if (measures) ProviderOrderDistance(order: order),
+      if (immediateActive && _noticeOpen)
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            'Cần thực hiện ngay: đây là đơn đặt ngay bây giờ.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: amber),
+          ),
+        ),
+    ];
+    final leading = <Widget>[
+      if (measures) ProviderOrderDistanceSpinner(order: order),
+      if (immediateActive)
+        IconButton(
+          tooltip: 'Cần thực hiện ngay',
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          onPressed: () => setState(() => _noticeOpen = !_noticeOpen),
+          icon: Icon(Icons.warning_amber_rounded, color: amber, size: 22),
+        ),
+    ];
+    return OrderSummaryCard(
+      order: order,
+      providerView: true,
+      statusLeading: leading.isEmpty
+          ? null
+          : Row(mainAxisSize: MainAxisSize.min, children: leading),
+      providerInfo: infoChildren.isEmpty
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: infoChildren,
+            ),
+    );
+  }
 }

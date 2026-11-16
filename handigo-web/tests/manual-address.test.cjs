@@ -48,6 +48,7 @@ test('Bản đồ hiển thị trực tiếp, không có nút hiện/ẩn và kh
     '@/components/common/LocationPickerMap': { LocationPickerMap: 'map' },
     '@/components/common/SearchableSelect': { SearchableSelect: 'select' },
     '@/components/common/FloatingField': { FloatingTextarea: 'textarea' },
+    './AddressLineSuggestInput': { AddressLineSuggestInput: 'suggest-input' },
   });
   const render = () => AddressBookFormFields({ addressForm: {}, provinceOptions: [], wardOptions: [], onUseCurrentLocation: () => locations++ });
   const tree = render();

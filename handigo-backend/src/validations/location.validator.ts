@@ -24,3 +24,15 @@ export const reverseGeocodeQuerySchema = z.object({
 });
 
 export type ReverseGeocodeQuery = z.infer<typeof reverseGeocodeQuerySchema>;
+
+export const addressSuggestQuerySchema = z.object({
+  q: z
+    .string()
+    .trim()
+    .min(2, "Vui lòng nhập ít nhất 2 ký tự")
+    .max(200, "Nội dung tìm kiếm quá dài"),
+  province: z.string().trim().max(120).optional(),
+  ward: z.string().trim().max(120).optional(),
+});
+
+export type AddressSuggestQuery = z.infer<typeof addressSuggestQuerySchema>;

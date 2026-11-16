@@ -36,14 +36,14 @@ class MapSurface extends ConsumerWidget {
 
 const mapPrimaryTileUrl = String.fromEnvironment(
   'MAP_TILE_URL',
-  defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  defaultValue:
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 );
 
 // Truyền `--dart-define=MAP_TILE_FALLBACK_URL=` (rỗng) để tắt nguồn dự phòng.
 const mapFallbackTileUrl = String.fromEnvironment(
   'MAP_TILE_FALLBACK_URL',
-  defaultValue:
-      'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+  defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 );
 
 class MapTiles extends StatefulWidget {
@@ -226,7 +226,7 @@ Widget mapAttribution() => Align(
       child: Padding(
         padding: const EdgeInsets.all(4),
         child: Text(
-          mapFallbackTileUrl.contains('cartocdn.com')
+          mapPrimaryTileUrl.contains('cartocdn.com')
               ? '© OpenStreetMap contributors © CARTO'
               : '© OpenStreetMap contributors',
           style: const TextStyle(fontSize: 11, color: Colors.black87),
