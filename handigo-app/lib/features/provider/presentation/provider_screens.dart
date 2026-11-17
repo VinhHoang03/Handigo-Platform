@@ -913,8 +913,12 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Đang thực hiện đơn (busy): công tắc vẫn hiện bật và vẫn lấy vị trí thật.
+    final working =
+        _optimisticOnline == null && widget.data.availabilityStatus == 'busy';
     final online =
-        _optimisticOnline ?? widget.data.availabilityStatus == 'online';
+        working ||
+        (_optimisticOnline ?? widget.data.availabilityStatus == 'online');
     final location = online && !busy
         ? ref.watch(providerCurrentLocationProvider)
         : null;
@@ -946,7 +950,9 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
         leading: Icon(
           Icons.circle,
           size: 12,
-          color: online
+          color: working
+              ? Theme.of(context).colorScheme.error
+              : online
               ? AppTheme.successGreen
               : Theme.of(context).colorScheme.outline,
         ),
@@ -971,7 +977,13 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
                           ? 'online'
                           : 'offline',
                     ),
-              style: const TextStyle(fontSize: 13),
+              style: TextStyle(
+                fontSize: 13,
+                color: working && !busy
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+                fontWeight: working && !busy ? FontWeight.w600 : null,
+              ),
             ),
             if (location?.isLoading == true)
               const Text(

@@ -11,6 +11,7 @@ import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/customer_page_header.dart';
 import '../data/order_repository.dart';
 import '../domain/order_summary.dart';
+import 'order_cancel_sheet.dart';
 import 'order_payment_panel.dart';
 import 'order_followup_panel.dart';
 import 'order_detail_overview.dart';
@@ -606,17 +607,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                     ?.value;
                 if (order == null) return [];
                 return [
-                  if (order.canCancelAt(DateTime.now()))
-                    const PopupMenuItem(
-                      value: 'cancel',
-                      child: Text('Hủy đơn'),
-                    ),
-                  if (order.orderType == 'recurring' &&
-                      order.canCancelAt(DateTime.now()))
-                    const PopupMenuItem(
-                      value: 'cancelSeries',
-                      child: Text('Hủy buổi này và các buổi sau'),
-                    ),
                   const PopupMenuItem(
                     value: 'report',
                     child: Text('Báo cáo đơn hàng'),
@@ -629,16 +619,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                     .asData
                     ?.value;
                 if (order == null || busy) return;
-                if (action == 'report') {
-                  showOrderReport(context, order);
-                } else if (order.canCancelAt(DateTime.now())) {
-                  _cancel(
-                    context,
-                    ref,
-                    order,
-                    series: action == 'cancelSeries',
-                  );
-                }
+                if (action == 'report') showOrderReport(context, order);
               },
             ),
         ],
@@ -690,6 +671,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                   quotation: quotation.asData?.value,
                 ),
                 OrderFollowupPanel(order: order),
+                if (order.showsCancelActions) _cancelActions(context, order),
                 if (order.orderType == 'scheduled' &&
                     order.rescheduleEligibility != null)
                   OrderReschedulePanel(order: order),
@@ -738,6 +720,51 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     );
   }
 
+  /// Nút hủy đơn/chuỗi lịch hiển thị trực tiếp, đồng bộ với web.
+  Widget _cancelActions(BuildContext context, OrderDetail order) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = !busy && order.canCancelAt(DateTime.now());
+    final recurring = order.orderType == 'recurring';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: scheme.error,
+              side: BorderSide(color: scheme.error.withValues(alpha: 0.3)),
+              minimumSize: const Size.fromHeight(48),
+            ),
+            onPressed: enabled ? () => _cancel(context, ref, order) : null,
+            icon: busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.close, size: 16),
+            label: Text(recurring ? 'Hủy buổi này' : 'Hủy yêu cầu'),
+          ),
+          if (recurring) ...[
+            const SizedBox(height: 8),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: scheme.error,
+                foregroundColor: scheme.onError,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: enabled
+                  ? () => _cancel(context, ref, order, series: true)
+                  : null,
+              child: const Text('Hủy buổi này và các buổi sau'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _cancel(
     BuildContext context,
     WidgetRef ref,
@@ -746,63 +773,54 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   }) async {
     if (busy) return;
     setState(() => busy = true);
-    final reason = await _reasonDialog(context);
-    if (reason == null || reason.trim().isEmpty) {
-      if (mounted) setState(() => busy = false);
-      return;
-    }
+    final repository = ref.read(orderRepositoryProvider);
     try {
-      final preview = await ref
-          .read(orderRepositoryProvider)
-          .cancellationPreview(orderId, series: series);
-      if (!context.mounted) return;
-      if (!preview.canCancel) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(preview.policyReason ?? 'Đã hết thời hạn hủy đơn.'),
-          ),
+      CancellationPreview preview;
+      try {
+        preview = await repository.cancellationPreview(
+          orderId,
+          series: series,
         );
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Không thể tải chính sách hoàn tiền. Vui lòng đóng và thử lại.',
+              ),
+            ),
+          );
+        }
         return;
       }
-      final approved = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          scrollable: true,
-          title: const Text('Xác nhận hủy đơn'),
-          content: Text(
-            'Số tiền hoàn dự kiến: ${_money(preview.refundAmount)}\nPhí hủy: ${_money(preview.cancellationFee)}\n${preview.policyReason ?? ''}',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Quay lại'),
-            ),
-            StreamBuilder<int>(
-              stream: Stream<int>.periodic(
-                const Duration(seconds: 1),
-                (index) => index,
-              ),
-              builder: (context, snapshot) => FilledButton(
-                onPressed: order.canCancelAt(DateTime.now())
-                    ? () => Navigator.pop(context, true)
-                    : null,
-                child: const Text('Xác nhận'),
-              ),
-            ),
-          ],
+      if (!context.mounted) return;
+      final cancelled = await showOrderCancelSheet(
+        context,
+        order: order,
+        preview: preview,
+        reload: () async {
+          final fresh = await repository.cancellationPreview(
+            orderId,
+            series: series,
+          );
+          ref.invalidate(orderDetailProvider(orderId));
+          return fresh;
+        },
+        submit: (reason, confirmed) => repository.cancel(
+          orderId,
+          reason,
+          preview: confirmed,
+          series: series,
         ),
       );
-      if (approved != true) return;
-      await ref
-          .read(orderRepositoryProvider)
-          .cancel(orderId, reason, preview: preview, series: series);
+      if (cancelled != true) return;
       ref.invalidate(orderDetailProvider(orderId));
       ref.invalidate(orderListProvider);
       ref.invalidate(orderPageProvider);
       ref.invalidate(pendingOrderProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã gửi yêu cầu hủy đơn.')),
+          const SnackBar(content: Text('Đã hủy lịch dịch vụ.')),
         );
       }
     } catch (error) {
@@ -835,50 +853,6 @@ class _InfoTile extends StatelessWidget {
   );
 }
 
-class _ReasonDialog extends StatefulWidget {
-  const _ReasonDialog({this.title = 'Lý do hủy đơn'});
-  final String title;
-  @override
-  State<_ReasonDialog> createState() => _ReasonDialogState();
-}
-
-class _ReasonDialogState extends State<_ReasonDialog> {
-  final controller = TextEditingController();
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    scrollable: true,
-    title: Text(widget.title),
-    content: TextField(
-      controller: controller,
-      maxLines: 3,
-      decoration: const InputDecoration(hintText: 'Nhập lý do'),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Bỏ qua'),
-      ),
-      FilledButton(
-        onPressed: () => Navigator.pop(context, controller.text.trim()),
-        child: const Text('Tiếp tục'),
-      ),
-    ],
-  );
-}
-
-Future<String?> _reasonDialog(
-  BuildContext context, {
-  String title = 'Lý do hủy đơn',
-}) => showDialog<String>(
-  context: context,
-  builder: (_) => _ReasonDialog(title: title),
-);
 String _money(double value) => NumberFormat.currency(
   locale: 'vi_VN',
   symbol: 'đ',

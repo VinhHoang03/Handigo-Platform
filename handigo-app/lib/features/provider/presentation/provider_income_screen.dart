@@ -234,9 +234,9 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
                         child: Row(
                           children: [
                             for (final (index, icon, label) in const [
-                              (0, Symbols.trending_up, 'Thu nhập'),
-                              (1, Symbols.account_balance_wallet, 'Ví'),
-                              (2, Symbols.military_tech, 'Tiền thưởng'),
+                              (0, null, 'Thu nhập'),
+                              (1, null, 'Ví'),
+                              (2, null, 'Tiền thưởng'),
                             ])
                               Expanded(
                                 child: _IncomeTabItem(
@@ -311,12 +311,12 @@ class _ProviderIncomeScreenState extends ConsumerState<ProviderIncomeScreen>
 /// Một ô trong thanh chuyển tab Thu nhập / Ví / Tiền thưởng.
 class _IncomeTabItem extends StatelessWidget {
   const _IncomeTabItem({
-    required this.icon,
+    this.icon,
     required this.label,
     required this.selected,
     required this.onTap,
   });
-  final IconData icon;
+  final IconData? icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -353,12 +353,15 @@ class _IncomeTabItem extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 17, fill: selected ? 1 : 0, color: color),
-              const SizedBox(width: 5),
+              if (icon != null) ...[
+                Icon(icon, size: 17, fill: selected ? 1 : 0, color: color),
+                const SizedBox(width: 5),
+              ],
               Flexible(
                 child: Text(
                   label,
                   maxLines: 1,
+                  textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,

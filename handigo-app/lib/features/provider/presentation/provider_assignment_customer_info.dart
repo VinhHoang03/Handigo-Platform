@@ -185,7 +185,7 @@ class ProviderOrderDistance extends ConsumerWidget {
   }
 }
 
-class ProviderAssignmentCustomerInfo extends ConsumerWidget {
+class ProviderAssignmentCustomerInfo extends ConsumerStatefulWidget {
   const ProviderAssignmentCustomerInfo({
     required this.orderId,
     this.order,
@@ -199,7 +199,20 @@ class ProviderAssignmentCustomerInfo extends ConsumerWidget {
   final bool showName;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProviderAssignmentCustomerInfo> createState() =>
+      _ProviderAssignmentCustomerInfoState();
+}
+
+class _ProviderAssignmentCustomerInfoState
+    extends ConsumerState<ProviderAssignmentCustomerInfo> {
+  // Khoảng cách chỉ đo một lần; các lần cập nhật vị trí sau không đổi kết quả.
+  double? _distance;
+  bool _approximate = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final order = widget.order, assignment = widget.assignment;
+    final orderId = widget.orderId, showName = widget.showName;
     final details =
         order ??
         ref
@@ -225,15 +238,16 @@ class ProviderAssignmentCustomerInfo extends ConsumerWidget {
     );
     final destination = ref.watch(providerAssignmentDestinationProvider(query));
     final target = destination.asData?.value;
-    double? distance;
-    if (position != null && target != null) {
-      distance = Geolocator.distanceBetween(
+    if (_distance == null && position != null && target != null) {
+      _distance = Geolocator.distanceBetween(
         position.latitude,
         position.longitude,
         target.latitude,
         target.longitude,
       );
+      _approximate = target.approximate;
     }
+    final distance = _distance;
     final name = details?.customerName?.trim();
     Widget line(IconData icon, String text) => Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,7 +271,7 @@ class ProviderAssignmentCustomerInfo extends ConsumerWidget {
         if (distance != null)
           line(
             Icons.near_me_outlined,
-            '${target!.approximate ? 'Đến khu vực khách khoảng' : 'Cách bạn khoảng'} ${distance < 1000 ? '${distance.round()} m' : '${NumberFormat('0.0', 'vi_VN').format(distance / 1000)} km'}${target.approximate ? ' (ước tính theo địa chỉ)' : ''}',
+            '${_approximate ? 'Đến khu vực khách khoảng' : 'Cách bạn khoảng'} ${distance < 1000 ? '${distance.round()} m' : '${NumberFormat('0.0', 'vi_VN').format(distance / 1000)} km'}${_approximate ? ' (ước tính theo địa chỉ)' : ''}',
           ),
       ],
     );

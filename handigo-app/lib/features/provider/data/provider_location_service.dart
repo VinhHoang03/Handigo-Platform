@@ -12,6 +12,7 @@ class ProviderLocationService extends ChangeNotifier {
     : _now = now ?? DateTime.now;
   final ApiClient _api;
   final DateTime Function() _now;
+
   /// Chu kỳ gửi vị trí tự động lên hệ thống khi thợ bật nhận việc.
   static const checkInterval = Duration(minutes: 5);
 
@@ -65,6 +66,22 @@ class ProviderLocationService extends ChangeNotifier {
       accuracy: LocationAccuracy.high,
       distanceFilter: 25,
     );
+  }
+
+  /// Đã được cấp quyền khi đang dùng app nhưng chưa "Luôn cho phép" nên
+  /// vị trí có thể bị ngắt khi thợ chuyển sang app khác.
+  Future<bool> needsAlwaysPermission() async {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
+      return false;
+    }
+    try {
+      return await Geolocator.checkPermission() ==
+          LocationPermission.whileInUse;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> synchronize({

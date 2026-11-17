@@ -37,15 +37,13 @@ void main() {
       );
       await tester.tap(find.text('Mở'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
       expect(find.text('Không thể đến địa chỉ khách hàng'), findsNothing);
-      await tester.tap(find.text('Khách hàng không đồng ý báo giá').last);
+      await tester.tap(find.text('Khách hàng không đồng ý báo giá'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Tiếp tục hủy đơn'));
       await tester.pumpAndSettle();
       expect(result, isNull);
-      await tester.tap(find.text('Xác nhận hủy'));
+      await tester.tap(find.text('Hủy đơn'));
       await tester.pumpAndSettle();
       expect(result, 'Khách hàng không đồng ý báo giá');
       expect(tester.takeException(), isNull);
@@ -92,9 +90,12 @@ void main() {
       );
       await tester.tap(find.text('Mở'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      expect(find.text('Lịch hẹn không còn phù hợp').last, findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Lịch hẹn không còn phù hợp'),
+        100,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Lịch hẹn không còn phù hợp'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

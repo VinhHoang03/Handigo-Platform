@@ -290,7 +290,7 @@ void main() {
         ),
       ];
       await h.show(tester, scale: 2);
-      expect(find.text('Khách hàng: Nguyễn An'), findsOneWidget);
+      expect(find.textContaining('Khách hàng:'), findsNothing);
       // Không đo được khoảng cách thì ẩn dòng khoảng cách.
       expect(find.textContaining('Cách bạn'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -321,7 +321,7 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(find.text('Vệ sinh máy lạnh 1'), findsOneWidget);
       expect(find.text('Mã đơn: HD-1', findRichText: true), findsOneWidget);
-      expect(find.textContaining('Giá trị đơn hàng: 200.000'), findsOneWidget);
+      expect(find.textContaining('Giá trị đơn hàng'), findsNothing);
       expect(find.text('Còn 01:00'), findsOneWidget);
       expect(find.text('Bạn có đơn hàng mới'), findsOneWidget);
       expect(find.text('Thời gian thực hiện: Bây giờ'), findsOneWidget);
