@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../orders/domain/order_summary.dart';
+import '../../orders/presentation/order_cancel_sheet.dart';
 
 class ProviderCancelOrderDialog extends StatefulWidget {
   const ProviderCancelOrderDialog({required this.order, super.key});
@@ -34,6 +35,8 @@ class _ProviderCancelOrderDialogState extends State<ProviderCancelOrderDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
     title: Text(_confirming ? 'Xác nhận hủy đơn?' : 'Hủy đơn dịch vụ'),
     content: SingleChildScrollView(
       child: _confirming
@@ -42,12 +45,16 @@ class _ProviderCancelOrderDialogState extends State<ProviderCancelOrderDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Bạn có chắc chắn muốn hủy nhận đơn này? Lý do hủy sẽ được lưu và thông báo cho khách hàng.',
+                  'Bạn xác nhận hủy nhận đơn dịch vụ này? Lý do hủy sẽ được lưu và thông báo cho khách hàng.',
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Lý do đã chọn',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                Text(
+                  'LÝ DO ĐÃ CHỌN',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(_fullReason),
@@ -58,31 +65,57 @@ class _ProviderCancelOrderDialogState extends State<ProviderCancelOrderDialog> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: _reason,
-                    isExpanded: true,
-                    itemHeight: null,
-                    decoration: const InputDecoration(labelText: 'Lý do hủy'),
-                    hint: const Text('Chọn lý do'),
-                    items: [
-                      for (final reason in _reasons)
-                        DropdownMenuItem(value: reason, child: Text(reason)),
-                    ],
-                    onChanged: (value) => setState(() => _reason = value),
-                    validator: (value) =>
-                        value == null ? 'Vui lòng chọn lý do hủy đơn.' : null,
+                  Text(
+                    'Lý do hủy sẽ được lưu cùng đơn hàng và thông báo cho khách hàng.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  FormField<String>(
+                    validator: (_) =>
+                        _reason == null ? 'Vui lòng chọn lý do hủy đơn.' : null,
+                    builder: (field) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final reason in _reasons)
+                          CancelReasonTile(
+                            label: reason,
+                            selected: _reason == reason,
+                            enabled: true,
+                            onTap: () {
+                              setState(() => _reason = reason);
+                              field.didChange(reason);
+                            },
+                          ),
+                        if (field.hasError)
+                          Text(
+                            field.errorText!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     initialValue: _explanation,
                     onChanged: (value) => _explanation = value.trim(),
-                    minLines: 2,
-                    maxLines: 4,
+                    minLines: 3,
+                    maxLines: 5,
                     maxLength: 500 - (_reason?.length ?? 0) - 2,
                     decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
                       labelText: _reason == 'Lý do khác'
-                          ? 'Nội dung lý do khác'
-                          : 'Giải thích thêm (không bắt buộc)',
+                          ? 'Giải thích thêm *'
+                          : 'Giải thích thêm',
+                      hintText: _reason == 'Lý do khác'
+                          ? 'Mô tả cụ thể lý do hủy (ít nhất 10 ký tự)...'
+                          : 'Bổ sung thông tin để khách hàng hiểu rõ hơn (không bắt buộc)...',
+                      alignLabelWithHint: true,
                     ),
                     validator: (value) {
                       final text = value?.trim() ?? '';
@@ -127,7 +160,7 @@ class _ProviderCancelOrderDialogState extends State<ProviderCancelOrderDialog> {
             setState(() => _confirming = true);
           }
         },
-        child: Text(_confirming ? 'Xác nhận hủy' : 'Tiếp tục hủy đơn'),
+        child: Text(_confirming ? 'Hủy đơn' : 'Tiếp tục hủy đơn'),
       ),
     ],
   );

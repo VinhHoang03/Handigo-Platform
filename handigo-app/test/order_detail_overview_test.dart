@@ -514,16 +514,17 @@ void main() {
   });
 
   for (final status in ['created', 'in_progress', 'cancelled']) {
-    testWidgets('Menu tác vụ $status chỉ cho hủy khi được phép', (
+    testWidgets('Nút hủy $status chỉ hiện khi được phép, menu chỉ có báo cáo', (
       tester,
     ) async {
       await _show(tester, () => _order(status));
-      await tester.tap(find.byIcon(Icons.more_vert));
-      await tester.pumpAndSettle();
       expect(
-        find.text('Hủy đơn'),
+        find.text('Hủy yêu cầu'),
         status == 'created' ? findsOneWidget : findsNothing,
       );
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      expect(find.text('Hủy đơn'), findsNothing);
       expect(find.text('Báo cáo đơn hàng'), findsOneWidget);
       await tester.tap(find.text('Báo cáo đơn hàng'));
       await tester.pumpAndSettle();

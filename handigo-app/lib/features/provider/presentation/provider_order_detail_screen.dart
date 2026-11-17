@@ -1,4 +1,5 @@
 import '../../../app/providers/app_providers.dart';
+import 'package:go_router/go_router.dart';
 import 'slide_to_start_order.dart';
 import 'provider_cancel_order_dialog.dart';
 import 'provider_no_show_screen.dart';
@@ -112,13 +113,6 @@ class _ProviderOrderDetailScreenState
                   icon: Icons.flag_outlined,
                   label: 'Báo cáo đơn',
                 ),
-              if (order != null)
-                _orderMenuItem(
-                  value: 'cancel',
-                  icon: Icons.cancel_outlined,
-                  label: 'Hủy đơn',
-                  enabled: _canCancel(order),
-                ),
             ],
             onSelected: (action) {
               final current = ref
@@ -129,8 +123,6 @@ class _ProviderOrderDetailScreenState
                 _reloadOrder();
               } else if (current != null && action == 'report') {
                 showOrderReport(context, current);
-              } else if (current?.status == 'accepted' && action == 'cancel') {
-                _cancelOrder(current!);
               }
             },
           ),
@@ -252,6 +244,24 @@ class _ProviderOrderDetailScreenState
                         _ =>
                           'Báo cáo khách không có mặt đã được ghi nhận. Vui lòng tải lại để xem kết quả.',
                       }),
+              ),
+            ],
+            if (order.status == 'accepted' &&
+                order.currentQuotationId == null &&
+                quotationLoaded &&
+                quotation == null) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: scheme.error,
+                  side: BorderSide(color: scheme.error.withValues(alpha: 0.3)),
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: busy || !_canCancel(order)
+                    ? null
+                    : () => _cancelOrder(order),
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text('Hủy đơn dịch vụ'),
               ),
             ],
             const SizedBox(height: 12),
@@ -988,8 +998,13 @@ class _ProviderOrderDetailScreenState
       context,
       ref,
       () => ref.read(orderRepositoryProvider).cancel(order.id, reason),
-      'Đã hủy nhận đơn.',
+      'Đã hủy nhận đơn dịch vụ.',
     );
+    if (!mounted) return;
+    final after = ref.read(orderDetailProvider(orderId)).asData?.value;
+    if (after?.status == 'cancelled') {
+      GoRouter.maybeOf(context)?.go('/provider/orders');
+    }
   }
 }
 

@@ -1420,18 +1420,23 @@ Future<void> main() async {
     },
   );
 
-  testWidgets('Menu chi tiết provider có tải lại, báo cáo và hủy đơn', (
+  testWidgets('Menu chi tiết provider có tải lại và báo cáo, nút hủy hiện riêng', (
     tester,
   ) async {
     await _showScreen(
       tester,
       const ProviderOrderDetailScreen(orderId: 'detail'),
+      status: 'accepted',
+    );
+    expect(
+      find.text('Hủy đơn dịch vụ', skipOffstage: false),
+      findsOneWidget,
     );
     await tester.tap(find.byIcon(Icons.more_vert));
     await tester.pumpAndSettle();
     expect(find.text('Tải lại đơn'), findsOneWidget);
     expect(find.text('Báo cáo đơn'), findsOneWidget);
-    expect(find.text('Hủy đơn'), findsOneWidget);
+    expect(find.text('Hủy đơn'), findsNothing);
     await tester.tap(find.text('Báo cáo đơn'));
     await tester.pumpAndSettle();
     expect(find.text('Báo cáo vấn đề'), findsOneWidget);

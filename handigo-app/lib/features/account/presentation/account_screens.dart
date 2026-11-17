@@ -13,6 +13,8 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/app_feedback.dart';
+import '../../service_catalog/presentation/add_booking_address_sheet.dart';
 import '../../../shared/widgets/account_overview_widgets.dart';
 import '../../../shared/widgets/customer_page_header.dart';
 import '../../home/presentation/device_location_provider.dart';
@@ -616,7 +618,7 @@ class AddressScreen extends ConsumerWidget {
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                         children: [
                           _AddAddressCard(
-                            onTap: () => _addressForm(context, ref),
+                            onTap: () => _addAddressFromMap(context, ref, items),
                           ),
                           const SizedBox(height: 24),
                           const _AddressSectionLabel('Vị trí hiện tại'),
@@ -650,7 +652,8 @@ class AddressScreen extends ConsumerWidget {
                           const SizedBox(height: 12),
                           if (items.isEmpty)
                             _EmptyAddress(
-                              onAdd: () => _addressForm(context, ref),
+                              onAdd: () =>
+                                  _addAddressFromMap(context, ref, items),
                             )
                           else
                             ...items.asMap().entries.expand(
@@ -706,6 +709,70 @@ Future<void> _determineLocation(BuildContext context, WidgetRef ref) async {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(location.label)));
+}
+
+// Thêm địa chỉ bằng cách ghim trên bản đồ, dùng chung sheet với luồng đặt đơn.
+Future<void> _addAddressFromMap(
+  BuildContext context,
+  WidgetRef ref,
+  List<AddressItem> items,
+) async {
+  final result = await showModalBottomSheet<Map<String, String>>(
+    useRootNavigator: true,
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: false,
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    builder: (_) => const AddBookingAddressSheet(),
+  );
+  if (result == null || !context.mounted) return;
+  try {
+    // Lấy người nhận từ địa chỉ mặc định, nếu thiếu thì lấy từ hồ sơ.
+    final contact =
+        items.where((item) => item.isDefault).firstOrNull ?? items.firstOrNull;
+    var name = contact?.recipientName.trim() ?? '';
+    var phone = contact?.recipientPhone.trim() ?? '';
+    if (name.isEmpty || phone.isEmpty) {
+      final profile = await ref.read(accountProfileProvider.future);
+      if (name.isEmpty) name = '${profile['fullName'] ?? ''}'.trim();
+      if (phone.isEmpty) phone = '${profile['phone'] ?? ''}'.trim();
+    }
+    if (name.isEmpty || phone.isEmpty) {
+      throw const ApiException(
+        'Vui lòng cập nhật họ tên và số điện thoại trong tài khoản trước khi thêm địa chỉ.',
+      );
+    }
+    final latitude = double.tryParse(result['latitude'] ?? '');
+    final longitude = double.tryParse(result['longitude'] ?? '');
+    await ref.read(accountRepositoryProvider).createAddress({
+      'recipientName': name,
+      'recipientPhone': phone,
+      'fullAddress': result['fullAddress']!,
+      'province': result['province']!,
+      'ward': result['ward']!,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
+    });
+    ref.invalidate(accountAddressesProvider);
+    if (context.mounted) {
+      AppToast.show(context, 'Đã thêm địa chỉ.', type: AppToastType.success);
+    }
+  } catch (error) {
+    if (context.mounted) {
+      AppToast.show(
+        context,
+        error is ApiException
+            ? error.message
+            : 'Không thể thêm địa chỉ. Vui lòng thử lại.',
+        type: AppToastType.error,
+      );
+    }
+  }
 }
 
 Future<void> _addressForm(

@@ -40,6 +40,7 @@ class ProviderAssignment {
     this.scheduledAt,
     this.addressLabel,
     this.responseDeadline,
+    this.assignedAt,
     this.serviceImage,
     this.orderType,
     this.totalAmount,
@@ -81,6 +82,7 @@ class ProviderAssignment {
       ward: address is Map ? address['ward'] as String? : null,
       province: address is Map ? address['province'] as String? : null,
       responseDeadline: _date(json['responseDeadline']),
+      assignedAt: _date(json['assignedAt']),
       serviceImage: service is Map<String, dynamic>
           ? (service['coverImage'] ?? service['image']) as String?
           : null,
@@ -100,6 +102,10 @@ class ProviderAssignment {
   final DateTime? scheduledAt;
   final String? addressLabel;
   final DateTime? responseDeadline;
+
+  /// Thời điểm gửi đề nghị; cùng `responseDeadline` cho biết tổng thời gian
+  /// cấu hình để thợ cân nhắc nhận đơn.
+  final DateTime? assignedAt;
   final String? serviceImage;
   final String? orderType;
   final double? totalAmount;

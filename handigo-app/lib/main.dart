@@ -30,9 +30,25 @@ class HandigoApp extends ConsumerWidget {
       locale: const Locale('vi', 'VN'),
       supportedLocales: const [Locale('vi', 'VN'), Locale('en', 'US')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      builder: (context, child) => ProviderLocationGate(
-        child: ProviderAssignmentGate(child: child ?? const SizedBox.shrink()),
-      ),
+      builder: (context, child) {
+        // Thanh điều hướng được ẩn nên khi bàn phím mở, vùng đệm đáy cũ sẽ
+        // cộng thêm vào SafeArea và tạo khoảng trắng lớn phía trên bàn phím.
+        final media = MediaQuery.of(context);
+        final keyboardOpen = media.viewInsets.bottom > 0;
+        return MediaQuery(
+          data: keyboardOpen
+              ? media.copyWith(
+                  padding: media.padding.copyWith(bottom: 0),
+                  viewPadding: media.viewPadding.copyWith(bottom: 0),
+                )
+              : media,
+          child: ProviderLocationGate(
+            child: ProviderAssignmentGate(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -478,7 +478,13 @@ class OrderDetail {
               ['not_required', 'awaiting_payment'].contains(bookingStatus) &&
               paymentMethod != 'cash' &&
               !hasAdditionalQuotation));
+  /// Điều kiện hiển thị thao tác hủy, đồng bộ với web (`BookingRefundPanel`).
+  bool get showsCancelActions =>
+      ['created', 'accepted'].contains(status) &&
+      !hasArrived &&
+      reassignment['status'] != 'awaiting_customer';
   bool canCancelAt(DateTime now) {
+    if (status == 'in_progress' || hasArrived) return false;
     if (status == 'created') return true;
     if (status != 'accepted') return false;
     return customerCancellationDeadline != null &&
@@ -516,19 +522,43 @@ class CancellationPreview {
     this.canCancel = true,
     this.providerCompensation = 0,
     this.items = const [],
+    this.scope = 'single',
+    this.orderCount = 1,
   });
-  factory CancellationPreview.fromJson(Map<String, dynamic> json) =>
-      CancellationPreview(
-        paidAmount: _number(json['paidAmount']),
-        refundAmount: _number(json['refundAmount']),
-        cancellationFee: _number(json['cancellationFee']),
-        policyReason: json['policyReason'] as String?,
-        canCancel: json['canCancel'] as bool? ?? false,
-        providerCompensation: _number(json['providerCompensation']),
-        items: (json['items'] as List? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .toList(),
-      );
+  factory CancellationPreview.fromJson(Map<String, dynamic> json) {
+    final items = (json['items'] as List? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    return CancellationPreview(
+      paidAmount: _number(json['paidAmount']),
+      refundAmount: _number(json['refundAmount']),
+      cancellationFee: _number(json['cancellationFee']),
+      policyReason:
+          json['policyReason'] as String? ??
+          (items.isEmpty ? null : items.first['policyReason'] as String?),
+      canCancel: json['canCancel'] as bool? ?? false,
+      providerCompensation: _number(json['providerCompensation']),
+      items: items,
+      scope: json['scope'] as String? ?? 'single',
+      orderCount: (json['orderCount'] as num?)?.toInt() ?? 1,
+    );
+  }
+  final String scope;
+  final int orderCount;
+  bool get isSeries => scope == 'series';
+
+  /// Tỷ lệ hoàn của đơn lẻ; null khi preview có nhiều buổi.
+  num? get singleRefundRate => items.length == 1
+      ? items.first['refundRate'] as num?
+      : null;
+
+  /// Lý do của buổi đầu tiên không thể hủy (dùng cho chuỗi lịch).
+  String? get blockedReason {
+    for (final item in items) {
+      if (item['canCancel'] == false) return item['policyReason'] as String?;
+    }
+    return policyReason;
+  }
   final double paidAmount;
   final double refundAmount;
   final double cancellationFee;

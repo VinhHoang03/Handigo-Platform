@@ -316,57 +316,46 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
                             Text(
                               'Còn ${_countdown(item.responseDeadline!, _now)}',
                               style: TextStyle(
-                                fontSize: 13,
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 18,
+                                color: assignmentCountdownColor(
+                                  Theme.of(context).colorScheme,
+                                  item,
+                                  _now,
+                                ),
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text.rich(
-                          TextSpan(
-                            text: 'Mã đơn: ',
-                            children: [
-                              TextSpan(
-                                text: item.orderCode,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
+                        _infoLine(
+                          Icons.tag_rounded,
+                          'Mã đơn: ${item.orderCode}',
+                          bold: true,
                         ),
                         const SizedBox(height: 8),
-                        ProviderAssignmentCustomerInfo(
-                          orderId: item.orderId,
-                          assignment: item,
+                        _infoLine(
+                          Icons.schedule_outlined,
+                          item.orderType == 'immediate' ||
+                                  item.scheduledAt == null
+                              ? 'Thời gian thực hiện: Bây giờ'
+                              : 'Thời gian thực hiện: ${DateFormat('HH:mm dd/MM/yyyy').format(item.scheduledAt!.toLocal())}',
                         ),
-                        if (item.serviceType == 'fixed_price') ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Giá trị đơn hàng: ${amountLabel ?? 'Chưa có thông tin giá'}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ],
                         if ((_fullAddress ?? item.addressLabel)?.isNotEmpty ==
                             true) ...[
                           const SizedBox(height: 8),
-                          Text(
+                          _infoLine(
+                            Icons.location_on_outlined,
                             formatAssignmentAddress(
                               _fullAddress ?? item.addressLabel!,
                             ),
                           ),
                         ],
                         const SizedBox(height: 8),
-                        Text(
-                          item.orderType == 'immediate' ||
-                                  item.scheduledAt == null
-                              ? 'Thời gian thực hiện: Bây giờ'
-                              : 'Thời gian thực hiện: ${DateFormat('HH:mm dd/MM/yyyy').format(item.scheduledAt!.toLocal())}',
+                        ProviderAssignmentCustomerInfo(
+                          orderId: item.orderId,
+                          assignment: item,
+                          showName: false,
                         ),
                         if (_error != null) ...[
                           const SizedBox(height: 12),
@@ -466,6 +455,45 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
       ],
     );
   }
+}
+
+Widget _infoLine(IconData icon, String text, {bool bold = false}) => Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Icon(icon, size: 20),
+    const SizedBox(width: 8),
+    Expanded(
+      child: Text(
+        text,
+        style: bold ? const TextStyle(fontWeight: FontWeight.w600) : null,
+      ),
+    ),
+  ],
+);
+
+const _defaultAssignmentWindow = Duration(seconds: 60);
+const _assignmentWarningColor = Color(0xFFE0A100);
+
+/// Màu đếm ngược theo tỷ lệ thời gian cấu hình: còn ≤ 1/2 thì vàng, ≤ 1/3 thì đỏ.
+@visibleForTesting
+Color assignmentCountdownColor(
+  ColorScheme scheme,
+  ProviderAssignment item,
+  DateTime now,
+) {
+  final deadline = item.responseDeadline;
+  if (deadline == null) return scheme.primary;
+  final remaining = deadline.difference(now);
+  final assignedAt = item.assignedAt;
+  var total = assignedAt == null
+      ? _defaultAssignmentWindow
+      : deadline.difference(assignedAt);
+  // Đồng hồ máy lệch hoặc dữ liệu thiếu thì dùng giá trị mặc định/còn lại.
+  if (total <= Duration.zero) total = _defaultAssignmentWindow;
+  if (remaining > total) total = remaining;
+  if (remaining * 3 <= total) return scheme.error;
+  if (remaining * 2 <= total) return _assignmentWarningColor;
+  return scheme.primary;
 }
 
 String _countdown(DateTime deadline, DateTime now) {

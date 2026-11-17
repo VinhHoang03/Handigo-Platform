@@ -175,10 +175,8 @@ void main() {
       expect(find.text('Cách bạn khoảng 1,1 km'), findsOneWidget);
       tracker.move(10.005);
       await tester.pumpAndSettle();
-      expect(
-        find.textContaining(RegExp(r'Cách bạn khoảng 55[0-9] m')),
-        findsOneWidget,
-      );
+      // Khoảng cách chỉ đo một lần, không đổi khi thợ di chuyển tiếp.
+      expect(find.text('Cách bạn khoảng 1,1 km'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
