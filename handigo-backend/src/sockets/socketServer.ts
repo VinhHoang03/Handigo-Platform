@@ -1,6 +1,7 @@
 import type { Server } from "socket.io";
 import { Conversation } from "../models/conversation.model";
 import { Provider } from "../models/provider.model";
+import { Order } from "../models/order.model";
 import { createLogger } from "../utils/logger";
 
 let socketServer: Server | null = null;
@@ -26,11 +27,29 @@ export const getOnlineUserIds = async (): Promise<string[] | null> => {
 
 export const emitToUser = (userId: string, event: string, payload: unknown) => {
   socketServer?.to(`user:${userId}`).emit(event, payload);
+  if (event === "provider:availability") publishProviderDiscoveryChanged();
+};
+
+// Chỉ báo dữ liệu đã đổi; khách phải gọi lại API có kiểm tra điều kiện nhận việc.
+export const publishProviderDiscoveryChanged = () => {
+  socketServer?.to("provider-discovery").emit("providers:changed", {});
+};
+
+export const publishProviderLocationChanged = async (userId: string) => {
+  if (!socketServer) return;
+  const provider = await Provider.findOne({ userId, verified: true, isDeleted: false }).select("_id").lean();
+  if (!provider) return;
+  publishProviderDiscoveryChanged();
+  const orders = await Order.find({ providerId: provider._id, status: { $in: ["accepted", "in_progress"] }, isDeleted: false })
+    .select("_id customerId").lean();
+  for (const order of orders) {
+    emitToUser(String(order.customerId), "order:location", { orderId: String(order._id) });
+  }
 };
 
 export const emitToConversation = (conversationId: string, event: string, payload: unknown) => {
   if (!socketServer) return;
-  // Chat thuộc cặp khách–thợ, không đổi người nhận khi đơn được giao cho thợ khác.
+  // Chat giữ đúng khách và thợ của cuộc trò chuyện, không phát lịch sử cho thợ được giao lại.
   void (async () => {
     const conversation = await Conversation.findOne({ _id: conversationId, isDeleted: false }).select("customerId providerId").lean();
     if (!conversation) return;

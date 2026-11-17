@@ -1011,11 +1011,12 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 12),
               ),
-            if (location?.isLoading != true &&
-                locationFailed &&
-                _lastAddress == null)
+            if (location?.isLoading != true && locationFailed)
               Text(
-                'Chưa lấy được vị trí hiện tại.',
+                trackingError?.message ??
+                    (location?.error is ApiException
+                        ? (location!.error as ApiException).message
+                        : 'Chưa cập nhật được vị trí. Hệ thống sẽ thử lại.'),
                 style: TextStyle(
                   fontSize: 13,
                   color: Theme.of(context).colorScheme.error,

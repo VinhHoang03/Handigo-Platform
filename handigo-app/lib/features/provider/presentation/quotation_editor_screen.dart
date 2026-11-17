@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/widgets/app_feedback.dart';
 import '../../../core/network/api_exception.dart';
 import '../../orders/domain/order_summary.dart';
 import 'provider_screens.dart';
@@ -31,30 +33,33 @@ class QuotationEditorScreen extends ConsumerStatefulWidget {
 
 class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
   final form = GlobalKey<FormState>();
+  late final _initialQuotation = widget.quotation;
   late final note = TextEditingController(
-    text: widget.quotation?.inspectionNote,
+    text: _initialQuotation?.inspectionNote,
   );
   late final recommendation = TextEditingController(
-    text: widget.quotation?.recommendation,
+    text: _initialQuotation?.recommendation,
   );
   late final duration = TextEditingController(
     text:
-        '${widget.quotation?.estimatedDurationMinutes ?? widget.order.durationMinutes ?? 60}',
+        '${_initialQuotation?.estimatedDurationMinutes ?? widget.order.durationMinutes ?? 60}',
   );
   late final discount = TextEditingController(
-    text: '${widget.quotation?.discountAmount ?? 0}',
+    text: '${_initialQuotation?.discountAmount ?? 0}',
   );
   late final List<_ItemDraft> items =
-      widget.quotation?.items.map(_ItemDraft.fromItem).toList() ?? [];
+      _initialQuotation?.items.map(_ItemDraft.fromItem).toList() ?? [];
   bool busy = false;
   int _revision = 0;
   String? error;
+  bool _messageIsError = true;
 
   Future<void> scan() async {
     if (busy) return;
     setState(() {
       busy = true;
       error = null;
+      _messageIsError = true;
     });
     widget.onBusyChanged?.call(true);
     try {
@@ -73,6 +78,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
         }
         items.addAll(scanned.take(100 - items.length).map(_ItemDraft.fromItem));
         _revision++;
+        _messageIsError = false;
         error =
             'Đã đọc ảnh. Vui lòng kiểm tra từng hạng mục và đơn giá trước khi lưu.';
       });
@@ -105,6 +111,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
 
   Future<void> save() async {
     if (busy || !form.currentState!.validate()) return;
+    _messageIsError = true;
     if (items.isEmpty) {
       setState(() => error = 'Vui lòng thêm ít nhất một hạng mục báo giá.');
       return;
@@ -157,7 +164,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
           'inspectionNote': note.text.trim(),
           'recommendation': recommendation.text.trim(),
         },
-        current: widget.quotation,
+        current: _initialQuotation,
       );
       if (!mounted) return;
       if (widget.embedded) {
@@ -193,6 +200,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
     setState(() {
       busy = true;
       error = null;
+      _messageIsError = true;
     });
     widget.onBusyChanged?.call(true);
     final revision = _revision;
@@ -275,6 +283,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
           recommendation.text = reply['recommendation'] as String;
         }
         _revision++;
+        _messageIsError = false;
         error = [
           reply['message'] ?? 'Đã điền vào báo giá.',
           ...?reply['warnings'] as List?,
@@ -300,7 +309,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
   }
 
   Future<void> _editItem([int? index]) async {
-    if (busy) return;
+    if (busy || (index == null && items.length >= 100)) return;
     final source = index == null ? null : items[index];
     final draft = source == null
         ? _ItemDraft()
@@ -311,18 +320,17 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
             type: source.type,
             original: source.original,
           );
+    final drafts = [draft];
+    final itemCount = TextEditingController(text: '1');
+    var visibleCount = 1;
+    final maximumCount = 100 - items.length;
     final key = GlobalKey<FormState>();
-    final accepted = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
+    final accepted = await AppBottomSheet.show<bool>(
+      context,
       builder: (context) => StatefulBuilder(
         builder: (context, update) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            16,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + 20,
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
           ),
           child: SingleChildScrollView(
             child: Form(
@@ -331,59 +339,97 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          index == null
+                              ? 'Thêm hạng mục báo giá'
+                              : 'Chỉnh sửa hạng mục',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Đóng form hạng mục',
+                        onPressed: () => Navigator.pop(context, false),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     index == null
-                        ? 'Thêm hạng mục báo giá'
-                        : 'Chỉnh sửa hạng mục',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: draft.title,
-                    maxLength: 200,
-                    decoration: const InputDecoration(
-                      labelText: 'Tên hạng mục',
+                        ? 'Chọn số hạng mục, rồi nhập thông tin cho từng phần.'
+                        : 'Nhập thông tin và số lượng để tính thành tiền.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Nhập tên hạng mục.'
-                        : null,
                   ),
-                  DropdownButtonFormField<String>(
-                    initialValue: draft.type,
-                    decoration: const InputDecoration(
-                      labelText: 'Loại hạng mục',
-                    ),
-                    items: [
-                      for (final entry in _types.entries)
-                        DropdownMenuItem(
-                          value: entry.key,
-                          child: Text(entry.value),
+                  const SizedBox(height: 20),
+                  if (index == null) ...[
+                    TextFormField(
+                      controller: itemCount,
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(3),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: 'Số hạng mục báo giá',
+                        helperText:
+                            'Có thể thêm tối đa $maximumCount hạng mục.',
+                        prefixIcon: const Icon(
+                          Icons.format_list_numbered_rounded,
                         ),
+                      ),
+                      validator: (value) => _integer(value, 1, maximumCount),
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (value) {
+                        final count = int.tryParse(value);
+                        if (count == null ||
+                            count < 1 ||
+                            count > maximumCount) {
+                          return;
+                        }
+                        update(() {
+                          while (drafts.length < count) {
+                            drafts.add(_ItemDraft());
+                          }
+                          visibleCount = count;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                  for (var i = 0; i < visibleCount; i++) ...[
+                    if (index == null) ...[
+                      Text(
+                        'Hạng mục ${i + 1}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
                     ],
-                    onChanged: (value) => update(() => draft.type = value!),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: draft.quantity,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Số lượng'),
-                    validator: (value) => _integer(value, 1, 1000),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: draft.price,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Đơn giá (đ)'),
-                    validator: _amount,
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
+                    KeyedSubtree(
+                      key: ObjectKey(drafts[i]),
+                      child: _itemFields(drafts[i], update),
+                    ),
+                    if (i < visibleCount - 1) ...[const Divider(height: 32)],
+                  ],
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
                     onPressed: () {
                       if (key.currentState!.validate()) {
                         Navigator.pop(context, true);
                       }
                     },
-                    child: const Text('Xác nhận hạng mục'),
+                    icon: const Icon(Icons.check_rounded),
+                    label: Text(
+                      visibleCount == 1
+                          ? 'Xác nhận hạng mục'
+                          : 'Xác nhận $visibleCount hạng mục',
+                    ),
                   ),
                 ],
               ),
@@ -394,13 +440,19 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
     );
     // Chờ sheet kết thúc hiệu ứng đóng trước khi giải phóng các ô nhập.
     await Future<void>.delayed(const Duration(milliseconds: 300));
+    itemCount.dispose();
     if (!mounted || accepted != true) {
-      draft.dispose();
+      for (final entry in drafts) {
+        entry.dispose();
+      }
       return;
+    }
+    for (final entry in drafts.skip(visibleCount)) {
+      entry.dispose();
     }
     setState(() {
       if (index == null) {
-        items.add(draft);
+        items.addAll(drafts.take(visibleCount));
       } else {
         items[index] = draft;
         source!.dispose();
@@ -408,6 +460,137 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
       _revision++;
     });
   }
+
+  Widget _itemFields(_ItemDraft draft, StateSetter update) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      TextFormField(
+        controller: draft.title,
+        maxLength: 200,
+        textCapitalization: TextCapitalization.sentences,
+        textInputAction: TextInputAction.next,
+        decoration: const InputDecoration(
+          labelText: 'Tên hạng mục',
+          hintText: 'Ví dụ: Thay tụ điện',
+          prefixIcon: Icon(Icons.edit_note_rounded),
+        ),
+        validator: (value) =>
+            value == null || value.trim().isEmpty ? 'Nhập tên hạng mục.' : null,
+      ),
+      DropdownButtonFormField<String>(
+        initialValue: draft.type,
+        decoration: const InputDecoration(
+          labelText: 'Loại hạng mục',
+          prefixIcon: Icon(Icons.category_outlined),
+        ),
+        items: [
+          for (final entry in _types.entries)
+            DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+        ],
+        onChanged: (value) => update(() => draft.type = value!),
+      ),
+      const SizedBox(height: 16),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: IconButton.filledTonal(
+              tooltip: 'Giảm số lượng',
+              style: IconButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: (int.tryParse(draft.quantity.text) ?? 1) <= 1
+                  ? null
+                  : () => update(() {
+                      draft.quantity.text =
+                          '${(int.parse(draft.quantity.text) - 1).clamp(1, 1000)}';
+                    }),
+              icon: const Icon(Icons.remove_rounded),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextFormField(
+              controller: draft.quantity,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              textAlign: TextAlign.center,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(4),
+              ],
+              decoration: const InputDecoration(labelText: 'Số lượng'),
+              onChanged: (_) => update(() {}),
+              validator: (value) => _integer(value, 1, 1000),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: IconButton.filledTonal(
+              tooltip: 'Tăng số lượng',
+              style: IconButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: (int.tryParse(draft.quantity.text) ?? 0) >= 1000
+                  ? null
+                  : () => update(() {
+                      draft.quantity.text =
+                          '${((int.tryParse(draft.quantity.text) ?? 0) + 1).clamp(1, 1000)}';
+                    }),
+              icon: const Icon(Icons.add_rounded),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        controller: draft.price,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          labelText: 'Đơn giá (đ)',
+          prefixIcon: Icon(Icons.payments_outlined),
+        ),
+        onChanged: (_) => update(() {}),
+        validator: _amount,
+      ),
+      const SizedBox(height: 16),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Thành tiền', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 4),
+            Text(
+              _integer(draft.quantity.text, 1, 1000) == null &&
+                      _amount(draft.price.text) == null
+                  ? _money(
+                      int.parse(draft.quantity.text) *
+                          double.parse(draft.price.text),
+                    )
+                  : '—',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
 
   static const _types = {
     'material': 'Vật tư',
@@ -554,7 +737,12 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
           if (error != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(error!),
+              child: Text(
+                error!,
+                style: _messageIsError
+                    ? TextStyle(color: Theme.of(context).colorScheme.error)
+                    : null,
+              ),
             ),
           for (var i = 0; i < items.length; i++) _itemCard(i),
           if (items.isEmpty)

@@ -25,6 +25,7 @@ class _Api extends ApiClient {
   String status = 'accepted', orderType = 'immediate';
   String paymentStatus = 'unpaid', paymentMethod = 'cash';
   bool rejectCash = false;
+  bool failDetail = false;
   Map<String, dynamic>? cashConfirmation;
   Map<String, dynamic>? cancellation;
   Map<String, dynamic>? rescheduleRequest;
@@ -77,6 +78,7 @@ class _Api extends ApiClient {
       return {'data': {}};
     }
     expect(path, '/orders/order');
+    if (failDetail) throw const ApiException('Lỗi mạng kiểm thử.');
     return {
       'data': {
         'id': 'order',
@@ -126,10 +128,12 @@ class _Tracker extends ProviderLocationService {
   Completer<void>? pending;
   @override
   Future<void> synchronize({
+    bool forArrival = false,
     required bool Function() shouldUpload,
     bool useCachedPosition = false,
   }) async {
     api.events.add('gps');
+    expect(forArrival, isTrue);
     if (fail) throw const ApiException('Vui lòng bật GPS.');
     await pending?.future;
     expect(shouldUpload(), isTrue);
@@ -140,6 +144,7 @@ Future<void> _show(WidgetTester tester, _Api api, _Tracker tracker) async {
   addTearDown(api.close);
   await tester.pumpWidget(
     ProviderScope(
+      retry: (_, _) => null,
       overrides: [
         apiClientProvider.overrideWithValue(api),
         authControllerProvider.overrideWith(
@@ -170,6 +175,30 @@ Future<void> _swipe(WidgetTester tester) => tester.drag(
 );
 
 void main() {
+  testWidgets('Lỗi đồng bộ tạm thời giữ chi tiết đơn gần nhất và cho thử lại', (
+    tester,
+  ) async {
+    final api = _Api();
+    await _show(tester, api, _Tracker(api));
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ProviderOrderDetailScreen)),
+    );
+    api.failDetail = true;
+    container.invalidate(orderDetailProvider('order'));
+    await expectLater(
+      container.read(orderDetailProvider('order').future),
+      throwsA(isA<ApiException>()),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Đã đến nơi'), findsOneWidget);
+    final message = find.text(
+      'Chưa đồng bộ được đơn hàng. Đang hiển thị dữ liệu gần nhất.',
+    );
+    await tester.scrollUntilVisible(message, 200);
+    expect(message, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final method in ['wallet', 'bank']) {
     testWidgets(
       'Khách trả $method sau nghiệm thu: cập nhật đơn sẽ ẩn xác nhận tiền mặt',
@@ -183,6 +212,7 @@ void main() {
           tester.element(find.byType(ProviderOrderDetailScreen)),
         );
         container.invalidate(orderDetailProvider('order'));
+        await container.read(orderDetailProvider('order').future);
         await tester.pumpAndSettle();
         expect(find.text('Xác nhận đã nhận tiền mặt'), findsNothing);
         expect(api.cashConfirmation, isNull);

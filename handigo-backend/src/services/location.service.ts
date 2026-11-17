@@ -2,6 +2,10 @@ import { Location } from "../models/location.model";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
 import type { CurrentLocationPayload } from "../validations/location.validator";
+import { publishProviderLocationChanged } from "../sockets/socketServer";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("Location");
 
 export const getCurrentLocation = async (userId: string) => {
   return Location.findOne({ userId, isActive: true, isDeleted: false })
@@ -19,7 +23,7 @@ export const updateCurrentLocation = async (
   }
 
   const ownerType = user.role === "PROVIDER" ? "provider" : "customer";
-  return Location.findOneAndUpdate(
+  const location = await Location.findOneAndUpdate(
     { userId, ownerType, isDeleted: false },
     {
       coordinates: {
@@ -36,6 +40,11 @@ export const updateCurrentLocation = async (
       setDefaultsOnInsert: true,
     },
   ).lean();
+  if (ownerType === "provider") {
+    try { await publishProviderLocationChanged(userId); }
+    catch (error) { logger.error("Đã lưu vị trí nhưng chưa phát được cập nhật trực tiếp.", error); }
+  }
+  return location;
 };
 
 export const deactivateCurrentLocation = async (userId: string) => {

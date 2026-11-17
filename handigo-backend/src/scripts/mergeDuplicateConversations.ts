@@ -14,7 +14,7 @@ const backupDirectory = resolve("backups", `chat-dedup-${new Date().toISOString(
 const groupsQuery = () => Conversation.aggregate<{
   _id: { customerId: Types.ObjectId; providerId: Types.ObjectId }; count: number;
 }>([
-  { $match: { isDeleted: false } },
+  { $match: { isDeleted: false, scope: { $ne: "order" } } },
   { $group: { _id: { customerId: "$customerId", providerId: "$providerId" }, count: { $sum: 1 } } },
   { $match: { count: { $gt: 1 } } },
 ]);
@@ -46,7 +46,7 @@ const run = async () => {
             { returnDocument: "after", session, runValidators: true },
           );
           if (!provider) return { skipped: true, archived: 0, messages: 0, reports: 0 };
-          const filter = { ...group._id, isDeleted: false };
+          const filter = { ...group._id, isDeleted: false, scope: { $ne: "order" as const } };
           const conversations = await Conversation.find(filter).sort({ createdAt: 1, _id: 1 }).session(session).lean();
           if (conversations.length < 2) return { skipped: false, archived: 0, messages: 0, reports: 0 };
           const ids = conversations.map((item) => item._id);

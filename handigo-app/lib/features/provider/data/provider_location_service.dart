@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,7 +13,10 @@ class ProviderLocationService extends ChangeNotifier {
   final DateTime Function() _now;
 
   /// Chu kỳ gửi vị trí tự động lên hệ thống khi thợ bật nhận việc.
-  static const checkInterval = Duration(minutes: 5);
+  static const checkInterval = Duration(minutes: 2);
+  static const workingCheckInterval = Duration(seconds: 15);
+  static const maximumAccuracy = 300.0;
+  static const arrivalMaximumAccuracy = 300.0;
 
   /// Thời gian thử lại khi lấy hoặc lưu vị trí lỗi.
   static const retryInterval = Duration(seconds: 30);
@@ -32,10 +34,19 @@ class ProviderLocationService extends ChangeNotifier {
   int _generation = 0;
   int? _operationGeneration;
   bool _tracking = false, _disposed = false;
+  bool _working = false;
   ApiException? error;
   bool get tracking => _tracking;
   Position? get synchronizedPosition => _anchor;
   Position? get currentPosition => _currentPosition ?? synchronizedPosition;
+  Duration get updateInterval =>
+      _working ? workingCheckInterval : checkInterval;
+
+  void setWorking(bool value) {
+    if (_working == value) return;
+    _working = value;
+    if (_tracking) unawaited(check(force: true));
+  }
 
   LocationSettings get streamSettings {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
@@ -87,7 +98,9 @@ class ProviderLocationService extends ChangeNotifier {
   Future<void> synchronize({
     required bool Function() shouldUpload,
     bool useCachedPosition = false,
+    bool forArrival = false,
   }) {
+    final accuracyLimit = forArrival ? arrivalMaximumAccuracy : maximumAccuracy;
     final generation = _generation;
     bool allowed() => !_disposed && generation == _generation && shouldUpload();
     return _run(() async {
@@ -104,8 +117,14 @@ class ProviderLocationService extends ChangeNotifier {
               age <= const Duration(seconds: 30) &&
               recent.accuracy <= 25
           ? recent
-          : await _readPosition();
-      await _accept(position, allowed, force: true, manual: true);
+          : await _readPosition(accuracyLimit: accuracyLimit);
+      await _accept(
+        position,
+        allowed,
+        force: true,
+        manual: true,
+        accuracyLimit: accuracyLimit,
+      );
     }, afterRunning: true);
   }
 
@@ -131,9 +150,9 @@ class ProviderLocationService extends ChangeNotifier {
         if (force ||
             error != null ||
             _lastSampleAt == null ||
-            _now().difference(_lastSampleAt!) >= checkInterval ||
+            _now().difference(_lastSampleAt!) >= updateInterval ||
             sentAt == null ||
-            _now().difference(sentAt) >= checkInterval) {
+            _now().difference(sentAt) >= updateInterval) {
           await _accept(await _readPosition(), allowed, force: force);
         }
       });
@@ -155,8 +174,9 @@ class ProviderLocationService extends ChangeNotifier {
   Duration _nextCheckDelay() {
     final sentAt = _lastSentAt;
     if (error != null || sentAt == null) return retryInterval;
-    final remaining = checkInterval - _now().difference(sentAt);
-    return remaining < retryInterval ? retryInterval : remaining;
+    final remaining = updateInterval - _now().difference(sentAt);
+    if (remaining <= Duration.zero) return retryInterval;
+    return remaining;
   }
 
   void _ensureStream() {
@@ -214,14 +234,36 @@ class ProviderLocationService extends ChangeNotifier {
     }
   }
 
-  Future<Position> _readPosition() async {
+  Future<Position> _readPosition({
+    double accuracyLimit = maximumAccuracy,
+  }) async {
     try {
-      return await Geolocator.getCurrentPosition(
+      final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 15),
         ),
       ).timeout(const Duration(seconds: 15));
+      if (_positionIssue(position, accuracyLimit: accuracyLimit) == null) {
+        return position;
+      }
+      // Mẫu đầu có thể chưa ổn định; chờ GPS trả mẫu mới trước khi báo lỗi.
+      try {
+        return await Geolocator.getPositionStream(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                distanceFilter: 0,
+              ),
+            )
+            .where(
+              (sample) =>
+                  _positionIssue(sample, accuracyLimit: accuracyLimit) == null,
+            )
+            .timeout(const Duration(seconds: 12))
+            .first;
+      } catch (_) {
+        return position;
+      }
     } on TimeoutException {
       throw const ApiException(
         'Lấy vị trí mất quá lâu. Vui lòng kiểm tra GPS và thử lại.',
@@ -233,22 +275,40 @@ class ProviderLocationService extends ChangeNotifier {
     }
   }
 
-  Future<void> _accept(
-    Position position,
-    bool Function() allowed, {
-    bool force = false,
-    bool manual = false,
-  }) async {
-    final age = _now().difference(position.timestamp);
+  String? _positionIssue(
+    Position position, {
+    double accuracyLimit = maximumAccuracy,
+  }) {
     if (!position.latitude.isFinite ||
         !position.longitude.isFinite ||
         position.latitude.abs() > 90 ||
         position.longitude.abs() > 180 ||
         !position.accuracy.isFinite ||
-        position.accuracy < 0 ||
-        (!manual && position.accuracy > 25) ||
-        age > const Duration(seconds: 60) ||
-        age < const Duration(seconds: -10)) {
+        position.accuracy < 0) {
+      return 'Thiết bị trả về vị trí không hợp lệ. Vui lòng kiểm tra GPS và thử lại.';
+    }
+    final age = _now().difference(position.timestamp);
+    if (age > const Duration(seconds: 60)) {
+      return 'Thiết bị đang trả về vị trí cũ. Vui lòng bật GPS và thử lại ở nơi thoáng.';
+    }
+    if (age < const Duration(seconds: -10)) {
+      return 'Thời gian vị trí không khớp với thiết bị. Vui lòng bật ngày giờ tự động rồi thử lại.';
+    }
+    if (position.accuracy > accuracyLimit) {
+      return 'GPS đang có sai số khoảng ${position.accuracy.round()} m. Vui lòng bật Vị trí chính xác cho Handigo trong cài đặt và thử lại ở nơi thoáng.';
+    }
+    return null;
+  }
+
+  Future<void> _accept(
+    Position position,
+    bool Function() allowed, {
+    bool force = false,
+    bool manual = false,
+    double accuracyLimit = maximumAccuracy,
+  }) async {
+    final issue = _positionIssue(position, accuracyLimit: accuracyLimit);
+    if (issue != null) {
       // Bỏ mẫu tự động nhiễu, giữ mốc vừa lưu; không gửi tọa độ kém chất lượng.
       final syncAge = _lastSentAt == null
           ? null
@@ -259,40 +319,28 @@ class ProviderLocationService extends ChangeNotifier {
           syncAge <= noisySampleGrace) {
         return;
       }
-      throw const ApiException(
-        'Vị trí chưa đủ chính xác hoặc đã cũ. Vui lòng ra nơi thoáng và thử lại.',
-      );
+      throw ApiException(issue);
     }
     if (!allowed() || _disposed) return;
     _currentPosition = position;
     notifyListeners();
     _lastSampleAt = _now();
     final previous = _anchor;
-    final moved =
-        manual ||
-        previous == null ||
-        previous.accuracy > 25 ||
-        Geolocator.distanceBetween(
-              previous.latitude,
-              previous.longitude,
-              position.latitude,
-              position.longitude,
-            ) >=
-            math.max(movementThreshold, previous.accuracy + position.accuracy);
     final elapsed = _lastSentAt == null
         ? checkInterval
         : _now().difference(_lastSentAt!);
     // Mốc đang lưu có sai số lớn thì cho phép thay bằng mẫu chính xác ngay.
-    final upgradesCoarseAnchor = previous != null && previous.accuracy > 25;
-    // Gửi tự động tối đa mỗi 5 phút, kể cả khi đang di chuyển, để vị trí trên hệ thống ổn định.
+    final upgradesCoarseAnchor =
+        previous != null && previous.accuracy > 25 && position.accuracy <= 25;
+    // Khi đang làm đơn, cập nhật nhanh hơn; mỗi lần gửi đều dùng mẫu GPS mới.
     if (!force &&
         (elapsed < const Duration(seconds: 5) ||
-            (!upgradesCoarseAnchor && elapsed < checkInterval))) {
+            (!upgradesCoarseAnchor && elapsed < updateInterval))) {
       _clearError();
       _scheduleCheck(_nextCheckDelay());
       return;
     }
-    final target = moved ? position : previous;
+    final target = position;
     final generation = _generation;
     try {
       await _api.request(
@@ -307,9 +355,9 @@ class ProviderLocationService extends ChangeNotifier {
       );
     }
     if (_disposed || generation != _generation || !allowed()) return;
-    if (moved) _anchor = position;
+    _anchor = position;
     _lastSentAt = _now();
-    if (moved && error == null) notifyListeners();
+    if (error == null) notifyListeners();
     _clearError();
     _scheduleCheck(_nextCheckDelay());
   }

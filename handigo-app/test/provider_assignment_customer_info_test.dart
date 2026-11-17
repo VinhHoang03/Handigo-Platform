@@ -23,6 +23,7 @@ class _Tracker extends ProviderLocationService {
   int reads = 0;
   @override
   Future<void> synchronize({
+    bool forArrival = false,
     required bool Function() shouldUpload,
     bool useCachedPosition = false,
   }) async {

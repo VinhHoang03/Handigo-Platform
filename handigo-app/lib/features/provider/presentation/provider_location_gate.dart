@@ -60,6 +60,7 @@ class _ProviderLocationGateState
       if (data == null) return;
       // Đang thực hiện đơn (busy) vẫn phải gửi vị trí để khách theo dõi thợ.
       _online = const ['online', 'busy'].contains(data.availabilityStatus);
+      _service.setWorking(data.availabilityStatus == 'busy');
       if (_online && _foreground) {
         _service.start(shouldUpload: _canUpload);
         unawaited(_refreshAlwaysPrompt());
