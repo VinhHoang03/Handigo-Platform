@@ -308,6 +308,11 @@ void main() {
       await tester.tap(accept);
       await tester.pumpAndSettle();
       expect(api.events, ['reschedule:accept']);
+      // Nút hủy đơn làm danh sách dài hơn nên cuộn ngược lên để thấy kết quả.
+      await tester.scrollUntilVisible(
+        find.text('Lịch hẹn đã được cập nhật.'),
+        -120,
+      );
       expect(find.text('Lịch hẹn đã được cập nhật.'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
@@ -344,7 +349,10 @@ void main() {
         await _show(tester, api, tracker);
         expect(find.text('Trượt để bắt đầu xử lý'), findsNothing);
         expect(find.text('Đã đến nơi'), findsOneWidget);
-        expect(find.text('Hủy đơn dịch vụ'), findsNothing);
+        expect(
+          find.text('Hủy đơn dịch vụ', skipOffstage: false),
+          findsOneWidget,
+        );
         await _swipe(tester);
         await tester.pump();
         expect(api.events, ['gps']);
@@ -416,18 +424,17 @@ void main() {
   ) async {
     final api = _Api();
     await _show(tester, api, _Tracker(api));
-    expect(find.text('Hủy đơn dịch vụ'), findsNothing);
-    await tester.tap(find.byTooltip('Tác vụ đơn hàng'));
+    final cancelButton = find.text('Hủy đơn dịch vụ', skipOffstage: false);
+    expect(cancelButton, findsOneWidget);
+    await tester.ensureVisible(cancelButton);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Hủy đơn'));
+    await tester.tap(cancelButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Tiếp tục hủy đơn'));
     await tester.pumpAndSettle();
     expect(find.text('Vui lòng chọn lý do hủy đơn.'), findsOneWidget);
     expect(api.cancellation, isNull);
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Không thể đến địa chỉ khách hàng').last);
+    await tester.tap(find.text('Không thể đến địa chỉ khách hàng'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Tiếp tục hủy đơn'));
     await tester.pumpAndSettle();
@@ -438,11 +445,11 @@ void main() {
     expect(find.text('Không thể đến địa chỉ khách hàng'), findsOneWidget);
     await tester.tap(find.text('Tiếp tục hủy đơn'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Xác nhận hủy'));
+    await tester.tap(find.text('Hủy đơn'));
     await tester.pumpAndSettle();
     expect(api.cancellation, {'reason': 'Không thể đến địa chỉ khách hàng'});
     expect(find.text('Đã đến nơi'), findsNothing);
-    expect(find.text('Hủy đơn dịch vụ'), findsNothing);
+    expect(find.text('Hủy đơn dịch vụ', skipOffstage: false), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -451,13 +458,12 @@ void main() {
     (tester) async {
       final api = _Api();
       await _show(tester, api, _Tracker(api));
-      await tester.tap(find.byTooltip('Tác vụ đơn hàng'));
+      final cancelButton = find.text('Hủy đơn dịch vụ', skipOffstage: false);
+      await tester.ensureVisible(cancelButton);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Hủy đơn'));
+      await tester.tap(cancelButton);
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Lý do khác').last);
+      await tester.tap(find.text('Lý do khác'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Tiếp tục hủy đơn'));
       await tester.pumpAndSettle();

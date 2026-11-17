@@ -79,6 +79,22 @@ class ProviderLocationService extends ChangeNotifier {
     );
   }
 
+  /// Đã được cấp quyền khi đang dùng app nhưng chưa "Luôn cho phép" nên
+  /// vị trí có thể bị ngắt khi thợ chuyển sang app khác.
+  Future<bool> needsAlwaysPermission() async {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
+      return false;
+    }
+    try {
+      return await Geolocator.checkPermission() ==
+          LocationPermission.whileInUse;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> synchronize({
     required bool Function() shouldUpload,
     bool useCachedPosition = false,
