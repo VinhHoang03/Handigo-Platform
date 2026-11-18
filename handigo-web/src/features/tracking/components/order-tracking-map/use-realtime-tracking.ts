@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 import { mapText } from "./constants";
-import { hasGeolocationSupport } from "./geo-helpers";
+import { hasGeolocationSupport, isValidCoordinate } from "./geo-helpers";
 import type { Coordinate, LocationEvent, TrackingState } from "./types";
 
 interface UseRealtimeTrackingParams {
@@ -11,6 +11,12 @@ interface UseRealtimeTrackingParams {
   trackingEnabled: boolean;
   liveTrackingEnabled: boolean;
   savedCustomerCoordinate: Coordinate | null;
+}
+
+function latestCoordinate(current: Coordinate | null, next?: Coordinate | null): Coordinate | null {
+  if (!next || !isValidCoordinate(next)) return current;
+  if (current?.updatedAt && next.updatedAt && Date.parse(next.updatedAt) < Date.parse(current.updatedAt)) return current;
+  return next;
 }
 
 /**
@@ -63,30 +69,45 @@ export function useRealtimeTracking({
       reconnectionDelay: 2000,
     });
     socketRef.current = socket;
+    let disposed = false;
+    let refreshing = false;
+    let refreshQueued = false;
 
-    const joinOrderRoom = () => {
-      console.log(`[Socket-Client] Đã kết nối! Định danh socket: ${socket.id}`);
-      socket.emit(
+    const refreshTracking = (resendPosition = false) => {
+      if (disposed || !socket.connected) return;
+      if (refreshing) {
+        refreshQueued = true;
+        return;
+      }
+      refreshing = true;
+      socket.timeout(10_000).emit(
         "order:tracking:join",
         { orderId },
-        (response: { success: boolean; data?: TrackingState; message?: string }) => {
-          console.log("[Socket-Client] Phản hồi tham gia theo dõi đơn hàng:", response);
-          if (response.success) {
+        (error: Error | null, response?: { success: boolean; data?: TrackingState; message?: string }) => {
+          if (disposed) return;
+          refreshing = false;
+          if (!error && response?.success) {
             setTracking((cur) => ({
               customer: cur.customer,
-              provider: response.data?.provider || cur.provider,
+              provider: latestCoordinate(cur.provider, response.data?.provider),
             }));
             setLocationMessage(mapText.connected);
-            lastSentAtRef.current = 0;
-            if (viewerRole === "PROVIDER" && liveTrackingEnabled && latestPositionRef.current) {
+            // Chỉ gửi lại GPS khi kết nối, không gửi khi nhận tín hiệu vị trí đã đổi.
+            if (resendPosition && viewerRole === "PROVIDER" && liveTrackingEnabled && latestPositionRef.current) {
+              lastSentAtRef.current = 0;
               sendPosition(latestPositionRef.current);
             }
           } else {
-            setLocationMessage(response.message || mapText.joinFailed);
+            setLocationMessage(response?.message || mapText.joinFailed);
+          }
+          if (refreshQueued) {
+            refreshQueued = false;
+            refreshTracking();
           }
         },
       );
     };
+    const joinOrderRoom = () => refreshTracking(true);
 
     const handleConnectError = (err: Error) => {
       console.error("[Socket-Client] Lỗi kết nối:", err.message);
@@ -96,17 +117,23 @@ export function useRealtimeTracking({
     socket.on("connect", joinOrderRoom);
     socket.on("connect_error", handleConnectError);
 
-    const handleLocation = (location: LocationEvent) => {
-      console.log("[Socket-Client] Đã nhận vị trí đơn hàng:", location);
+    const handleLocation = (location: LocationEvent | { orderId: string }) => {
+      if (!location || (location.orderId && location.orderId !== orderId)) return;
+      // App lưu GPS qua HTTP và chỉ báo mã đơn; lấy lại tọa độ qua luồng có kiểm tra quyền.
+      if (!("ownerType" in location)) {
+        if (location.orderId === orderId) refreshTracking();
+        return;
+      }
       if (location.ownerType === "provider") {
-        setTracking((cur) => ({ ...cur, provider: location }));
+        setTracking((cur) => ({ ...cur, provider: latestCoordinate(cur.provider, location) }));
       } else if (location.ownerType === "customer") {
-        setTracking((cur) => ({ ...cur, customer: location }));
+        setTracking((cur) => ({ ...cur, customer: latestCoordinate(cur.customer, location) }));
       }
     };
     socket.on("order:location", handleLocation);
 
     return () => {
+      disposed = true;
       console.log("[Socket-Client] Đang đóng kết nối socket...");
       socket.off("connect", joinOrderRoom);
       socket.off("connect_error", handleConnectError);

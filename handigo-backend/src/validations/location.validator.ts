@@ -3,6 +3,8 @@ import { z } from "zod";
 export const currentLocationSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
+  accuracy: z.number().finite().min(0).optional(),
+  capturedAt: z.number().finite().min(0).optional(),
 });
 
 export type CurrentLocationPayload = z.infer<typeof currentLocationSchema>;

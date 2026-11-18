@@ -4,6 +4,7 @@ import { AppError } from "../utils/appError";
 import type { CurrentLocationPayload } from "../validations/location.validator";
 import { publishProviderLocationChanged } from "../sockets/socketServer";
 import { createLogger } from "../utils/logger";
+import { detectProviderMovementFromLocation } from "./providerMovement.service";
 
 const logger = createLogger("Location");
 
@@ -43,6 +44,8 @@ export const updateCurrentLocation = async (
   if (ownerType === "provider") {
     try { await publishProviderLocationChanged(userId); }
     catch (error) { logger.error("Đã lưu vị trí nhưng chưa phát được cập nhật trực tiếp.", error); }
+    try { await detectProviderMovementFromLocation(userId, payload); }
+    catch (error) { logger.error("Đã lưu vị trí nhưng chưa kiểm tra được thông báo di chuyển.", error); }
   }
   return location;
 };
