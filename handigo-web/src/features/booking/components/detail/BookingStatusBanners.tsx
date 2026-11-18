@@ -51,7 +51,9 @@ export const BookingStatusBanners = ({
     </div>}
     {/* Khi đang chạy vòng tìm thợ thì khối đếm ngược bên dưới đã nói rồi, không
         hiện thêm banner chờ xác nhận nữa. */}
-    {order.status !== "cancelled" && order.bookingStatus === "awaiting_provider" && !isWaitingForProvider && (
+    {/* Chỉ hiện khi đơn còn mới tạo và chưa có thợ; đơn đã có thợ nhận hoặc
+        đã hoàn thành thì banner này không còn đúng. */}
+    {order.status === "created" && !order.providerId && order.bookingStatus === "awaiting_provider" && !isWaitingForProvider && (
       <div className="mb-lg rounded-2xl border border-primary/20 bg-primary-container/10 p-md text-sm text-on-surface">
         <p className="font-bold">{order.preferredProviderId ? 'Đang chờ chuyên gia bạn chọn nhận đơn' : 'Đang chờ chuyên gia xác nhận lịch hẹn'}</p>
         <p className="mt-1 text-on-surface-variant">

@@ -13,7 +13,6 @@ export function TrackingHeader({
   etaLabel,
   liveTrackingEnabled,
   otherPartyLabel,
-  addressLine,
   distanceLabel,
 }: TrackingHeaderProps) {
   return (
@@ -25,11 +24,11 @@ export function TrackingHeader({
             {liveTrackingEnabled ? mapText.realtimeTitle : mapText.addressTitle}
           </h2>
         </div>
-        <p className="text-sm text-on-surface-variant">
-          {liveTrackingEnabled
-            ? `Bạn và ${otherPartyLabel} ${mapText.bothLocationNote}`
-            : addressLine || mapText.fallbackAddress}
-        </p>
+        {liveTrackingEnabled && (
+          <p className="text-sm text-on-surface-variant">
+            {`Bạn và ${otherPartyLabel} ${mapText.bothLocationNote}`}
+          </p>
+        )}
         {etaLabel && (
           <p role="status" className="flex items-center gap-2 text-sm font-semibold text-primary">
             <Clock3 aria-hidden="true" size={18} />
