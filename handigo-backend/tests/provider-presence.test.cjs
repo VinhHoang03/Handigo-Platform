@@ -153,7 +153,7 @@ test('Socket kiểm tra phiên đã thu hồi và chỉ vào phòng của đúng
     }) } },
     '../models/session.model': { Session: { exists: async () => active } },
     '../services/chat.service': {}, '../services/orderTracking.service': {},
-    './socketServer': { setSocketServer() {} }, '../configs/cors': {},
+    './socketServer': { setSocketServer() {}, publishProviderDiscoveryChanged() {} }, '../configs/cors': {},
     '../validations/chat.validator': {}, '../validations/location.validator': {}, '../validations/order.validator': {},
     '../utils/logger': { createLogger: () => ({ warn() {} }) },
     '../utils/token': { isTokenVersionCurrent: () => true },

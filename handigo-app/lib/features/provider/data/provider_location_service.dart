@@ -331,7 +331,12 @@ class ProviderLocationService extends ChangeNotifier {
         '/locations/me',
         method: 'PUT',
         authenticated: true,
-        data: {'latitude': target.latitude, 'longitude': target.longitude},
+        data: {
+          'latitude': target.latitude,
+          'longitude': target.longitude,
+          'accuracy': target.accuracy,
+          'capturedAt': target.timestamp.millisecondsSinceEpoch,
+        },
       );
     } catch (_) {
       throw const ApiException(

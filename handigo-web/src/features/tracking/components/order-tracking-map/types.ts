@@ -13,6 +13,7 @@ export type TrackingState = {
 };
 
 export type LocationEvent = Coordinate & {
+  orderId?: string;
   ownerType: "customer" | "provider" | `candidate:${string}`;
 };
 
