@@ -5,6 +5,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:latlong2/latlong.dart';
 import 'map_surface.dart';
 
+// Giữ phép chiếu chuẩn nhưng không lặp ghim và tuyến qua các bản sao thế giới.
+class _SingleWorldMercator extends Epsg3857 {
+  const _SingleWorldMercator();
+
+  @override
+  bool get replicatesWorldLongitude => false;
+}
+
 class RouteMap extends StatefulWidget {
   const RouteMap({
     required this.points,
@@ -23,13 +31,19 @@ class RouteMap extends StatefulWidget {
 class _RouteMapState extends State<RouteMap> {
   final controller = MapController();
   bool ready = false;
+  bool userMovedCamera = false;
   List<LatLng> get bounds => [
     ...widget.points,
     ?widget.origin,
     ?widget.destination,
   ];
-  void fit() {
+  void fit({bool force = false}) {
     if (!mounted || !ready || bounds.isEmpty) return;
+    if (!force &&
+        (userMovedCamera ||
+            bounds.every(controller.camera.visibleBounds.contains))) {
+      return;
+    }
     if (bounds.every(
       (p) =>
           p.latitude == bounds.first.latitude &&
@@ -72,18 +86,29 @@ class _RouteMapState extends State<RouteMap> {
       map: FlutterMap(
         mapController: controller,
         options: MapOptions(
+          crs: const _SingleWorldMercator(),
+          cameraConstraint: CameraConstraint.containCenter(
+            bounds: LatLngBounds(
+              const LatLng(-85, -180),
+              const LatLng(85, 180),
+            ),
+          ),
           initialCenter: widget.points.first,
           initialZoom: 14,
           maxZoom: 19,
           onMapReady: () {
             ready = true;
-            fit();
+            fit(force: true);
+          },
+          onPositionChanged: (_, hasGesture) {
+            if (hasGesture) userMovedCamera = true;
           },
         ),
         children: [
           const MapTiles(),
           if (widget.hasRoute && widget.points.length > 1)
             PolylineLayer(
+              drawInSingleWorld: true,
               polylines: [
                 Polyline(
                   points: widget.points,

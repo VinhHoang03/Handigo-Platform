@@ -70,18 +70,24 @@ export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Prop
     <form onSubmit={submit} className="space-y-6">
       <div>
         <label className="mb-2 block font-semibold">Mức độ hài lòng</label>
-        <RatingStars value={rating} editable onChange={setRating} size="lg" />
+        <div className="flex justify-center">
+          <RatingStars value={rating} editable onChange={setRating} size="lg" />
+        </div>
       </div>
 
-      <FloatingTextarea
-        id="feedback-comment"
-        label="Chia sẻ trải nghiệm của bạn"
-        value={comment}
-        maxLength={1000}
-        rows={5}
-        onValueChange={setComment}
-        hint={`${comment.length}/1000 ký tự. Bạn có thể phản ánh chất lượng kém; vui lòng tránh chửi tục, miệt thị và đe dọa.`}
-      />
+      <div className="relative">
+        <FloatingTextarea
+          id="feedback-comment"
+          label="Chia sẻ trải nghiệm của bạn"
+          value={comment}
+          maxLength={1000}
+          rows={5}
+          onValueChange={setComment}
+        />
+        <span className="pointer-events-none absolute bottom-3 right-4 text-xs text-on-surface-variant">
+          {comment.length}/1000
+        </span>
+      </div>
 
       <div>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
