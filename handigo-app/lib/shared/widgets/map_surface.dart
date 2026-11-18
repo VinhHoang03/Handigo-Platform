@@ -36,8 +36,7 @@ class MapSurface extends ConsumerWidget {
 
 const mapPrimaryTileUrl = String.fromEnvironment(
   'MAP_TILE_URL',
-  defaultValue:
-      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 );
 
 // Truyền `--dart-define=MAP_TILE_FALLBACK_URL=` (rỗng) để tắt nguồn dự phòng.
@@ -45,6 +44,34 @@ const mapFallbackTileUrl = String.fromEnvironment(
   'MAP_TILE_FALLBACK_URL',
   defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 );
+
+String mapTileFailureCode(Object error) {
+  if (error is NetworkImageLoadException) {
+    return 'TILE_HTTP_${error.statusCode}';
+  }
+  final message = error.toString().toLowerCase();
+  final status = RegExp(
+    r'status(?:code|\s+code)?\s*[:=]?\s*([45]\d{2})',
+  ).firstMatch(message);
+  if (status != null) return 'TILE_HTTP_${status.group(1)}';
+  if (message.contains('failed host lookup') ||
+      message.contains('name_not_resolved') ||
+      message.contains('getaddrinfo')) {
+    return 'TILE_DNS';
+  }
+  if (message.contains('handshakeexception') ||
+      message.contains('certificate_verify_failed') ||
+      message.contains('tls handshake')) {
+    return 'TILE_TLS';
+  }
+  if (message.contains('connection reset') ||
+      message.contains('connection was reset') ||
+      message.contains('connection refused')) {
+    return 'TILE_CONNECTION';
+  }
+  if (message.contains('failed to fetch')) return 'TILE_FETCH';
+  return 'TILE_LOAD_FAILED';
+}
 
 class MapTiles extends StatefulWidget {
   const MapTiles({this.tileProvider, super.key});
@@ -57,7 +84,9 @@ class _MapTilesState extends State<MapTiles> {
   static const primaryTileUrl = mapPrimaryTileUrl;
   static const fallbackTileUrl = mapFallbackTileUrl;
   bool failed = false;
-  bool receivedTile = false, errorQueued = false, timedOut = false;
+  bool receivedTile = false, statusQueued = false;
+  MapCamera? camera;
+  final tiles = <TileCoordinates, TileImage>{};
   // Nguồn chính có thể bị chặn/chập chờn theo mạng (lỗi TLS, timeout), nên
   // chuyển cả lớp sang nguồn dự phòng để bản đồ không bị trộn hai kiểu tile.
   bool usingFallback = false;
@@ -80,7 +109,6 @@ class _MapTilesState extends State<MapTiles> {
   void watchLoading() {
     loadingTimer?.cancel();
     receivedTile = false;
-    timedOut = false;
     loadingTimer = Timer(const Duration(seconds: 12), () {
       if (mounted && !receivedTile) {
         report('TILE_TIMEOUT');
@@ -90,7 +118,6 @@ class _MapTilesState extends State<MapTiles> {
         }
         setState(() {
           failed = true;
-          timedOut = true;
         });
       }
     });
@@ -104,7 +131,7 @@ class _MapTilesState extends State<MapTiles> {
     setState(() {
       usingFallback = true;
       failed = false;
-      errorQueued = false;
+      tiles.clear();
       diagnostic = null;
       revision++;
     });
@@ -114,24 +141,64 @@ class _MapTilesState extends State<MapTiles> {
   void report(String code) {
     // Không ghi URL đầy đủ vì nguồn tile tùy chỉnh có thể chứa key.
     final host = Uri.tryParse(tileUrl)?.host ?? 'nguồn không hợp lệ';
-    diagnostic = '$code · $host';
+    final value = '$code · $host';
+    if (diagnostic == value) return;
+    diagnostic = value;
     if (kDebugMode) {
       debugPrint('[Bản đồ nền][$code] Nguồn: $host');
     }
   }
 
-  void tileLoaded() {
-    if (receivedTile) return;
-    receivedTile = true;
-    loadingTimer?.cancel();
+  bool isVisible(TileCoordinates coordinates) {
+    final current = camera;
+    if (current == null || coordinates.z != current.zoom.round().clamp(0, 19)) {
+      return false;
+    }
+    final scale = current.getZoomScale(coordinates.z.toDouble(), current.zoom);
+    final bounds = Rect.fromCenter(
+      center: current.projectAtZoom(current.center, coordinates.z.toDouble()),
+      width: current.size.width * scale,
+      height: current.size.height * scale,
+    );
+    return bounds.overlaps(
+      Rect.fromLTWH(coordinates.x * 256.0, coordinates.y * 256.0, 256, 256),
+    );
+  }
+
+  void observeTile(TileImage tile) {
+    if (!isVisible(tile.coordinates)) return;
+    tiles[tile.coordinates] = tile;
+    updateStatus();
+  }
+
+  void updateStatus() {
+    if (statusQueued) return;
+    statusQueued = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          if (timedOut) {
+      statusQueued = false;
+      if (!mounted) return;
+      tiles.removeWhere((coordinates, _) => !isVisible(coordinates));
+      final loaded = tiles.values.any(
+        (tile) => tile.imageInfo != null && !tile.loadError,
+      );
+      final allFailed =
+          tiles.isNotEmpty && tiles.values.every((tile) => tile.loadError);
+      if (loaded) {
+        loadingTimer?.cancel();
+        if (!receivedTile || failed || diagnostic != null) {
+          setState(() {
+            receivedTile = true;
             failed = false;
             diagnostic = null;
-          }
-        });
+          });
+        }
+      } else if (allFailed) {
+        loadingTimer?.cancel();
+        if (canUseFallback) {
+          switchToFallback();
+        } else if (!failed) {
+          setState(() => failed = true);
+        }
       }
     });
   }
@@ -143,77 +210,82 @@ class _MapTilesState extends State<MapTiles> {
   }
 
   @override
-  Widget build(BuildContext context) => Stack(
-    children: [
-      TileLayer(
-        key: ValueKey(revision),
-        urlTemplate: tileUrl,
-        tileProvider: widget.tileProvider,
-        userAgentPackageName: 'com.handigo.handigo_app',
-        maxNativeZoom: 19,
-        tileBuilder: (context, child, tile) {
-          if (tile.imageInfo != null) tileLoaded();
-          return child;
-        },
-        errorTileCallback: (_, error, _) {
-          if (!errorQueued) {
-            errorQueued = true;
-            loadingTimer?.cancel();
-            report(
-              error is NetworkImageLoadException
-                  ? 'TILE_HTTP_${error.statusCode}'
-                  : 'TILE_LOAD_FAILED',
-            );
-            final fallback = canUseFallback;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              if (fallback) {
-                switchToFallback();
-              } else {
-                setState(() => failed = true);
-              }
-            });
-          }
-        },
-      ),
-      if (!receivedTile && !failed)
-        const Center(
-          child: IgnorePointer(
-            child: Card(
-              child: Padding(
-                padding: EdgeInsets.all(12),
-                child: Text('Đang tải bản đồ nền...'),
+  Widget build(BuildContext context) {
+    final current = MapCamera.of(context);
+    final viewChanged =
+        camera?.center != current.center ||
+        camera?.zoom != current.zoom ||
+        camera?.size != current.size ||
+        camera?.rotation != current.rotation;
+    camera = current;
+    if (viewChanged) {
+      // Chỉ xét ô ảnh trong vùng và mức zoom đang xem, bỏ lỗi của vùng cũ.
+      tiles.removeWhere((coordinates, _) => !isVisible(coordinates));
+      failed = false;
+      diagnostic = null;
+      watchLoading();
+    }
+    final currentRevision = revision;
+    updateStatus();
+    return Stack(
+      children: [
+        TileLayer(
+          key: ValueKey(revision),
+          urlTemplate: tileUrl,
+          tileProvider: widget.tileProvider,
+          userAgentPackageName: 'com.handigo.handigo_app',
+          maxNativeZoom: 19,
+          evictErrorTileStrategy: EvictErrorTileStrategy.notVisible,
+          tileBuilder: (context, child, tile) {
+            if (currentRevision == revision) observeTile(tile);
+            return child;
+          },
+          errorTileCallback: (tile, error, _) {
+            if (currentRevision == revision && isVisible(tile.coordinates)) {
+              report(mapTileFailureCode(error));
+              observeTile(tile);
+            }
+          },
+        ),
+        if (!receivedTile && !failed)
+          const Center(
+            child: IgnorePointer(
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text('Đang tải bản đồ nền...'),
+                ),
               ),
             ),
           ),
-        ),
-      if (failed)
-        Positioned(
-          top: 8,
-          left: 8,
-          right: 8,
-          child: Material(
-            borderRadius: BorderRadius.circular(8),
-            child: TextButton.icon(
-              icon: const Icon(Icons.refresh),
-              label: Text(
-                'Không tải được bản đồ nền. Nhấn để thử lại.'
-                '${kDebugMode && diagnostic != null ? '\n$diagnostic' : ''}',
+        if (failed)
+          Positioned(
+            top: 8,
+            left: 8,
+            right: 8,
+            child: Material(
+              borderRadius: BorderRadius.circular(8),
+              child: TextButton.icon(
+                icon: const Icon(Icons.refresh),
+                label: Text(
+                  'Không tải được bản đồ nền. Nhấn để thử lại.'
+                  '${diagnostic != null ? '\nMã lỗi: $diagnostic' : ''}',
+                ),
+                onPressed: () => setState(() {
+                  // Thử lại từ nguồn chính; lỗi tiếp sẽ tự chuyển dự phòng.
+                  usingFallback = false;
+                  failed = false;
+                  tiles.clear();
+                  diagnostic = null;
+                  revision++;
+                  watchLoading();
+                }),
               ),
-              onPressed: () => setState(() {
-                // Thử lại từ nguồn chính; lỗi tiếp sẽ tự chuyển dự phòng.
-                usingFallback = false;
-                failed = false;
-                errorQueued = false;
-                diagnostic = null;
-                revision++;
-                watchLoading();
-              }),
             ),
           ),
-        ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 Widget mapAttribution() => Align(

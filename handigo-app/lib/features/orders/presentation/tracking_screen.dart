@@ -8,6 +8,7 @@ import '../../../shared/widgets/route_map.dart';
 import '../../../core/network/realtime_connection.dart';
 import '../../../core/network/api_exception.dart';
 import '../../auth/domain/app_user.dart';
+import '../domain/order_summary.dart';
 import 'order_screens.dart';
 
 class OrderTrackingScreen extends ConsumerStatefulWidget {
@@ -34,6 +35,11 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   DateTime? updatedAt, sentAt;
   bool loading = false, active = true;
 
+  OrderDetail? get currentOrder {
+    final state = ref.read(orderDetailProvider(widget.orderId));
+    return state.hasValue ? state.value : null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -56,7 +62,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   }
 
   void join() {
-    final order = ref.read(orderDetailProvider(widget.orderId)).asData?.value;
+    final order = currentOrder;
     if (order != null && !order.canTrack) return;
     final connection = ref.read(realtimeConnectionProvider);
     if (connection?.connected != true) {
@@ -156,10 +162,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
             ),
           ).listen(
             (position) {
-              final order = ref
-                  .read(orderDetailProvider(widget.orderId))
-                  .asData
-                  ?.value;
+              final order = currentOrder;
               if (!active ||
                   order?.canTrack != true ||
                   (sentAt != null &&
@@ -245,7 +248,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
             .toList();
 
   LatLng? get _destination {
-    final order = ref.read(orderDetailProvider(widget.orderId)).asData?.value;
+    final order = currentOrder;
     return _coordinate({
       'latitude': order?.addressLatitude,
       'longitude': order?.addressLongitude,
@@ -280,7 +283,8 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final order = ref.watch(orderDetailProvider(widget.orderId)).asData?.value;
+    final orderState = ref.watch(orderDetailProvider(widget.orderId));
+    final order = orderState.hasValue ? orderState.value : null;
     if (order != null && !order.canTrack && positions != null) {
       positions?.cancel();
       positions = null;
