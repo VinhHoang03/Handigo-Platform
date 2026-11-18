@@ -10,7 +10,7 @@ export function TrackingInfoCards({ hasMapCoordinate, points }: TrackingInfoCard
   if (!hasMapCoordinate) return null;
 
   return (
-    <div className="grid gap-3 border-t border-outline-variant/20 p-6 sm:grid-cols-2">
+    <div className={`grid gap-3 border-t border-outline-variant/20 p-6 ${points.length > 1 ? "sm:grid-cols-2" : ""}`}>
       {points.map((point) => (
         <div
           key={point.key}
