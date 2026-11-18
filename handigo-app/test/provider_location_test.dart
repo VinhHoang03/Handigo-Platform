@@ -103,7 +103,13 @@ void main() {
 
   test('Lấy GPS và gửi tọa độ đúng API có xác thực', () async {
     await service.synchronize(shouldUpload: () => true);
-    expect(api.payload, {'latitude': 10.8, 'longitude': 106.7});
+    expect(api.payload, containsPair('latitude', 10.8));
+    expect(api.payload, containsPair('longitude', 106.7));
+    expect(api.payload!['accuracy'], 5);
+    expect(
+      api.payload!['capturedAt'],
+      service.synchronizedPosition!.timestamp.millisecondsSinceEpoch,
+    );
   });
 
   for (final accuracy in [127.0, 300.0]) {
@@ -221,6 +227,7 @@ void main() {
       );
       expect(location.reads, 1);
       await service.synchronize(shouldUpload: () => true);
+      expect(api.uploads[1]['capturedAt'], api.uploads[0]['capturedAt']);
       expect(location.reads, 2);
     },
   );
@@ -276,7 +283,9 @@ void main() {
     () async {
       location.accuracy = 100;
       await service.synchronize(shouldUpload: () => true);
-      expect(api.payload, {'latitude': 10.8, 'longitude': 106.7});
+      expect(api.payload, containsPair('latitude', 10.8));
+      expect(api.payload, containsPair('longitude', 106.7));
+      expect(api.payload!['accuracy'], 100);
     },
   );
 

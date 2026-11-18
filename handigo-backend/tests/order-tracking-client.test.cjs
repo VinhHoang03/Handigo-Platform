@@ -7,22 +7,33 @@ const ts = require('typescript');
 
 function setup(role = 'PROVIDER') {
   const effects = [], handlers = {}, sent = [];
+  const state = [], pending = [];
+  let stateIndex = 0, provider = null, holdReplies = false;
   let clock = Date.now(), onGps, stopped = false, disposed = false;
   const socket = {
     connected: false, id: 'socket',
     on(event, handler) { handlers[event] = handler; }, off() {},
+    timeout(milliseconds) { assert.equal(milliseconds, 10000); return this; },
     emit(event, payload, callback) {
       sent.push({ event, payload });
-      callback?.({ success: true, data: { provider: null } });
+      if (event !== 'order:tracking:join') { callback?.({ success: true }); return; }
+      if (holdReplies) pending.push(callback);
+      else callback?.(null, { success: true, data: { provider } });
     },
   };
   const modules = {
     react: {
-      useRef: current => ({ current }), useState: initial => [initial, () => {}],
+      useRef: current => ({ current }), useState: initial => {
+        const index = stateIndex++; state[index] = initial;
+        return [initial, value => { state[index] = typeof value === 'function' ? value(state[index]) : value; }];
+      },
       useEffect: run => effects.push(run), useCallback: callback => callback,
     },
     '@/realtime/authenticatedSocket': { createAuthenticatedSocket: () => ({ socket, dispose() { disposed = true; } }) },
-    './constants': { mapText: {} }, './geo-helpers': { hasGeolocationSupport: () => true },
+    './constants': { mapText: {} }, './geo-helpers': {
+      hasGeolocationSupport: () => true,
+      isValidCoordinate: value => value && Number.isFinite(value.latitude) && Number.isFinite(value.longitude),
+    },
   };
   const filename = path.join(__dirname, '../../handigo-web/src/features/tracking/components/order-tracking-map/use-realtime-tracking.ts');
   const source = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
@@ -45,6 +56,12 @@ function setup(role = 'PROVIDER') {
     advance(ms = 10000) { clock += ms; },
     cleanup() { cleanup.forEach(run => run?.()); return { stopped, disposed }; },
     hasGps() { return Boolean(onGps); },
+    setProvider(value) { provider = value; },
+    receive(value) { handlers['order:location'](value); },
+    tracking() { return state[0]; },
+    hold() { holdReplies = true; },
+    reply(value = provider) { pending.shift()(null, { success: true, data: { provider: value } }); },
+    timeout() { pending.shift()(new Error('Hết thời gian chờ')); },
   };
 }
 
@@ -76,6 +93,58 @@ test('Khách kết nối nhận realtime mà không phải cấp quyền GPS', (
   assert.equal(s.hasGps(), false);
   assert.equal(s.sent[0].event, 'order:tracking:join');
   assert.equal(s.sent.filter(item => item.event === 'order:location:update').length, 0);
+});
+
+test('Khách web nhận mã đơn từ app và tự cập nhật tọa độ mới mà không F5', () => {
+  const s = setup('CUSTOMER');
+  s.setProvider({ latitude: 10, longitude: 106 }); s.connect();
+  s.setProvider({ latitude: 10.02, longitude: 106.03 });
+  s.receive({ orderId: 'order' });
+  assert.equal(s.tracking().provider.latitude, 10.02);
+  assert.equal(s.sent.filter(item => item.event === 'order:tracking:join').length, 2);
+  assert.equal(s.hasGps(), false);
+  s.cleanup();
+});
+
+test('Bỏ tín hiệu của đơn khác và vẫn nhận sự kiện đủ tọa độ từ web thợ', () => {
+  const s = setup('CUSTOMER'); s.connect();
+  s.receive({ orderId: 'other-order' });
+  s.receive({ orderId: 'other-order', ownerType: 'provider', latitude: 20, longitude: 106 });
+  assert.equal(s.tracking().provider, null);
+  assert.equal(s.sent.length, 1);
+  s.receive({ orderId: 'order', ownerType: 'provider', latitude: 10, longitude: 106 });
+  assert.equal(s.tracking().provider.latitude, 10);
+  s.cleanup();
+});
+
+test('Gộp tín hiệu trong lúc chờ và không cho snapshot cũ ghi đè vị trí mới', () => {
+  const s = setup('CUSTOMER'); s.connect(); s.hold();
+  s.receive({ orderId: 'order' });
+  s.receive({ orderId: 'order' }); s.receive({ orderId: 'order' });
+  assert.equal(s.sent.length, 2);
+  s.receive({ orderId: 'order', ownerType: 'provider', latitude: 10.02, longitude: 106, updatedAt: '2026-11-18T08:01:00Z' });
+  s.reply({ latitude: 10, longitude: 106, updatedAt: '2026-11-18T08:00:00Z' });
+  assert.equal(s.tracking().provider.latitude, 10.02);
+  assert.equal(s.sent.length, 3);
+  s.reply({ latitude: 10.03, longitude: 106, updatedAt: '2026-11-18T08:02:00Z' });
+  assert.equal(s.tracking().provider.latitude, 10.03);
+  s.cleanup();
+});
+
+test('Lấy lại snapshot không kích hoạt vòng lặp gửi GPS của thợ web', () => {
+  const s = setup(); s.gps(); s.connect();
+  s.receive({ orderId: 'order' }); s.receive({ orderId: 'order' });
+  assert.equal(s.sent.filter(item => item.event === 'order:location:update').length, 1);
+  s.cleanup();
+});
+
+test('Snapshot hết thời gian chờ có thể thử lại và phản hồi sau khi đóng bị bỏ qua', () => {
+  const s = setup('CUSTOMER'); s.connect(); s.hold();
+  s.receive({ orderId: 'order' }); s.timeout();
+  s.receive({ orderId: 'order' });
+  s.cleanup();
+  s.reply({ latitude: 10.1, longitude: 106 });
+  assert.equal(s.tracking().provider, null);
 });
 
 test('Tuyến đường và ETA tính tiếp vị trí mới nhất sau thời gian giới hạn gọi API', async () => {

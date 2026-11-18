@@ -61,9 +61,10 @@ for (const role of ['PROVIDER', 'CUSTOMER']) {
         return { _id: 'location' };
       } }) } },
       '../sockets/socketServer': { publishProviderLocationChanged: async () => effects.push('published') },
+      './providerMovement.service': { detectProviderMovementFromLocation: async () => effects.push('detected') },
       '../utils/logger': { createLogger: () => ({ error() {} }) },
     });
     assert.equal((await location.updateCurrentLocation('user', { latitude: 10, longitude: 106 }))._id, 'location');
-    assert.deepEqual(effects, role === 'PROVIDER' ? ['saved', 'published'] : ['saved']);
+    assert.deepEqual(effects, role === 'PROVIDER' ? ['saved', 'published', 'detected'] : ['saved']);
   });
 }
