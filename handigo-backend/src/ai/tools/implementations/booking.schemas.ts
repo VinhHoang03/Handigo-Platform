@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createOrderSchema, cancelOrderSchema, orderIdParamSchema } from "../../../validations/order.validator";
 import { getEarliestScheduledAt, isWithinAppointmentHours } from "../../../utils/bookingPolicy";
 import { bookingAttachmentsSchema } from "../../agent/booking-attachments";
+import { vietnamesePhoneSchema } from "../../../validations/user.validator";
 
 export const idSchema = createOrderSchema.shape.serviceId;
 export const priceSchema = z.object({
@@ -11,6 +12,7 @@ export const priceSchema = z.object({
 }).strict();
 export const bookingSchema = priceSchema.extend({
   addressId: createOrderSchema.shape.addressId,
+  recipientPhone: vietnamesePhoneSchema.optional(),
   saveAddressToBook: z.boolean().optional(),
   orderType: z.enum(["normal", "scheduled"]),
   scheduledAt: createOrderSchema.shape.scheduledAt,

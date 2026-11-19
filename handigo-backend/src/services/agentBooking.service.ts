@@ -34,7 +34,7 @@ function bookingView(order: Pick<IOrder, "_id" | "orderCode" | "status" | "booki
 }
 
 type PriceArguments = Pick<CreateOrderPayload, "serviceId" | "selectedOptions" | "uniformQuantity">;
-type BookingArguments = PriceArguments & Pick<CreateOrderPayload, "addressId" | "paymentMethod" | "problemDescription" | "customerAttachments" | "voucherCode" | "preferredProviderId"> & {
+type BookingArguments = PriceArguments & Pick<CreateOrderPayload, "addressId" | "recipientPhone" | "paymentMethod" | "problemDescription" | "customerAttachments" | "voucherCode" | "preferredProviderId"> & {
   orderType: "normal" | "scheduled";
   saveAddressToBook?: boolean;
   scheduledAt?: string;
@@ -277,7 +277,8 @@ export const AgentBookingService = {
       ...(quantityPrice ? { unitPrice: quantityPrice.price, quantity: quantityPrice.quantity }
         : { options: price.options.map((option) => `${option.name} × ${option.quantity}: ${option.subtotal.toLocaleString("vi-VN")} đ`) }),
       address: bookingAddressLabel(address),
-      ...(draft?.id === args.addressId ? { recipientName: address.recipientName, recipientPhone: address.recipientPhone, addressNote: address.note } : {}),
+      recipientName: address.recipientName, recipientPhone: args.recipientPhone ?? address.recipientPhone,
+      ...(draft?.id === args.addressId ? { addressNote: address.note } : {}),
       addressVersion: address.updatedAt.toISOString(),
       addressStorage: draft?.id === args.addressId
         ? args.saveAddressToBook === false ? "Chỉ dùng cho đơn này, không lưu vào sổ địa chỉ" : "Lưu vào sổ địa chỉ khi đặt đơn thành công"

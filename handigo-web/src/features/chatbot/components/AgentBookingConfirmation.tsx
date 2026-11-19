@@ -3,7 +3,7 @@ import { useBookingPolicies } from "@/features/booking/hooks/useBookingPolicies"
 import type { AgentBookingValues, AgentConfirmation, AgentPolicyConsent, AgentSession } from "../types/agent.types";
 import { AgentConfirmationCard } from "./AgentConfirmationCard";
 import type { AgentBookingTool } from "./AgentBookingTools";
-import { CalendarDays, ChevronDown, CreditCard, MapPin, Minus, PencilLine, Ticket } from "lucide-react";
+import { CalendarDays, ChevronDown, CreditCard, MapPin, Minus, PencilLine, Phone, Ticket } from "lucide-react";
 import { useState } from "react";
 import { Modal } from "@/components/common/Modal";
 
@@ -36,6 +36,7 @@ export function AgentBookingConfirmation({ action, values, disabled, onDecision,
   const edits: Array<{ tool: AgentBookingTool; label: string }> = [
     ...(canEditQuantity ? [{ tool: "quantity" as const, label: "Số lượng" }] : []),
     { tool: "address", label: "Địa chỉ" }, { tool: "schedule", label: "Ngày giờ" }, { tool: "payment", label: "Thanh toán" },
+    { tool: "phone", label: "Số điện thoại người nhận" },
   ];
   return <><AgentConfirmationCard action={action} disabled={disabled || voucherOpen || savingVoucher} confirmDisabled={!policies.accepted}
     voucherField={vouchers.length > 0 && onVoucherChange ? <button type="button" aria-label="Chọn mã giảm giá" aria-haspopup="dialog"
@@ -49,7 +50,7 @@ export function AgentBookingConfirmation({ action, values, disabled, onDecision,
       <details className="group mb-3 rounded-xl border border-outline-variant/40">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium text-on-surface-variant focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden"><PencilLine size={13} aria-hidden="true" />Sửa thông tin đặt lịch<ChevronDown size={14} aria-hidden="true" className="ml-auto transition-transform group-open:rotate-180 motion-reduce:transition-none" /></summary>
         <div className="grid gap-1 px-2 pb-2">{edits.map((edit) => {
-          const Icon = edit.tool === "quantity" ? Minus : edit.tool === "address" ? MapPin : edit.tool === "schedule" ? CalendarDays : CreditCard;
+          const Icon = edit.tool === "quantity" ? Minus : edit.tool === "address" ? MapPin : edit.tool === "schedule" ? CalendarDays : edit.tool === "phone" ? Phone : CreditCard;
           return <button key={edit.tool} type="button" disabled={disabled}
           onClick={() => onOpenTool(edit.tool)} className="flex min-h-11 items-center gap-2 rounded-xl border border-outline-variant/50 px-3 text-left text-xs font-medium text-on-surface transition-colors hover:border-primary/30 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"><Icon size={15} aria-hidden="true" className="shrink-0 text-primary" />{edit.label}</button>;
         })}</div>
