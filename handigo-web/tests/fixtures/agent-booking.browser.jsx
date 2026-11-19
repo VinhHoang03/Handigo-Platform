@@ -66,6 +66,7 @@ function confirmation(tool = 'create_booking') {
     preview: tool === 'create_booking' ? { title: 'Tạo đơn dịch vụ', service: 'Vệ sinh điều hòa', serviceType: 'fixed_price',
       policyVersion: fixture.policies.version,
       quantity: values.uniformQuantity, unitPrice: 200000, address: values.addressId === ids.address ? '12 Lê Lợi, Phường A, Hà Nội' : '34 Nguyễn Trãi, Phường B, Hà Nội',
+      recipientPhone: values.recipientPhone ?? fixture.addresses.find((item) => item._id === values.addressId)?.recipientPhone,
       schedule: values.scheduledAt || 'Đặt ngay', paymentMethod: values.paymentMethod, amount: 200000 * values.uniformQuantity,
       customerAttachments: values.customerAttachments ?? [], addressStorage: values.saveAddressToBook === false ? 'Chỉ dùng cho đơn này, không lưu vào sổ địa chỉ' : undefined,
       providerName: values.preferredProviderId ? 'Nguyễn Minh' : undefined } : { title: 'Xác nhận trừ tiền ví', orderId: ids.order, orderCode: 'ORD-KIEM-THU', amount: 600000, paymentMethod: 'wallet' } };
@@ -327,6 +328,10 @@ fixture.send = async (request) => {
     if (text.includes('sang Ví Handigo')) values.paymentMethod = 'wallet';
     if (text.includes('Tôi chọn chuyên gia Nguyễn Minh')) values.preferredProviderId = ids.provider;
     if (request.bookingAction?.patch.preferredProviderId === null) delete values.preferredProviderId;
+    if (request.bookingAction?.patch.recipientPhone !== undefined) {
+      if (request.bookingAction.patch.recipientPhone === null) delete values.recipientPhone;
+      else values.recipientPhone = request.bookingAction.patch.recipientPhone;
+    }
     const time = /(\d{4}-\d{2}-\d{2}) lúc (\d{2}:\d{2})/.exec(text);
     if (time) { values.scheduledAt = time[1] + 'T' + time[2] + ':00+07:00'; values.orderType = 'scheduled'; }
     confirmation();
@@ -761,6 +766,30 @@ async function run() {
   assert(!lastSend().message.includes('bản nháp') && !lastSend().message.includes('Chưa tạo đơn'), 'tin chọn địa chỉ không kèm chỉ dẫn xử lý nội bộ');
   assert(lastSend().bookingAction?.patch.addressId === ids.otherAddress, 'địa chỉ được chọn bằng ID dữ liệu, không nhờ AI đoán tên');
   assert(lastSend().message.split('Phường B').length === 2 && lastSend().message.split('Hà Nội').length === 2, 'lệnh chọn địa chỉ không ghép lặp khu vực');
+  await click('Số điện thoại người nhận');
+  verifyDialogBounds();
+  assert(dialog().querySelector('input[type="tel"]').value === '0987654321', 'điền số thực tế từ địa chỉ đang chọn');
+  const beforePhone = calls.filter((item) => item.type === 'send').length;
+  change(dialog().querySelector('input[type="tel"]'), '123'); await pause();
+  await click('Gửi thay đổi', dialog());
+  assert(dialog().textContent.includes('Số điện thoại Việt Nam không hợp lệ'), 'báo lỗi số điện thoại');
+  assert(calls.filter((item) => item.type === 'send').length === beforePhone, 'số không hợp lệ không gửi yêu cầu');
+  change(dialog().querySelector('input[type="tel"]'), '090 123 4567'); await pause();
+  await click('Gửi thay đổi', dialog());
+  await wait(() => values.recipientPhone === '0901234567' && !dialog(), 'cập nhật số điện thoại riêng cho đơn');
+  assert(lastSend().bookingAction.patch.recipientPhone === '0901234567', 'gửi số đã chuẩn hóa bằng dữ liệu cấu trúc');
+  assert(session.pendingConfirmation.preview.recipientPhone === '0901234567', 'xác nhận mới hiển thị đúng số');
+  assert(fixture.addresses[1].recipientPhone === '0987654321', 'không sửa số trong sổ địa chỉ');
+  assert(button('Xác nhận').disabled, 'đổi số phải xác nhận lại chính sách');
+  await click('Số điện thoại người nhận');
+  dialog().querySelector('input[type="checkbox"]').click(); await pause();
+  await click('Gửi thay đổi', dialog());
+  await wait(() => !values.recipientPhone && !dialog(), 'bỏ số riêng và dùng lại số từ địa chỉ');
+  assert(lastSend().bookingAction.patch.recipientPhone === null && session.pendingConfirmation.preview.recipientPhone === '0987654321', 'khôi phục số từ địa chỉ bằng null');
+  await click('Số điện thoại người nhận');
+  change(dialog().querySelector('input[type="tel"]'), '0901234567'); await pause();
+  await click('Gửi thay đổi', dialog());
+  await wait(() => values.recipientPhone === '0901234567' && !dialog(), 'chọn lại số riêng');
   await click('Thanh toán');
   dialog().querySelector('input[value="wallet"]').click(); await pause();
   await click('Gửi thay đổi', dialog());
@@ -795,6 +824,7 @@ async function run() {
   assert(!button('Ngày giờ'), 'form cũ không còn cho sửa sau tạm dừng');
   await click('Tiếp tục bản nháp');
   await wait(() => button('Số lượng'), 'khôi phục form');
+  assert(values.recipientPhone === '0901234567' && session.pendingConfirmation.preview.recipientPhone === '0901234567', 'giữ số khi đổi thanh toán, lịch và tạm dừng/tiếp tục');
   await click('chính sách Handigo');
   await wait(() => dialog()?.textContent.includes('17 phút'), 'chính sách dùng cấu hình từ API');
   await click('Đồng ý với chính sách', dialog());

@@ -16,6 +16,7 @@ import { getOrderSettlement, withPendingOrderSettlement } from "../utils/orderSe
 import { OrderStatus } from "../models/orderStatus.model";
 import { ensureAddressCoordinates, createAddress } from "./address.service";
 import { AppError } from "../utils/appError";
+import { vietnamesePhoneSchema } from "../validations/user.validator";
 import { withTransactionRetry } from "../utils/transaction";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
@@ -157,6 +158,7 @@ export interface CreateOrderPayload {
   selectedOptionIds?: string[];
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
   addressId: string;
+  recipientPhone?: string;
   orderType?: "normal" | "scheduled";
   scheduledAt?: Date | string;
   problemDescription?: string;
@@ -201,6 +203,7 @@ export const OrderService = {
    *  4. Hand off to DispatchService to find & assign the nearest provider.
    */
   async createOrder(payload: CreateOrderPayload, confirmedOrderId?: Types.ObjectId, draftAddress?: IAddress, saveAddressToBook = true): Promise<IOrder> {
+    const recipientPhone = payload.recipientPhone === undefined ? undefined : vietnamesePhoneSchema.parse(payload.recipientPhone);
     await assertFeatureAllowed(payload.customerId, "booking");
     if (!payload.paymentMethod || !["wallet", "bank", "cash"].includes(payload.paymentMethod)) {
       throw new AppError("Phương thức thanh toán không hợp lệ.", 400);
@@ -442,7 +445,7 @@ export const OrderService = {
       selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
       addressId: draftAddress && !saveAddressToBook ? null : new Types.ObjectId(payload.addressId),
       addressSnapshot: {
-        recipientName: address.recipientName, recipientPhone: address.recipientPhone,
+        recipientName: address.recipientName, recipientPhone: recipientPhone ?? address.recipientPhone,
         fullAddress: address.fullAddress, province: address.province, ward: address.ward,
         note: address.note,
         latitude: address.latitude, longitude: address.longitude,

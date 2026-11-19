@@ -53,7 +53,7 @@ Tài liệu đối chiếu với bản nháp, công cụ voucher, địa chỉ v
 | “Ở nhà/ở công ty/nhà mẹ” | Đối chiếu địa chỉ và ghi chú; hỏi nếu chưa xác định. |
 | Địa chỉ mới thiếu thông tin | Hỏi gộp phần thiếu; giữ dịch vụ, số lượng, lịch, voucher và thợ đã nêu. |
 | “Đặt cho mẹ” | Xác định địa chỉ, người nhận và điện thoại; không sửa hồ sơ của khách. |
-| “Đổi số điện thoại người nhận lần này” | Nêu rõ công cụ hiện sửa bản ghi trong sổ; không hứa thay tạm cho một lần. |
+| “Đổi số điện thoại người nhận lần này” | Gửi `recipientPhone` vào `update_booking_draft`; chỉ đổi số cho đơn đang đặt, không sửa hồ sơ hoặc sổ địa chỉ. `null` để dùng lại số từ địa chỉ. Đơn đã tạo chưa hỗ trợ đổi số. |
 | “Dùng địa chỉ khác” | Chọn/thêm địa chỉ mới; không sửa đè địa chỉ cũ nếu khách chưa yêu cầu. |
 | “Đừng lưu địa chỉ mới” | Gửi `saveAddressToBook: false` vào bản nháp; địa chỉ chỉ gắn với đơn, không thêm vào sổ. Giữ lựa chọn qua các lần sửa; chỉ bật lưu lại khi khách yêu cầu. |
 | “Đặt tại vị trí hiện tại” hoặc gửi ảnh địa chỉ | Không tự lấy vị trí hoặc suy ra tọa độ từ ảnh; hướng dẫn chọn/ghim trong Hồ sơ. |

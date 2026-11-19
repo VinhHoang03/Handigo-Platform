@@ -18,7 +18,7 @@ export type AgentInput = { requestId: string } & (
 export type AgentPolicyConsent = { accepted: true; version: string };
 export type AgentBookingAction =
   | { type: "update"; revision: number; patch: { mode?: "update" | "pause" | "discard" | "resume"; quantity?: number;
-      selectedOptions?: Array<{ optionId: string; quantity: number }>; addressId?: string; paymentMethod?: "bank" | "wallet" | "cash";
+      selectedOptions?: Array<{ optionId: string; quantity: number }>; addressId?: string; recipientPhone?: string | null; paymentMethod?: "bank" | "wallet" | "cash";
       orderType?: "normal" | "scheduled"; scheduledAt?: string | null; preferredProviderId?: string | null; saveAddressToBook?: boolean; voucherCode?: string | null } }
   | { type: "rebook_decision"; proposalId: string; accept: boolean }
   | { type: "restore_draft"; backupId: string }
@@ -44,6 +44,7 @@ export interface AgentBookingValues {
   uniformQuantity?: number;
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
   addressId?: string;
+  recipientPhone?: string;
   orderType?: "normal" | "scheduled";
   scheduledAt?: string;
   paymentMethod?: "bank" | "wallet" | "cash";

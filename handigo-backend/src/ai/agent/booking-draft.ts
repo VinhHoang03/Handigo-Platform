@@ -21,6 +21,7 @@ export const bookingDraftPatchSchema = z.object({
   quantity: z.number().int().min(1).max(99).optional(),
   optionPreference: z.string().trim().max(300).nullable().optional(),
   addressId: idSchema.nullable().optional(),
+  recipientPhone: bookingSchema.shape.recipientPhone.nullable(),
   saveAddressToBook: z.boolean().optional(),
   addressPreference: z.string().trim().max(300).nullable().optional(),
   voucherCode: z.string().trim().min(1).max(50).nullable().optional(),
@@ -38,7 +39,7 @@ export const bookingDraftPatchSchema = z.object({
   customerAttachments: bookingAttachmentsSchema.optional(),
 }).strict();
 export type BookingDraftPatch = z.infer<typeof bookingDraftPatchSchema>;
-type DraftFields = "serviceId" | "selectedOptions" | "uniformQuantity" | "addressId" | "orderType" | "scheduledAt" | "paymentMethod" | "problemDescription" | "customerAttachments" | "voucherCode" | "preferredProviderId";
+type DraftFields = "serviceId" | "selectedOptions" | "uniformQuantity" | "addressId" | "recipientPhone" | "orderType" | "scheduledAt" | "paymentMethod" | "problemDescription" | "customerAttachments" | "voucherCode" | "preferredProviderId";
 export interface BookingDraft {
   lookupFailures?: Array<"providers" | "vouchers">;
   draftAddress?: DraftBookingAddress;
@@ -255,7 +256,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
     }));
     draft.sources.selectedOptions = "customer";
   }
-  for (const key of ["addressId", "orderType", "paymentMethod", "problemDescription", "preferredProviderId", "voucherCode"] as const) {
+  for (const key of ["addressId", "recipientPhone", "orderType", "paymentMethod", "problemDescription", "preferredProviderId", "voucherCode"] as const) {
     if (input[key] === undefined) continue;
     if (input[key] === null) { delete values[key]; delete draft.sources[key]; }
     else Object.assign(values, { [key]: input[key] });
@@ -504,6 +505,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   }
   const address = addresses.find((item) => item.id === values.addressId);
   if (address) draft.summary.push(`Địa chỉ: ${bookingAddressLabel(address)}`);
+  if (values.recipientPhone) draft.summary.push(`Số điện thoại người nhận riêng cho đơn này: ${values.recipientPhone}`);
   if (values.saveAddressToBook === false) draft.summary.push("Địa chỉ chỉ dùng cho đơn này, không thêm vào sổ địa chỉ.");
   if (draft.rebookNeedsOptionReview) {
     draft.missing.push("Gói cũ đã thay đổi. Vui lòng chọn lại gói và số lượng trước khi đặt lại");
