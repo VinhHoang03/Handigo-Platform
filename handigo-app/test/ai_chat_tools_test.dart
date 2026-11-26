@@ -13,6 +13,38 @@ import 'package:handigo_app/core/network/api_exception.dart';
 import 'package:handigo_app/features/ai_chat/data/ai_chat_repository.dart';
 import 'package:handigo_app/features/ai_chat/presentation/ai_chat_controller.dart';
 import 'package:handigo_app/features/ai_chat/presentation/ai_chat_sheet.dart';
+import 'package:handigo_app/features/booking/domain/booking_models.dart';
+import 'package:handigo_app/features/service_catalog/data/service_catalog_repository.dart';
+import 'package:handigo_app/features/service_catalog/presentation/service_catalog_provider.dart';
+import 'package:handigo_app/features/service_catalog/domain/service_detail.dart';
+import 'package:handigo_app/features/service_catalog/domain/service_option.dart';
+import 'package:handigo_app/features/services/domain/service.dart';
+
+class _Catalog extends ServiceCatalogRepository {
+  _Catalog() : super(ApiClient(Dio(), CookieJar()));
+  bool fail = false;
+  List<Address> saved = [];
+  List<ServiceOption> options = [];
+  @override
+  Future<List<Address>> addresses() async {
+    if (fail) {
+      fail = false;
+      throw const ApiException('Lỗi tải địa chỉ thử nghiệm.');
+    }
+    return saved;
+  }
+
+  @override
+  Future<ServiceDetail> detail(String serviceId) async => ServiceDetail(
+    service: const Service(
+      id: 'dich-vu',
+      name: 'Vệ sinh máy lạnh',
+      description: '',
+      serviceType: 'fixed_price',
+    ),
+    options: options,
+  );
+}
 
 class _Repository extends AiChatRepository {
   _Repository(super.api);
@@ -87,7 +119,11 @@ _Repository _repository() {
   return _Repository(api);
 }
 
-Future<void> _show(WidgetTester tester, _Repository repository) async {
+Future<void> _show(
+  WidgetTester tester,
+  _Repository repository, {
+  ServiceCatalogRepository? catalog,
+}) async {
   FlutterSecureStorage.setMockInitialValues({});
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(320, 800);
@@ -96,6 +132,8 @@ Future<void> _show(WidgetTester tester, _Repository repository) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (catalog != null)
+          serviceCatalogRepositoryProvider.overrideWithValue(catalog),
         aiChatControllerProvider.overrideWith(
           (ref) => AiChatController(repository),
         ),
@@ -110,6 +148,94 @@ Future<void> _show(WidgetTester tester, _Repository repository) async {
 }
 
 void main() {
+  testWidgets(
+    'Xác nhận rút tiền hiện đủ nơi nhận và không hiển thị mã ngân hàng nội bộ',
+    (tester) async {
+      final repository = _repository()
+        ..initialSession = {
+          'sessionId': 'rut-tien',
+          'messages': <Map<String, dynamic>>[],
+          'pendingConfirmation': {
+            'actionId': 'xac-nhan-rut',
+            'tool': 'create_withdrawal',
+            'preview': {
+              'title': 'Tạo yêu cầu rút tiền',
+              'bankName': 'Ngân hàng thử nghiệm',
+              'maskedAccountNumber': '••••6789',
+              'accountHolderName': 'NGUYEN VAN AN',
+              'amount': 100000,
+              'bankAccountId': 'ma-ngan-hang-noi-bo',
+              'bankFingerprint': 'phien-ban-noi-bo',
+              'note': 'Chờ quản trị viên duyệt, chưa chuyển tiền.',
+            },
+          },
+        };
+      await _show(tester, repository);
+      expect(
+        find.textContaining('Ngân hàng nhận: Ngân hàng thử nghiệm'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Số tài khoản: ••••6789'), findsOneWidget);
+      expect(
+        find.textContaining('Chủ tài khoản: NGUYEN VAN AN'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('100.000 đ'), findsOneWidget);
+      expect(find.textContaining('ma-ngan-hang-noi-bo'), findsNothing);
+      expect(find.textContaining('phien-ban-noi-bo'), findsNothing);
+      expect(repository.requests, isEmpty);
+      await tester.ensureVisible(find.text('Xác nhận'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Xác nhận'));
+      await tester.pumpAndSettle();
+      expect(repository.requests.single['confirmation'], {
+        'actionId': 'xac-nhan-rut',
+        'decision': 'CONFIRM',
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Xác nhận báo cáo có loại, đối tượng và ảnh; lịch cũ mới đều được hiển thị',
+    (tester) async {
+      final repository = _repository()
+        ..initialSession = {
+          'sessionId': 'bao-cao',
+          'messages': <Map<String, dynamic>>[],
+          'pendingConfirmation': {
+            'actionId': 'xac-nhan-bao-cao',
+            'tool': 'create_report',
+            'preview': {
+              'title': 'Gửi báo cáo',
+              'reportType': 'harassment',
+              'targetType': 'chat_conversation',
+              'currentSchedule': '2026-11-22T08:00:00+07:00',
+              'schedule': '2026-11-23T09:00:00+07:00',
+              'customerAttachments': [
+                'https://res.cloudinary.com/test/image/upload/handigo/reports/evidence.png',
+              ],
+            },
+          },
+        };
+      await _show(tester, repository);
+      expect(find.text('Loại báo cáo: Quấy rối'), findsOneWidget);
+      expect(find.text('Đối tượng: Cuộc trò chuyện'), findsOneWidget);
+      expect(find.textContaining('Lịch hiện tại: 22/11/2026'), findsOneWidget);
+      expect(find.textContaining('Thời gian: 23/11/2026'), findsOneWidget);
+      expect(find.text('Ảnh đính kèm yêu cầu'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Image && widget.semanticLabel == 'Xem ảnh đính kèm 1',
+        ),
+        findsOneWidget,
+      );
+      expect(repository.requests, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   Map<String, dynamic> bookingSession() => {
     'sessionId': 'phien-xac-nhan',
     'messages': <Map<String, dynamic>>[
@@ -139,6 +265,317 @@ void main() {
       'decision': 'REJECT',
     });
   });
+
+  Map<String, dynamic> editableSession() =>
+      bookingSession()
+        ..['bookingDraft'] = {
+          'status': 'active',
+          'revision': 7,
+          'values': {
+            'recipientName': 'Nguyễn An',
+            'recipientPhone': '0912345678',
+            'uniformQuantity': 1,
+            'paymentMethod': 'bank',
+          },
+          'availableVouchers': [
+            {'code': 'GIAM10', 'name': 'Giảm mười nghìn'},
+          ],
+        };
+
+  Future<void> openEditor(WidgetTester tester, String label) async {
+    await tester.ensureVisible(find.text('Sửa thông tin đặt lịch'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sửa thông tin đặt lịch'));
+    await tester.pumpAndSettle();
+    final button = find.widgetWithText(OutlinedButton, label);
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('Sửa tên kiểm tra dữ liệu, gửi đúng phiên bản và chưa tạo đơn', (
+    tester,
+  ) async {
+    final repository = _repository()..initialSession = editableSession();
+    await _show(tester, repository);
+    await openEditor(tester, 'Tên người nhận');
+    await tester.enterText(find.byType(TextFormField), '123');
+    await tester.tap(find.text('Gửi thay đổi'));
+    await tester.pumpAndSettle();
+    expect(repository.requests, isEmpty);
+    expect(find.textContaining('chỉ gồm chữ'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField), '  Trần   Bình ');
+    await tester.tap(find.text('Gửi thay đổi'));
+    await tester.pumpAndSettle();
+    expect(repository.requests.single['bookingAction'], {
+      'type': 'update',
+      'revision': 7,
+      'patch': {'recipientName': 'Trần Bình'},
+    });
+    expect(repository.requests.single.containsKey('confirmation'), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Sửa số điện thoại chặn số sai, chuẩn hóa số và gửi thay đổi riêng',
+    (tester) async {
+      final repository = _repository()..initialSession = editableSession();
+      await _show(tester, repository);
+      await openEditor(tester, 'Số điện thoại người nhận');
+      for (final value in ['123', '0301234567', '0501234567', '0951234567']) {
+        await tester.enterText(find.byType(TextFormField), value);
+        await tester.tap(find.text('Gửi thay đổi'));
+        await tester.pumpAndSettle();
+        expect(repository.requests, isEmpty);
+      }
+      await tester.enterText(find.byType(TextFormField), '098 765 4321');
+      await tester.tap(find.text('Gửi thay đổi'));
+      await tester.pumpAndSettle();
+      expect((repository.requests.single['bookingAction'] as Map)['patch'], {
+        'recipientPhone': '0987654321',
+      });
+    },
+  );
+
+  testWidgets('Dùng lại tên/số từ địa chỉ gửi null để bỏ lựa chọn riêng', (
+    tester,
+  ) async {
+    for (final entry in {
+      'Tên người nhận': 'recipientName',
+      'Số điện thoại người nhận': 'recipientPhone',
+    }.entries) {
+      final repository = _repository()..initialSession = editableSession();
+      await _show(tester, repository);
+      await openEditor(tester, entry.key);
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gửi thay đổi'));
+      await tester.pumpAndSettle();
+      expect((repository.requests.single['bookingAction'] as Map)['patch'], {
+        entry.value: null,
+      });
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('Số lượng chặn rỗng, bằng không, số thập phân và quá giới hạn', (
+    tester,
+  ) async {
+    final repository = _repository()..initialSession = editableSession();
+    await _show(tester, repository);
+    await openEditor(tester, 'Số lượng');
+    for (final value in ['', '0', '1.5', '100']) {
+      await tester.enterText(find.byType(TextFormField), value);
+      await tester.tap(find.text('Gửi thay đổi'));
+      await tester.pumpAndSettle();
+      expect(repository.requests, isEmpty);
+    }
+    await tester.enterText(find.byType(TextFormField), '3');
+    await tester.tap(find.text('Gửi thay đổi'));
+    await tester.pumpAndSettle();
+    expect((repository.requests.single['bookingAction'] as Map)['patch'], {
+      'quantity': 3,
+    });
+  });
+
+  testWidgets(
+    'Thanh toán khảo sát không cho tiền mặt, chọn ví gửi bản nháp mới',
+    (tester) async {
+      final initial = editableSession();
+      ((initial['pendingConfirmation'] as Map)['preview']
+              as Map)['serviceType'] =
+          'variable_price';
+      final repository = _repository()..initialSession = initial;
+      await _show(tester, repository);
+      await openEditor(tester, 'Thanh toán');
+      expect(find.text('Tiền mặt'), findsNothing);
+      await tester.tap(find.text('Ví Handigo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gửi thay đổi'));
+      await tester.pumpAndSettle();
+      expect((repository.requests.single['bookingAction'] as Map)['patch'], {
+        'paymentMethod': 'wallet',
+      });
+    },
+  );
+
+  testWidgets(
+    'Chọn voucher gửi mã hệ thống, không thu tiền hoặc chấp nhận form cũ',
+    (tester) async {
+      final repository = _repository()..initialSession = editableSession();
+      await _show(tester, repository);
+      await openEditor(tester, 'Mã giảm giá');
+      await tester.tap(find.text('GIAM10'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gửi thay đổi'));
+      await tester.pumpAndSettle();
+      expect((repository.requests.single['bookingAction'] as Map)['patch'], {
+        'voucherCode': 'GIAM10',
+      });
+    },
+  );
+
+  testWidgets(
+    'Lịch chưa chọn không gửi, đặt ngay gửi loại lịch và xóa lịch hẹn cũ',
+    (tester) async {
+      final repository = _repository()..initialSession = editableSession();
+      await _show(tester, repository);
+      await openEditor(tester, 'Ngày giờ');
+      await tester.tap(find.text('Gửi thay đổi'));
+      await tester.pumpAndSettle();
+      expect(repository.requests, isEmpty);
+      await tester.tap(find.text('Chuyển sang đặt ngay'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gửi thay đổi'));
+      await tester.pumpAndSettle();
+      expect((repository.requests.single['bookingAction'] as Map)['patch'], {
+        'orderType': 'normal',
+        'scheduledAt': null,
+      });
+    },
+  );
+
+  testWidgets(
+    'Địa chỉ tải lỗi có thử lại; rỗng không gửi; chọn địa chỉ theo ID từ hệ thống',
+    (tester) async {
+      final repository = _repository()..initialSession = editableSession();
+      final catalog = _Catalog()..fail = true;
+      await _show(tester, repository, catalog: catalog);
+      await openEditor(tester, 'Địa chỉ');
+      expect(find.text('Lỗi tải địa chỉ thử nghiệm.'), findsOneWidget);
+      await tester.tap(find.text('Tải lại thông tin'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Chưa có địa chỉ'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Gửi thay đổi'),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('Đóng'));
+      await tester.pumpAndSettle();
+      catalog.saved = [
+        const Address(
+          id: 'dia-chi-that',
+          recipientName: 'Trần Bình',
+          recipientPhone: '0987654321',
+          fullAddress: '12 Lê Lợi',
+          province: 'Đà Nẵng',
+          ward: 'Phường A',
+          isDefault: true,
+        ),
+      ];
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Địa chỉ'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('12 Lê Lợi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gửi thay đổi'));
+      await tester.pumpAndSettle();
+      expect((repository.requests.single['bookingAction'] as Map)['patch'], {
+        'addressId': 'dia-chi-that',
+      });
+    },
+  );
+
+  testWidgets('Tùy chọn đã ngừng hoạt động không được gửi số lượng', (
+    tester,
+  ) async {
+    final initial = editableSession();
+    (initial['bookingDraft'] as Map)['values'] = {
+      'serviceId': 'dich-vu',
+      'selectedOptions': [
+        {'optionId': 'goi-cu', 'quantity': 1},
+      ],
+    };
+    final repository = _repository()..initialSession = initial;
+    await _show(tester, repository, catalog: _Catalog());
+    await openEditor(tester, 'Số lượng');
+    expect(find.text('Tùy chọn không còn khả dụng'), findsOneWidget);
+    await tester.tap(find.text('Gửi thay đổi'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Có tùy chọn không còn khả dụng'),
+      findsOneWidget,
+    );
+    expect(repository.requests, isEmpty);
+  });
+
+  testWidgets('Form đang mở không ghi nếu bản nháp đã đổi phiên bản', (
+    tester,
+  ) async {
+    final repository = _repository()..initialSession = editableSession();
+    await _show(tester, repository);
+    await openEditor(tester, 'Tên người nhận');
+    final controller = ProviderScope.containerOf(
+      tester.element(find.byType(AiChatSheet)),
+    ).read(aiChatControllerProvider);
+    (controller.session!['bookingDraft'] as Map)['revision'] = 8;
+    await tester.tap(find.text('Gửi thay đổi'));
+    await tester.pumpAndSettle();
+    expect(repository.requests, isEmpty);
+    expect(find.textContaining('Bản nháp đã thay đổi'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Danh sách nhiều yêu cầu hiển thị tiến độ, gửi đúng mục và không hủy đơn đã tạo',
+    (tester) async {
+      final initial = editableSession()..['pendingConfirmation'] = null;
+      initial['bookingPlan'] = {
+        'id': 'ke-hoach',
+        'revision': 5,
+        'status': 'active',
+        'activeItemId': 'muc-hai',
+        'items': [
+          {
+            'id': 'muc-mot',
+            'label': 'Vệ sinh máy lạnh',
+            'status': 'created',
+            'orderCode': 'ORD-1',
+          },
+          {'id': 'muc-hai', 'label': 'Sửa ống nước', 'status': 'active'},
+        ],
+      };
+      final repository = _repository()..initialSession = initial;
+      await _show(tester, repository);
+      expect(find.textContaining('1/2 đã tạo đơn'), findsOneWidget);
+      expect(find.textContaining('ORD-1'), findsOneWidget);
+      await tester.ensureVisible(find.text('Để lại yêu cầu'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Để lại yêu cầu'));
+      await tester.pumpAndSettle();
+      expect(repository.requests.single['bookingAction'], {
+        'type': 'plan',
+        'plan': {'action': 'defer', 'planId': 'ke-hoach', 'revision': 5},
+      });
+    },
+  );
+
+  test(
+    'Thử lại sửa tên giữ nguyên request; chặn sửa đơn đã tạo và khi cần đối soát',
+    () async {
+      final repository = _repository()
+        ..initialSession = editableSession()
+        ..failSend = true;
+      final controller = AiChatController(repository);
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+      await controller.updateBooking({'recipientName': 'Trần Bình'}, 7);
+      final first = repository.requests.single;
+      await controller.retry();
+      expect(repository.requests.last, first);
+      controller.session = editableSession();
+      controller.session!['requiresReconciliation'] = true;
+      await controller.updateBooking({'recipientName': 'Tên Sai'}, 7);
+      controller.session = editableSession();
+      (controller.session!['bookingDraft'] as Map)['orderId'] = 'da-tao';
+      await controller.updateBooking({'recipientName': 'Tên Sai'}, 7);
+      expect(repository.requests.length, 2);
+    },
+  );
 
   test('Chặn chính sách thiếu hoặc sai phiên bản dù đã chọn đồng ý', () async {
     for (final policies in [

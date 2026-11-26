@@ -8,8 +8,8 @@ import type { AgentBookingValues, AgentSend, AgentBookingAction } from "../types
 import { composeFullAddress } from "@/features/profile/utils/addressLineParsing.utils";
 import { isValidVietnamesePhone, normalizeVietnamesePhone } from "@/utils/phoneValidation";
 
-export type AgentBookingEditMode = "quantity" | "address" | "payment" | "phone";
-const titles = { quantity: "Sửa số lượng", address: "Chọn địa chỉ thực hiện", payment: "Đổi phương thức thanh toán", phone: "Đổi số điện thoại người nhận" };
+export type AgentBookingEditMode = "quantity" | "address" | "payment" | "phone" | "name";
+const titles = { quantity: "Sửa số lượng", address: "Chọn địa chỉ thực hiện", payment: "Đổi phương thức thanh toán", phone: "Đổi số điện thoại người nhận", name: "Đổi tên người nhận" };
 const paymentLabels = { bank: "Chuyển khoản PayOS", wallet: "Ví Handigo", cash: "Tiền mặt" };
 const inputClass = "min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface focus-visible:outline-2 focus-visible:outline-primary";
 
@@ -23,6 +23,8 @@ export function AgentBookingEditor({ mode, values, preview, disabled, onClose, o
   const [payment, setPayment] = useState(values.paymentMethod ?? "bank");
   const [phone, setPhone] = useState(values.recipientPhone ?? (typeof preview?.recipientPhone === "string" ? preview.recipientPhone : ""));
   const [useAddressPhone, setUseAddressPhone] = useState(false);
+  const [name, setName] = useState(values.recipientName ?? (typeof preview?.recipientName === "string" ? preview.recipientName : ""));
+  const [useAddressName, setUseAddressName] = useState(false);
   const [quantity, setQuantity] = useState(String(values.uniformQuantity ?? preview?.quantity ?? 1));
   const [quantities, setQuantities] = useState<Record<string, string>>(Object.fromEntries(
     (values.selectedOptions ?? []).map((item) => [item.optionId, String(item.quantity)])));
@@ -61,7 +63,14 @@ export function AgentBookingEditor({ mode, values, preview, disabled, onClose, o
     setError("");
     let change: string;
     let patch: Extract<AgentBookingAction, { type: "update" }>["patch"];
-    if (mode === "phone") {
+    if (mode === "name") {
+      const recipientName = name.trim().replace(/\s+/g, " ");
+      if (!useAddressName && (recipientName.length < 2 || recipientName.length > 120 || !/^[\p{L}\p{M} ]+$/u.test(recipientName))) {
+        setError("Tên người nhận phải từ 2 đến 120 ký tự, chỉ gồm chữ và khoảng trắng."); return;
+      }
+      patch = { recipientName: useAddressName ? null : recipientName };
+      change = useAddressName ? "Dùng lại tên người nhận từ địa chỉ đã chọn." : `Đổi tên người nhận riêng cho đơn này thành ${recipientName}.`;
+    } else if (mode === "phone") {
       const recipientPhone = normalizeVietnamesePhone(phone);
       if (!useAddressPhone && !isValidVietnamesePhone(recipientPhone)) {
         setError("Số điện thoại Việt Nam không hợp lệ."); return;
@@ -115,7 +124,14 @@ export function AgentBookingEditor({ mode, values, preview, disabled, onClose, o
           <option value="" disabled>Chọn địa chỉ</option>
           {addresses.map((address) => <option key={address._id} value={address._id}>{composeFullAddress(address.fullAddress || address.detailAddress || "", address.ward, address.province)}{address.recipientName ? ` — ${address.recipientName}` : ""}{address.recipientPhone ? ` (${address.recipientPhone})` : ""}{address.note ? ` — ${address.note}` : ""}</option>)}
         </select></label> : <p className="text-sm text-on-surface-variant">Bạn chưa có địa chỉ. Bạn có thể nhắn địa chỉ mới để trợ lý hỗ trợ lưu và đặt lịch.</p>
-      : mode === "phone" ? <div className="space-y-3">
+      : mode === "name" ? <div className="space-y-3">
+        <label className="block space-y-2 text-sm"><span>Tên người nhận</span>
+          <input name="recipient-name" autoComplete="name" required={!useAddressName} maxLength={120} value={name}
+            disabled={blocked || useAddressName} onChange={(event) => setName(event.target.value)} className={inputClass} /></label>
+        <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={useAddressName} disabled={blocked}
+          onChange={(event) => setUseAddressName(event.target.checked)} />Dùng tên từ địa chỉ đã chọn</label>
+        <p className="text-xs text-on-surface-variant">Tên này chỉ dùng cho đơn đang đặt.</p>
+      </div> : mode === "phone" ? <div className="space-y-3">
         <label className="block space-y-2 text-sm"><span>Số điện thoại người nhận</span>
           <input type="tel" name="recipient-phone" autoComplete="tel" inputMode="tel" required={!useAddressPhone} value={phone}
             disabled={blocked || useAddressPhone} onChange={(event) => setPhone(event.target.value)} className={inputClass} /></label>

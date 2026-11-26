@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CUSTOMER_GRAPH_VERSION } from "./mongo-graph-access";
-import { CUSTOMER_RUNTIME_STAGES, type CustomerRuntimeStage } from "./customer-runtime-metrics";
+import { CUSTOMER_CACHE_NAMES, CUSTOMER_RUNTIME_STAGES, type CustomerCacheName, type CustomerRuntimeStage } from "./customer-runtime-metrics";
 import { modelUsageSchema } from "../llm/model-usage";
 import type { ModelUsage } from "../llm/llm.interface";
 
@@ -21,6 +21,8 @@ const metricSchema = z.object({ engine: z.literal("langgraph-customer"), version
   requiresReconciliation: z.boolean().optional(), interrupted: z.boolean().optional(),
   stages: z.array(stageSchema).max(CUSTOMER_RUNTIME_STAGES.length).optional(),
   usage: z.array(z.intersection(modelUsageSchema, z.object({ calls: z.number().int().positive().max(10000) }))).max(8).optional(),
+  cache: z.array(z.object({ name: z.enum(CUSTOMER_CACHE_NAMES), hits: z.number().int().min(0).max(10000),
+    misses: z.number().int().min(0).max(10000) }).strict()).max(CUSTOMER_CACHE_NAMES.length).optional(),
 }).refine((event) => new Set(event.stages?.map((item) => item.stage)).size === (event.stages?.length ?? 0));
 
 const latency = (values: number[]) => {
@@ -41,6 +43,7 @@ export class CustomerMetricsSummary {
   private truncated = 0;
   private turnsWithUsage = 0;
   private readonly usage = new Map<string, ModelUsage & { calls: number }>();
+  private readonly cache = new Map<CustomerCacheName, { hits: number; misses: number }>();
 
   add(value: unknown) {
     const parsed = metricSchema.safeParse(value);
@@ -53,6 +56,12 @@ export class CustomerMetricsSummary {
     this.reconciliation += Number(event.requiresReconciliation === true);
     this.interrupted += Number(event.interrupted === true);
     if (event.usage?.length) this.turnsWithUsage++;
+    for (const item of event.cache ?? []) {
+      const count = this.cache.get(item.name) ?? { hits: 0, misses: 0 };
+      count.hits += item.hits;
+      count.misses += item.misses;
+      this.cache.set(item.name, count);
+    }
     for (const source of event.usage ?? []) {
       const key = `${source.provider}:${source.model}`;
       // Giới hạn số model trong báo cáo để log cấu hình sai không tăng bộ nhớ không giới hạn.
@@ -82,6 +91,9 @@ export class CustomerMetricsSummary {
       ignored: this.ignored, truncated: this.truncated, outcomes: { ...this.outcomes }, failed: this.failed,
       requiresReconciliation: this.reconciliation, interrupted: this.interrupted, latency: latency(this.durations),
       turnsWithUsage: this.turnsWithUsage,
+      modelCalls: this.stages.get("model_request")?.counts ?? 0,
+      cache: [...this.cache].map(([name, count]) => ({ name, ...count,
+        hitRate: count.hits + count.misses > 0 ? count.hits / (count.hits + count.misses) : null })),
       usage: [...this.usage.values()].map((item) => {
         const rate = rates.find((value) => value.provider === item.provider && value.model === item.model);
         const uncached = item.inputTokens - item.cachedInputTokens - item.cacheWriteTokens;

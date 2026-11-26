@@ -4,6 +4,8 @@ import type { SourceRow } from "./admin-ai.context";
 const hasRegistrationImage = (value: unknown) => typeof value === "string" && value.trim().length > 0;
 
 export function incompleteApplicationReasons(row: SourceRow): string[] {
+  // Hồ sơ bổ sung dịch vụ không yêu cầu nộp lại thông tin đăng ký thợ ban đầu.
+  if (row.applicationType === "service_addition") return [];
   const reasons: string[] = [];
   if (typeof row.description !== "string" || !row.description.trim()) reasons.push("Chưa có mô tả kinh nghiệm và công việc đăng ký.");
   const identity = (row.identityDocument || {}) as Record<string, unknown>;
@@ -16,6 +18,16 @@ export function incompleteApplicationReasons(row: SourceRow): string[] {
   return reasons;
 }
 
+export function applicationImagesPassed(row: SourceRow, output: AIOutput): boolean {
+  const identity = (row.identityDocument || {}) as Record<string, unknown>;
+  const identityUrls = row.applicationType === "service_addition" ? [] : identity.type === "passport"
+    ? [identity.passportImageUrl] : [identity.frontImageUrl, identity.backImageUrl];
+  if (identityUrls.length === 2 && identityUrls[0] === identityUrls[1]) return false;
+  const urls = [...identityUrls, ...((row.certificates || []) as Array<{ imageUrls?: unknown[] }>).flatMap(item => item.imageUrls || [])];
+  return urls.every(url => typeof url === "string" && output.imageAnalyses?.some(image => image.url === url
+    && image.status === "analyzed" && image.relevant && image.consistent && image.observations.length > 0 && image.uncertainties.length === 0));
+}
+
 export function evaluateCriteria(policy: AdminAIPolicy, row: SourceRow | null, now = new Date()): CriterionResult[] {
   const identity = (row?.identityDocument || {}) as Record<string, unknown>;
   const certificates = (row?.certificates || []) as Array<Record<string, unknown>>;
@@ -23,6 +35,9 @@ export function evaluateCriteria(policy: AdminAIPolicy, row: SourceRow | null, n
     let status: CriterionResult["status"] = "unknown";
     let reason = "Chưa có nguồn dữ liệu xác minh phù hợp.";
     const decide = (passed: boolean, detail: string) => { status = passed ? "pass" : "fail"; reason = detail; };
+    if (row?.applicationType === "service_addition" && ["identity_images", "identity_expiry"].includes(rule.kind)) {
+      return { code: rule.code, status: "pass" as const, reason: "Hồ sơ bổ sung dịch vụ không yêu cầu nộp lại giấy tờ tùy thân; hệ thống kiểm tra hồ sơ thợ hợp lệ trước khi duyệt.", evidence: [] };
+    }
     if (row) switch (rule.kind) {
       case "description_length": decide(typeof row.description === "string" && row.description.trim().length >= rule.value, `Yêu cầu mô tả tối thiểu ${rule.value} ký tự.`); break;
       case "experience_years": decide(typeof row.experienceYears === "number" && row.experienceYears >= rule.value, `Kinh nghiệm tự khai tối thiểu ${rule.value} năm; chưa xác minh kinh nghiệm thực tế.`); break;

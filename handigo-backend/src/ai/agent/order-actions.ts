@@ -16,7 +16,8 @@ export async function withOrderActions(view: ReturnType<typeof sessionView>, use
     const blocked = view.requiresReconciliation;
     const awaitingPayment = (["created", "accepted"].includes(order.status)
       || order.status === "in_progress" && !order.inspectionRequired)
-      && order.paymentStatus === "unpaid" && !["expired", "rejected"].includes(order.bookingStatus);
+      && order.paymentStatus === "unpaid" && !["expired", "rejected"].includes(order.bookingStatus)
+      || order.status === "completed" && order.inspectionRequired && order.paymentStatus === "partially_paid";
     const assignedProvider = view.assignedProvider?.orderId === String(order._id)
       && view.assignedProvider.status === order.status
       && (view.assignedProvider.provider?.id ?? "") === (order.providerId ? String(order.providerId) : "") ? view.assignedProvider : null;

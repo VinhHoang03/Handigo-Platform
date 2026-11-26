@@ -9,8 +9,9 @@ export const REFRESHABLE_READ_TOOLS = new Set([
   "search_customer_knowledge", "get_system_info", "search_services", "get_service", "get_service_catalog", "get_addresses",
   "get_price", "get_available_times", "get_booking_vouchers", "search_booking_providers", "get_cancellation_preview",
   "get_booking", "get_my_bookings", "search_my_bookings", "get_previous_providers", "get_booking_provider",
-  "get_booking_feedback", "get_booking_quotation", "get_booking_refunds", "get_order_provider_options", "get_payment_status",
+  "get_booking_feedback", "get_feedback_moderation", "get_booking_quotation", "get_booking_refunds", "get_order_provider_options", "get_payment_status",
   "get_my_support_tickets", "get_support_ticket", "get_my_complaints", "get_complaint",
+  "get_report_context", "get_my_reports", "get_report", "get_withdrawal_accounts", "get_my_withdrawals", "get_withdrawal",
 ]);
 export interface ReadSource {
   tool: string;

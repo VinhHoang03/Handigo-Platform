@@ -1,4 +1,6 @@
 import mongoose, { ClientSession, Types } from "mongoose";
+import { createHash } from "node:crypto";
+import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import type { RequestUser } from "../middlewares/authContext";
 import { AppError } from "../utils/appError";
 import { BankAccount } from "../models/bankAccount.model";
@@ -50,7 +52,7 @@ const getActiveBankAccount = async (
       await BankAccount.findOne(filter).sort({ createdAt: -1 });
 
   if (!bankAccount) {
-    throw new AppError("Nhà cung cấp cần có tài khoản ngân hàng để rút tiền", 400);
+    throw new AppError("Bạn cần có tài khoản ngân hàng đang hoạt động để rút tiền", 400);
   }
 
   return bankAccount;
@@ -94,7 +96,10 @@ const buildListResult = async (filter: Record<string, unknown>, query: Withdrawa
   };
 };
 
-export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawalInput) => {
+const bankFingerprint = (account: { bankName: string; bankCode: string; accountNumber: string; accountHolderName: string }) =>
+  createHash("sha256").update(JSON.stringify([account.bankName, account.bankCode, account.accountNumber, account.accountHolderName])).digest("hex");
+
+export const previewWithdrawal = async (user: RequestUser, input: CreateWithdrawalInput) => {
   await assertWithdrawalAccess(user);
 
   if (input.amount <= 0) {
@@ -119,13 +124,36 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
   }
 
   const bankAccount = await getActiveBankAccount(user.id, input.bankAccountId);
+  const wallet = await Wallet.findOne({ userId: user.id, isDeleted: false }).select("balance");
+  if (!wallet || wallet.balance < input.amount) throw new AppError("Số dư ví không đủ để tạo yêu cầu rút tiền", 400);
+  return { title: "Tạo yêu cầu rút tiền", amount: input.amount, bankAccountId: String(bankAccount._id),
+    bankName: bankAccount.bankName, maskedAccountNumber: `••••${bankAccount.accountNumber.slice(-4)}`,
+    accountHolderName: bankAccount.accountHolderName, bankFingerprint: bankFingerprint(bankAccount),
+    minWithdrawAmount, maxWithdrawAmount,
+    note: "Số tiền được chuyển sang chờ xử lý sau xác nhận; yêu cầu cần quản trị viên duyệt, chưa có nghĩa tiền đã về ngân hàng." };
+};
+
+export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawalInput,
+  options?: { resourceId: Types.ObjectId; expectedBankFingerprint: string }) => {
+  await assertWithdrawalAccess(user);
+  if (options) {
+    const existing = await WithdrawRequest.findOne({ _id: options.resourceId, userId: user.id, isDeleted: false });
+    if (existing) {
+      if (existing.amount !== input.amount || String(existing.bankAccountId) !== input.bankAccountId) throw new ActionPreconditionError();
+      return existing;
+    }
+  }
+  const preview = await previewWithdrawal(user, input);
+  if (options && preview.bankFingerprint !== options.expectedBankFingerprint) throw new ActionPreconditionError();
+  const bankAccountId = new Types.ObjectId(preview.bankAccountId);
   const session = await mongoose.startSession();
 
   try {
     let createdRequest = null;
 
     await withTransactionRetry(session, async () => {
-      await lockWithdrawalBankAccount(user.id, bankAccount._id, session);
+      const account = await lockWithdrawalBankAccount(user.id, bankAccountId, session);
+      if (options && bankFingerprint(account) !== options.expectedBankFingerprint) throw new ActionPreconditionError();
       const wallet = await Wallet.findOneAndUpdate(
         {
           userId: user.id,
@@ -148,9 +176,10 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
       const [withdrawal] = await WithdrawRequest.create(
         [
           {
+            ...(options ? { _id: options.resourceId } : {}),
             userId: user.id,
             walletId: wallet._id,
-            bankAccountId: bankAccount._id,
+            bankAccountId,
             amount: input.amount,
             status: "pending",
           },
@@ -162,6 +191,13 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
     });
 
     return createdRequest;
+  } catch (error) {
+    if (options && error && typeof error === "object" && "code" in error && error.code === 11000) {
+      const existing = await WithdrawRequest.findOne({ _id: options.resourceId, userId: user.id,
+        amount: input.amount, bankAccountId: input.bankAccountId, isDeleted: false });
+      if (existing) return existing;
+    }
+    throw error;
   } finally {
     await session.endSession();
   }

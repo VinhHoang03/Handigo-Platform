@@ -5,6 +5,9 @@ export type AgentConversationFlow = "booking" | "payment" | "cancellation" | "re
 
 const toolFlows: Record<string, AgentConversationFlow> = {
   create_booking: "booking", save_booking_address: "booking", update_booking_draft: "booking",
+  discard_unpaid_order: "general", get_feedback_moderation: "general", delete_saved_address: "general", set_default_address: "general",
+  create_withdrawal: "payment", get_my_withdrawals: "payment", get_withdrawal: "payment", get_withdrawal_accounts: "payment",
+  create_report: "complaint", get_my_reports: "complaint", get_report: "complaint", get_report_context: "complaint", cancel_report: "complaint", add_report_evidence: "complaint",
   create_payment: "payment", cancel_payment: "payment", get_payment_status: "payment",
   cancel_booking: "cancellation", get_cancellation_preview: "cancellation", get_booking_refunds: "refund",
   get_booking_quotation: "quotation", reject_booking_quotation: "quotation",
@@ -24,7 +27,7 @@ export function getAgentConversationFlow(session?: AgentSession | null): AgentCo
   if (confirmation && toolFlows[confirmation.tool]) return toolFlows[confirmation.tool];
   const request = (messages[userIndex]?.content ?? session?.currentGoal ?? "").toLocaleLowerCase("vi-VN")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
-  if (/khieu nai|bang chung/.test(request)) return "complaint";
+  if (/khieu nai|bang chung|bao cao|quay roi|lua dao|xuc pham/.test(request)) return "complaint";
   if (/ho tro|phieu ho tro|ticket/.test(request)) return "support";
   if (/danh gia|\bsao\b/.test(request)) return "feedback";
   if (/bao gia/.test(request)) return "quotation";
@@ -34,7 +37,7 @@ export function getAgentConversationFlow(session?: AgentSession | null): AgentCo
   if (/doi tho|thay tho|nguoi thay the|chon lai tho/.test(request)) return "reassignment";
   if (/tho thuc hien|vi tri tho|lien he tho|goi tho|nhan tin.*tho/.test(request)) return "provider";
   if (/tim don cu|lich su don|tho tung|chon tho tu don|xem trang/.test(request)) return "history";
-  if (/thanh toan|nap vi|ma qr|quet qr/.test(request)) return "payment";
+  if (/thanh toan|nap vi|rut tien|rut vi|yeu cau rut|ma qr|quet qr/.test(request)) return "payment";
   if (/dat|dich vu|dia chi|so luong|lich hen|voucher|chuyen gia/.test(request)) return "booking";
   return "general";
 }

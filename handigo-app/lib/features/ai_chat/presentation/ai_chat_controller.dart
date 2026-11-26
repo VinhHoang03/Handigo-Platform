@@ -150,17 +150,58 @@ class AiChatController extends ChangeNotifier {
     if (latest != null) _apply(latest);
   });
 
-  Future<void> send(String text, {List<String>? attachments}) async {
+  Future<void> send(
+    String text, {
+    List<String>? attachments,
+    Map<String, dynamic>? bookingAction,
+  }) async {
     final content = text.trim();
     if (!canSend || content.isEmpty || content.length > 4000) return;
     _pendingRequest = {
       'sessionId': _sessionId,
       'requestId': _newId(),
       'message': content,
+      'bookingAction': ?bookingAction,
       if (attachments != null)
         'customerAttachments': List<String>.of(attachments),
     };
     await _submit();
+  }
+
+  Future<void> updateBooking(Map<String, dynamic> patch, int revision) async {
+    final draft = session?['bookingDraft'] as Map?;
+    if (!canSend ||
+        draft == null ||
+        draft['revision'] != revision ||
+        !['active', 'paused'].contains(draft['status']) ||
+        draft['orderId'] != null) {
+      return;
+    }
+    await send(
+      'Cập nhật thông tin bản nháp đặt dịch vụ.',
+      bookingAction: {'type': 'update', 'revision': revision, 'patch': patch},
+    );
+  }
+
+  Future<void> managePlan(String action, {String? itemId}) async {
+    final plan = session?['bookingPlan'] as Map?;
+    if (!canSend ||
+        plan == null ||
+        (confirmation != null && confirmation!['tool'] != 'create_booking')) {
+      return;
+    }
+    await send(
+      'Cập nhật danh sách yêu cầu đặt dịch vụ.',
+      bookingAction: {
+        'type': 'plan',
+        'plan': {
+          'action': action,
+          'planId': plan['id'],
+          'revision': plan['revision'],
+          'itemId': ?itemId,
+        },
+      },
+    );
   }
 
   Future<void> decide(String decision, {bool policyAccepted = false}) async {

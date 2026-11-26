@@ -13,7 +13,7 @@ export function repairSafetyAdvice(description: string) {
     return false;
   });
   const key = present(/mui khet|(?:co|boc|ra|phat) khoi|khoi (?:boc|bay|lan)|tia lua|dang chay|phat chay|chay no/)
-      ? "fire" : present(/dien giat|ro dien|cham dien|te tay|te khi cham|nuoc (?:tran|ngap|chay).{0,30}(?:o cam|tu dien|bang dien)/)
+      ? "fire" : present(/dien giat|ro dien|cham dien|te tay|te khi cham|nuoc (?:tran|ngap|chay|sat|gan).{0,30}(?:o cam|phich cam|tu dien|bang dien|day dien ho|phan dien ho)/)
         ? "electric" : present(/(?:tron|do chung|do them).{0,60}(?:javen|axit|acid|thuoc tay|hoa chat|thong cong)/)
           ? "chemical" : null;
   if (!key) return null;
@@ -38,6 +38,7 @@ export function assessRepairDescription(description: string) {
     possibleCauses: item.possibleCauses, safeActions: item.safeActions, avoidActions: item.avoidActions,
     serviceQueries: item.serviceQueries, references: item.references.map((key) => repairReferences[key]) }));
   return { status: cases.length ? "advice" as const : "needs_details" as const,
+    serviceQueries: [...new Set(deviceMatches.flatMap(({ item }) => item.serviceQueries))].slice(0, 4),
     cases, questions: cases.length ? [] : [deviceMatches.length
       ? "Thiết bị đang gặp biểu hiện gì, bắt đầu khi nào và có mã lỗi không?"
       : "Bạn đang gặp sự cố ở thiết bị hoặc khu vực nào, và biểu hiện cụ thể là gì?"],
@@ -46,5 +47,5 @@ export function assessRepairDescription(description: string) {
 }
 
 export function formatRepairSafetyAdvice(advice: NonNullable<ReturnType<typeof repairSafetyAdvice>>) {
-  return `${advice.message}\n\nNguồn: ${advice.references.map((source) => `${source.title}: ${source.url}`).join("; ")}`;
+  return advice.message;
 }

@@ -92,6 +92,11 @@ export class AgentModelWorkflow {
         const plan = host.planTurn(session, context);
         if (typeof plan === "string") this.finish(plan);
         else if (plan === null) {
+          const faq = await host.answerBookingFaq(session, context);
+          if (faq !== undefined) {
+            this.reply(session, "COMPLETED", faq);
+            break;
+          }
           if (host.tools.routeByIntent) {
             const latest = [...session.conversation].reverse().find((item) => item.role === "user");
             f.intent = inferToolIntent(latest?.content ?? "");
@@ -209,12 +214,27 @@ export class AgentModelWorkflow {
     await this.save();
     const signal = AbortSignal.any([context.signal, AbortSignal.timeout(host.config.timeoutMs)]);
     try {
-      f.response = llmResponseSchema.parse(await measureCustomerStage("model_request", () => withAgentTimeout(host.provider.generate({
-        system: host.config.systemPrompt + (host.tools.routeByIntent ? TOOL_ROUTING_PROMPT : "")
-          + (f.modelRetryCount ? "\nYêu cầu vừa được tiếp tục sau gián đoạn. Kết quả công cụ trước đó là dữ liệu tại thời điểm đã đọc. Khi cần kết luận trạng thái hiện tại, hãy tra cứu lại bằng công cụ đọc; không tự thực hiện lại thao tác ghi đã thành công." : "")
-          + (context.readOnly ? "\nPhiên đang đối soát thao tác trước. Chỉ được tra cứu, giải thích dữ liệu hiện tại; không sửa bản nháp, chuẩn bị xác nhận hoặc thực hiện thao tác ghi. Không khẳng định thao tác trước thành công nếu chưa có bằng chứng." : ""),
-        ...agentContext(session), tools: host.tools.forIntent(context, f.intent), signal, onUsage: recordCustomerModelUsage,
-      }), signal, host.config.timeoutMs)));
+      for (let attempt = 0; ; attempt++) {
+        try {
+          f.response = llmResponseSchema.parse(await measureCustomerStage("model_request", () => withAgentTimeout(host.provider.generate({
+            system: host.config.systemPrompt + (host.tools.routeByIntent ? TOOL_ROUTING_PROMPT : "")
+              + (f.modelRetryCount ? "\nYêu cầu vừa được tiếp tục sau gián đoạn. Kết quả công cụ trước đó là dữ liệu tại thời điểm đã đọc. Khi cần kết luận trạng thái hiện tại, hãy tra cứu lại bằng công cụ đọc; không tự thực hiện lại thao tác ghi đã thành công." : "")
+              + (context.readOnly ? "\nPhiên đang đối soát thao tác trước. Chỉ được tra cứu, giải thích dữ liệu hiện tại; không sửa bản nháp, chuẩn bị xác nhận hoặc thực hiện thao tác ghi. Không khẳng định thao tác trước thành công nếu chưa có bằng chứng." : ""),
+            ...agentContext(session), tools: host.tools.forIntent(context, f.intent), signal, onUsage: recordCustomerModelUsage,
+          }), signal, host.config.timeoutMs)));
+          break;
+        } catch (error) {
+          if (!this.durable || context.readOnly || signal.aborted || attempt >= 2
+            || !(error instanceof ProviderHttpError) || ![502, 503, 504].includes(error.status)) throw error;
+          // Chỉ gọi lại model, giữ nguyên bước nghiệp vụ và giới hạn thời gian của lần gọi này.
+          const retryDelayMs = 1000 * 2 ** attempt + Math.floor(Math.random() * 250);
+          console.warn("Dịch vụ AI tạm gián đoạn, đang thử lại.", JSON.stringify({ requestId: session.activeRequest?.requestId,
+            status: error.status, nextAttempt: attempt + 2, retryDelayMs }));
+          host.activity(session, "Dịch vụ AI đang bận, đang thử lại yêu cầu");
+          await this.save();
+          await delay(retryDelayMs, undefined, { signal });
+        }
+      }
       f.consecutiveProviderErrors = 0;
       f.phase = f.response.type === "TOOL_CALL" ? "route_tool" : "respond";
     } catch (error) {
@@ -289,14 +309,14 @@ export class AgentModelWorkflow {
       f.selected = { tool: tool.name, args };
       if (!context.readOnly && session.bookingDraft?.status === "active" && !["update_booking_draft", "create_booking", "get_service",
         "search_services", "get_addresses", "get_price", "get_available_times", "get_booking_vouchers", "search_booking_providers",
-        "save_booking_address", "rebook_booking", "get_previous_providers", "search_my_bookings", "get_my_bookings", "get_booking"].includes(tool.name)) session.bookingDraft.status = "paused";
+        "save_booking_address", "manage_booking_plan", "rebook_booking", "get_previous_providers", "search_my_bookings", "get_my_bookings", "get_booking"].includes(tool.name)) session.bookingDraft.status = "paused";
       const address = args as { addressId?: string; useForBooking?: boolean };
       if (tool.name === "save_booking_address" && !address.addressId && address.useForBooking === true
         && session.bookingDraft && ["active", "paused"].includes(session.bookingDraft.status) && !session.bookingDraft.orderId) {
         f.phase = "apply_address"; return;
       }
       if (host.tools.needsConfirmation(tool)) {
-        const completed = !["create_payment", "cancel_payment", "submit_booking_feedback"].includes(tool.name)
+        const completed = !["create_payment", "cancel_payment", "submit_booking_feedback", "create_withdrawal"].includes(tool.name)
           && session.actions.find((action) => action.taskVersion === session.taskVersion && action.tool === tool.name
             && action.status === "SUCCEEDED" && isDeepStrictEqual(action.arguments, args));
         if (completed) {

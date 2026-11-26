@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { ClientSession, Model } from "mongoose";
 import { ProviderApplication } from "../../models/providerApplication.model";
+import { Provider } from "../../models/provider.model";
 import { ServiceSuggestion } from "../../models/serviceSuggestion.model";
 import { Complaint } from "../../models/complaint.model";
 import { Report } from "../../models/report.model";
@@ -17,6 +18,7 @@ import { AppError } from "../../utils/appError";
 import type { AISource } from "./admin-ai.provider";
 import type { RunInput } from "./admin-ai.validation";
 import { loadComplaintDetails } from "./admin-ai.complaint-context";
+import { assertAdminImageUrl } from "./admin-ai.images";
 
 export type SourceRow = Record<string, unknown> & { _id: import("mongoose").Types.ObjectId; updatedAt?: Date; status?: string };
 export const hashSource = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -46,14 +48,33 @@ export async function loadContext(input: Pick<RunInput, "sourceType" | "sourceId
   if (input.sourceType === "provider_application") {
     const services = await Service.find({ _id: { $in: (row.serviceIds as unknown[] || []).map(String) }, isDeleted: false, isActive: true }).select("name categoryId").session(session ?? null).lean();
     const certificates = row.certificates as Array<Record<string, unknown>> || [];
-    const identity = (row.identityDocument || {}) as Record<string, unknown>;
-    addImages([identity.frontImageUrl], "Mặt trước giấy tờ trong hồ sơ thợ.");
-    addImages([identity.backImageUrl], "Mặt sau giấy tờ trong hồ sơ thợ.");
-    addImages([identity.passportImageUrl], "Ảnh hộ chiếu trong hồ sơ thợ.");
-    addImages([identity.selfieImageUrl], "Ảnh chân dung trong hồ sơ thợ; không xác thực danh tính.");
-    for (const [index, certificate] of certificates.entries()) addImages((certificate.imageUrls || []) as unknown[], `Ảnh chứng chỉ thứ ${index + 1}; đối chiếu với chứng chỉ đã khai.`);
-    sources.push(source(`provider_application:${row._id}`, { description: row.description, experienceYears: row.experienceYears, identityDeclared: { type: identity.type, issuedAt: identity.issuedAt, expiresAt: identity.expiresAt }, applicationType: row.applicationType, status: row.status, createdAt: row.createdAt, updatedAt: row.updatedAt, certificates: certificates.map(item => ({ title: item.title, issuer: item.issuer, description: item.description, issuedAt: item.issuedAt, expiresAt: item.expiresAt, hasImages: Array.isArray(item.imageUrls) && item.imageUrls.length > 0 })), services: services.map(item => ({ id: String(item._id), name: item.name })) }));
-    catalogComplete = services.length === (row.serviceIds as unknown[] || []).length;
+    const identity = (row.applicationType === "service_addition" ? {} : row.identityDocument || {}) as Record<string, unknown>;
+    const provider = row.applicationType === "service_addition"
+      ? await Provider.findOne({ userId: String(row.userId), verified: true, isDeleted: false }).select("_id updatedAt").session(session ?? null).lean() : null;
+    if (row.applicationType === "service_addition") {
+      catalogComplete = Boolean(provider);
+      sources.push(source("provider_eligibility", { eligible: Boolean(provider), updatedAt: provider?.updatedAt }));
+    }
+    const addRegistrationImages = (urls: unknown[], label: string) => {
+      for (const url of urls) {
+        if (typeof url !== "string" || !url) continue;
+        try {
+          const pathname = new URL(assertAdminImageUrl(url)).pathname.replace(/^\/[^/]+\/image\/upload\/(?:v\d+\/)?/, "/");
+          if (!pathname.startsWith(`/handigo/provider-applications/${row.userId}/`)
+            && !(provider && ["provider-documents", "provider-certificates"].some(folder => pathname.startsWith(`/handigo/${folder}/${provider._id}/`)))) throw new Error("Ảnh ngoài phạm vi hồ sơ.");
+          addImages([url], label);
+        } catch {
+          catalogComplete = false;
+          sources.push(source(`unavailable_image:${sources.length}`, { label, note: "Ảnh không thuộc phạm vi tải lên của người đăng ký; cần Admin kiểm tra bản gốc, không suy đoán nội dung." }));
+        }
+      }
+    };
+    addRegistrationImages([identity.frontImageUrl], "Mặt trước giấy tờ trong hồ sơ thợ.");
+    addRegistrationImages([identity.backImageUrl], "Mặt sau giấy tờ trong hồ sơ thợ.");
+    addRegistrationImages([identity.passportImageUrl], "Ảnh hộ chiếu trong hồ sơ thợ.");
+    for (const [index, certificate] of certificates.entries()) addRegistrationImages((certificate.imageUrls || []) as unknown[], `Ảnh chứng chỉ thứ ${index + 1}; đối chiếu với chứng chỉ đã khai.`);
+    sources.push(source(`provider_application:${row._id}`, { description: row.description, experienceYears: row.experienceYears, identityDeclared: { type: identity.type, fullName: identity.fullName, issuedAt: identity.issuedAt, expiresAt: identity.expiresAt }, applicationType: row.applicationType, status: row.status, createdAt: row.createdAt, updatedAt: row.updatedAt, certificates: certificates.map(item => ({ title: item.title, issuer: item.issuer, description: item.description, issuedAt: item.issuedAt, expiresAt: item.expiresAt, hasImages: Array.isArray(item.imageUrls) && item.imageUrls.length > 0 })), services: services.map(item => ({ id: String(item._id), name: item.name })) }));
+    catalogComplete = catalogComplete && services.length === (row.serviceIds as unknown[] || []).length;
   } else if (input.sourceType === "service_suggestion") {
     const [services, categories] = await Promise.all([
       Service.find({ isDeleted: false }).select("name categoryId description").sort({ _id: 1 }).limit(501).session(session ?? null).lean(),

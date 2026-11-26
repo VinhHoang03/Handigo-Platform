@@ -22,7 +22,7 @@ const priorityLabels: Record<string, string> = { LOW: "Thấp", MEDIUM: "Vừa",
 const statusLabels: Record<string, string> = {
   open: "Mới tiếp nhận", in_progress: "Đang xử lý", waiting_user: "Chờ khách phản hồi",
   resolved: "Đã xử lý", closed: "Đã đóng", cancelled: "Đã hủy", pending: "Chờ xem xét",
-  evidence_requested: "Cần bổ sung bằng chứng", under_review: "Đang xem xét", rejected: "Đã từ chối",
+  evidence_requested: "Cần bổ sung bằng chứng", under_review: "Đang xem xét", rejected: "Đã từ chối", confirmed: "Đã xác nhận vi phạm",
 };
 const referenceSchema = z.object({ _id: z.unknown(), orderCode: z.string() }).nullable().optional();
 const caseSchema = z.object({

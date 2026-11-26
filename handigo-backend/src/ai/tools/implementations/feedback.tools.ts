@@ -5,6 +5,12 @@ import { agentRequestAttachments } from "../../agent/booking-attachments";
 import { AgentFeedbackService, agentFeedbackSchema } from "../../../services/agentFeedback.service";
 
 const orderSchema = z.object({ orderId: idSchema }).strict();
+const moderationSchema = orderSchema.extend({ page: z.number().int().min(1).max(100000).default(1) });
+export const getFeedbackModerationTool: AgentTool<z.infer<typeof moderationSchema>> = {
+  name: "get_feedback_moderation", description: "Tra trạng thái kiểm duyệt nhận xét của chính khách trên đúng đơn: đang chờ, bị từ chối, đã được duyệt và có đang hiển thị không. Phân biệt bản hiện tại với lịch sử, có phân trang. Không đọc người kiểm duyệt hoặc ghi chú nội bộ, không duyệt hay đăng lại nội dung.",
+  inputSchema: moderationSchema, mutates: false, requiresConfirmation: false, roles: ["CUSTOMER"],
+  execute: (ctx, args) => AgentFeedbackService.moderation(ctx.user.id, args.orderId, args.page),
+};
 const feedbackAttachments = (context: ToolContext, args: z.infer<typeof agentFeedbackSchema>) => {
   const latest = context.session?.conversation.slice().reverse().find((message) => message.role === "user");
   return args.customerAttachments !== undefined || latest?.customerAttachments !== undefined
