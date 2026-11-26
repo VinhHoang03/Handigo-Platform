@@ -13,7 +13,11 @@ export function AgentBookingActions({ session, disabled, onOpenTool, onSend, onC
   const pending = session?.pendingConfirmation;
   const buttonClass = "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-outline-variant/50 bg-surface-container-lowest px-3 py-2 text-xs font-medium text-on-surface transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:text-primary";
   const send = (message: string, action?: AgentBookingAction) => { void onSend(message, undefined, action).catch(() => undefined); };
-  const update = (message: string, mode: "pause" | "resume" | "discard") => send(message, { type: "update", revision: draft?.revision ?? 0, patch: { mode } });
+  const plan = session?.bookingPlan;
+  const livePlan = plan && ["active", "paused"].includes(plan.status);
+  const update = (message: string, mode: "pause" | "resume" | "discard") => send(message, livePlan
+    ? { type: "plan", plan: { action: mode === "discard" ? "cancel" : mode, planId: plan.id, revision: plan.revision } }
+    : { type: "update", revision: draft?.revision ?? 0, patch: { mode } });
   const options = (label: string, children: ReactNode) => <details className="group relative shrink-0" onKeyDown={(event) => {
     if (event.key === "Escape") {
       event.preventDefault(); event.currentTarget.removeAttribute("open"); event.currentTarget.querySelector("summary")?.focus();

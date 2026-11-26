@@ -4,6 +4,7 @@ import { randomInt } from "node:crypto";
 import { Category, ICategory } from "../models/category.model";
 import { Service } from "../models/service.model";
 import { AppError } from "../utils/appError";
+import { invalidateAgentServiceCatalog } from "./agentCatalog.service";
 
 interface CategoryInput {
   name?: string;
@@ -135,7 +136,9 @@ export const createCategory = async (data: CategoryInput, session?: ClientSessio
       const [category] = await Category.create([{ ...data, slug, iconColor }], { session });
       return category;
     }
-    return await Category.create({ ...data, slug, iconColor });
+    const category = await Category.create({ ...data, slug, iconColor });
+    invalidateAgentServiceCatalog();
+    return category;
   } catch (error) {
     return rethrowCategoryWriteError(error);
   }
@@ -159,7 +162,9 @@ export const updateCategory = async (id: string, data: CategoryInput) => {
   );
   Object.assign(category, { isActive: category.isActive && !category.isDeleted }, data, { iconColor, isDeleted: false, deletedAt: null });
   try {
-    return await category.save();
+    const updated = await category.save();
+    invalidateAgentServiceCatalog();
+    return updated;
   } catch (error) {
     return rethrowCategoryWriteError(error);
   }
@@ -172,6 +177,7 @@ export const deleteCategory = async (id: string) => {
 
   category.isActive = false;
   await category.save();
+  invalidateAgentServiceCatalog();
 };
 
 export const getActiveCategories = async () => {

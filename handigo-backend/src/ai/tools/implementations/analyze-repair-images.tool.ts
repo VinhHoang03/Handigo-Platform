@@ -15,11 +15,18 @@ export const analyzeRepairImagesTool: AgentTool<z.infer<typeof schema>> = {
     if (safety) return safety;
     const urls = agentRequestAttachments(ctx.session, args.customerAttachments);
     if (!urls.length) throw new AppError("Vui lòng đính kèm ảnh hiện trạng hoặc mô tả sự cố bằng chữ.", 400);
+    // Ghim ảnh đã chọn vào arguments để thử lại hoặc làm mới nguồn không phụ thuộc tin nhắn mới nhất.
+    args.customerAttachments = urls;
     const observations = await analyzeRepairImages(urls, args.description, ctx.signal);
+    if (!repairSafetyAdvice(observations.observations.join(". "))) {
+      observations.visibleHazards = observations.visibleHazards.filter((item) => item !== "water_near_electricity");
+    }
     const hazards = observations.visibleHazards;
     if (hazards.length) {
-      const labels = { smoke: "có khói", sparks: "có tia lửa", water_near_electricity: "nước gần ổ cắm", damaged_wire: "bị rò điện" };
-      const urgent = repairSafetyAdvice(hazards.map((item) => labels[item]).join(", "));
+      // Nhãn nước gần điện phải có quan sát cụ thể, không tự thêm ổ cắm vào ảnh chảy nước.
+      const labels = { smoke: "có khói", sparks: "có tia lửa", damaged_wire: "dây điện hở hoặc hỏng, có nguy cơ chạm điện" };
+      const urgent = repairSafetyAdvice([...observations.observations,
+        ...hazards.filter((item) => item !== "water_near_electricity").map((item) => labels[item])].join(". "));
       if (urgent) return { ...urgent, imageObservations: observations,
         observationNote: "Ảnh có dấu hiệu nguy hiểm có thể xảy ra. Không đến gần hoặc thử thiết bị để xác nhận." };
     }

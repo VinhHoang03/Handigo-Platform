@@ -40,6 +40,7 @@ export function ChatbotMessageList({
   audience,
   children,
   onSend,
+  onPreviewImage,
   choicesDisabled = false,
   bookingVoucherChoicesEnabled = false,
   pendingActionId,
@@ -54,6 +55,7 @@ export function ChatbotMessageList({
   audience: ChatbotAudience;
   children?: ReactNode;
   onSend?: (content: string) => Promise<void>;
+  onPreviewImage: (url: string) => void;
   choicesDisabled?: boolean;
   bookingVoucherChoicesEnabled?: boolean;
   pendingActionId?: string;
@@ -138,6 +140,10 @@ export function ChatbotMessageList({
     >
       {messages.map((message) => {
         const isUser = message.sender === "user";
+        const visibleContent = isUser && message.customerAttachments?.length && [
+          "Ảnh đính kèm.", "Cập nhật ảnh hiện trạng cho bản nháp đặt dịch vụ này.",
+          "Tôi gửi ảnh đính kèm. Hãy hỏi tôi muốn dùng ảnh cho yêu cầu nào nếu chưa rõ.",
+        ].includes(message.content.trim()) ? "" : message.content;
         const isBookingConfirmation = !isUser && message.confirmation?.tool === "create_booking";
         if (hasBookingForm && isBookingConfirmation && message.confirmation?.status === "EXPIRED") return null;
         const visibleChoiceGroups = hasBookingForm && isBookingConfirmation
@@ -164,18 +170,18 @@ export function ChatbotMessageList({
                 <time dateTime={message.createdAt} className="font-normal tabular-nums text-on-surface-variant">{formatTime(message.createdAt)}</time>
               </div>
               {isBookingConfirmation && confirmation}
-              {(message.content || showChoices) && <div
+              {(visibleContent || showChoices || Boolean(message.customerAttachments?.length)) && <div
               className={`${isBookingConfirmation ? "mt-3 " : ""}rounded-2xl px-4 py-3 text-sm leading-6 ${
                 isUser
                   ? "rounded-tr-sm bg-primary text-on-primary shadow-sm"
                   : "rounded-tl-sm border border-outline-variant/35 bg-surface-container-lowest text-on-surface shadow-[0_2px_4px_rgba(19,27,46,0.02)]"
               }`}
             >
-              {message.content && (isUser ? <p className="whitespace-pre-wrap break-words">{agentDisplayText(message.content)}</p> : <AgentMessageContent content={agentDisplayText(message.content)} />)}
+              {visibleContent && (isUser ? <p className="whitespace-pre-wrap break-words">{agentDisplayText(visibleContent)}</p> : <AgentMessageContent content={agentDisplayText(visibleContent, true)} />)}
               {Boolean(message.customerAttachments?.length) && <div className="mt-2 grid grid-cols-2 gap-2">
-                {message.customerAttachments!.map((url, index) => <a key={url} href={url} target="_blank" rel="noreferrer" aria-label={`Mở ảnh hiện trạng ${index + 1}`} className="overflow-hidden rounded-xl focus-visible:outline-2 focus-visible:outline-primary">
+                {message.customerAttachments!.map((url, index) => <button key={url} type="button" onClick={() => onPreviewImage(url)} aria-label={`Mở ảnh hiện trạng ${index + 1}`} className="cursor-zoom-in overflow-hidden rounded-xl focus-visible:outline-2 focus-visible:outline-primary">
                   <img src={url} alt={`Ảnh hiện trạng ${index + 1}`} loading="lazy" className="aspect-square w-full object-cover" />
-                </a>)}
+                </button>)}
               </div>}
               {showChoices && (
                 <AgentChoiceGroups key={message._id} groups={visibleChoiceGroups!}

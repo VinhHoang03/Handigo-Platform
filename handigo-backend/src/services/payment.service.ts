@@ -30,12 +30,14 @@ export interface ConfirmedPaymentExpectation {
   paymentType: PaymentType;
   previousPaymentId?: string;
   previousPaymentMethod?: "cash" | "payos";
+  quotationId?: string;
+  quotationRevision?: number;
 }
 
 export interface ConfirmedPaymentCancellation {
   paymentId: string;
   amount: number;
-  paymentType: "full" | "inspection_deposit";
+  paymentType: "full" | "inspection_deposit" | "remaining";
 }
 
 const isFixedPriceWorkPayment = (order: InstanceType<typeof Order>) =>
@@ -603,15 +605,29 @@ const reserveExternalPayment = async (
 export const previewOrderPayment = async (user: RequestUser, orderId: string, method: CreatePaymentInput["method"], allowMethodSwitch = false) => {
   const order = await Order.findOne({ _id: orderId, customerId: user.id, isDeleted: false });
   if (!order) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
-  if ((!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order)) || order.paymentStatus !== "unpaid") {
+  const remaining = order.inspectionRequired && order.status === "completed";
+  let quotationContext: Awaited<ReturnType<typeof validateQuotationPayment>> | undefined;
+  if (remaining) {
+    const quotation = await RepairQuotation.findOne({ _id: order.currentQuotationId, orderId, customerId: user.id, isDeleted: false });
+    if (!quotation) throw new AppError("Chưa có báo giá hiện tại để thanh toán.", 409);
+    const deposit = order.pricing.baseAmount !== undefined ? order.pricing.totalPaidAmount : order.depositAmount;
+    const session = await mongoose.startSession();
+    try {
+      quotationContext = await withTransactionRetry(session, () => validateQuotationPayment(user, {
+        orderId, method, paymentType: "REMAINING", quotationId: String(quotation._id),
+        expectedRevision: quotation.revision ?? 0, expectedAmount: Math.max(quotation.finalAmount - Math.max(deposit, 0), 0),
+      }, session, false));
+    } finally { await session.endSession(); }
+    if (order.paymentStatus !== "partially_paid") throw new AppError("Báo giá đã được thanh toán. Hãy kiểm tra trạng thái đơn.", 409);
+  } else if ((!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order)) || order.paymentStatus !== "unpaid") {
     throw new AppError("Đơn không còn chờ thanh toán. Hãy kiểm tra trạng thái thanh toán của đơn.", 409);
   }
-  const paymentType = getPaymentType(order);
+  const paymentType = remaining ? "remaining" : getPaymentType(order);
   assertAppointmentPaymentReady(order, paymentType);
   if (order.inspectionRequired && method === "CASH") {
     throw new AppError("Tiền đặt cọc khảo sát chỉ thanh toán bằng chuyển khoản hoặc ví Handigo.", 400);
   }
-  const amount = await getPaymentAmount(order, paymentType);
+  const amount = quotationContext?.amount ?? await getPaymentAmount(order, paymentType);
   if (amount < 0) throw new AppError("Số tiền thanh toán không hợp lệ.", 400);
   const existing = await Payment.findOne({ orderId, paymentType, isDeleted: false, status: { $in: ["pending", "paid"] } });
   const switching = allowMethodSwitch && existing?.status === "pending"
@@ -630,9 +646,12 @@ export const previewOrderPayment = async (user: RequestUser, orderId: string, me
   }
   return { title: switching ? "Xác nhận đổi phương thức thanh toán" : method === "WALLET" ? "Xác nhận trừ tiền ví" : method === "CASH" ? "Xác nhận thanh toán tiền mặt" : "Tạo liên kết chuyển khoản",
     orderId: String(order._id), orderCode: order.orderCode, amount, paymentType,
+    ...(quotationContext ? { quotationId: String(quotationContext.quotation._id), quotationRevision: quotationContext.quotation.revision ?? 0,
+      quotationCode: quotationContext.quotation.quotationCode, quotationAmount: quotationContext.quotation.finalAmount,
+      paidAmount: quotationContext.appliedDepositAmount } : {}),
     ...(switching ? { previousPaymentId: String(existing!._id), previousPaymentMethod: existing!.method as "cash" | "payos" } : {}),
     paymentMethod: method === "PAYOS" ? "bank" : method === "WALLET" ? "wallet" : "cash",
-    paymentLabel: paymentType === "inspection_deposit" ? "Tiền đặt cọc khảo sát" : "Thanh toán toàn bộ dịch vụ",
+    paymentLabel: paymentType === "remaining" ? "Phần còn lại của báo giá sau khấu trừ cọc" : paymentType === "inspection_deposit" ? "Tiền đặt cọc khảo sát" : "Thanh toán toàn bộ dịch vụ",
     note: switching && existing?.method === "cash" ? `Xác nhận sẽ thay giao dịch tiền mặt đang chờ bằng ${method === "WALLET" ? "thanh toán từ ví Handigo" : "chuyển khoản PayOS"} trên cùng đơn. Không trả thêm tiền mặt cho khoản này; đơn hàng và voucher được giữ nguyên. ${method === "PAYOS" ? "Tạo mã QR chưa có nghĩa đã thanh toán." : "Số tiền trên sẽ được trừ từ ví."}`
       : switching ? `Xác nhận sẽ hủy liên kết PayOS đang chờ trên cùng đơn rồi ${method === "WALLET" ? "trừ số tiền trên từ ví Handigo" : "ghi nhận thanh toán trực tiếp cho nhà cung cấp"}. Mã QR cũ sẽ không còn dùng được; đơn hàng và voucher được giữ nguyên.`
       : method === "WALLET" ? "Xác nhận sẽ trừ số tiền trên từ ví Handigo."
@@ -688,8 +707,8 @@ const cancelPendingPayosPayment = async (
   const transition = await Payment.updateOne({ _id: payment._id, status: "pending", isDeleted: false }, {
     $set: { status: "failed", failedAt: new Date(), failureReason: cancellationActionId
       ? "Khách hàng đã hủy giao dịch QR thanh toán" : "Đã hủy PayOS để đổi phương thức thanh toán",
-      ...(cancellationActionId ? { "metadata.customerCancelledQr": true, "metadata.agentCancellationActionId": cancellationActionId } : {}),
-      "gatewayResponse.statusCheck": { status: link.status, checkedAt: new Date(), amountPaid: link.amountPaid } },
+      ...(cancellationActionId ? { metadata: { ...(payment.metadata || {}), customerCancelledQr: true, agentCancellationActionId: cancellationActionId } } : {}),
+      gatewayResponse: { ...(payment.gatewayResponse || {}), statusCheck: { status: link.status, checkedAt: new Date(), amountPaid: link.amountPaid } } },
   }, { runValidators: true });
   if (transition.modifiedCount !== 1) throw new ActionPreconditionError();
   publishPaymentStatus({ _id: payment._id, orderId: payment.orderId, customerId: payment.customerId,
@@ -701,11 +720,12 @@ export const previewAgentPaymentCancellation = async (user: RequestUser, orderId
   if (user.role !== "CUSTOMER") throw new AppError("Hủy QR qua trợ lý chỉ dành cho khách hàng.", 403);
   const order = await Order.findOne({ _id: orderId, customerId: user.id, isDeleted: false });
   if (!order) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
-  if (order.paymentStatus !== "unpaid") throw new AppError("Đơn đã ghi nhận thanh toán. Vui lòng kiểm tra thanh toán, không hủy QR cũ.", 409);
-  if (!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order)) throw new AppError("Đơn không còn ở trạng thái có thể hủy QR qua trợ lý.", 409);
+  const remaining = order.inspectionRequired && order.status === "completed" && order.paymentStatus === "partially_paid";
+  if (order.paymentStatus !== "unpaid" && !remaining) throw new AppError("Đơn đã ghi nhận thanh toán. Vui lòng kiểm tra thanh toán, không hủy QR cũ.", 409);
+  if (!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order) && !remaining) throw new AppError("Đơn không còn ở trạng thái có thể hủy QR qua trợ lý.", 409);
   const payment = await Payment.findOne({ orderId, customerId: user.id, method: "payos", status: "pending", isDeleted: false,
-    ...(paymentId ? { _id: paymentId } : {}) });
-  if (!payment || !["full", "inspection_deposit"].includes(payment.paymentType)) {
+    ...(paymentId ? { _id: paymentId } : {}), paymentType: remaining ? "remaining" : { $in: ["full", "inspection_deposit"] } });
+  if (!payment) {
     throw new AppError("Không có giao dịch QR đang chờ phù hợp. Vui lòng kiểm tra thanh toán của đơn.", 409);
   }
   return { title: "Hủy giao dịch QR thanh toán", orderId, orderCode: order.orderCode,
@@ -724,7 +744,8 @@ export const cancelAgentPendingPayment = async (user: RequestUser, orderId: stri
   if (!payment) throw new ActionPreconditionError("Giao dịch QR đã thay đổi. Vui lòng kiểm tra thanh toán trước khi chọn lại.");
   if (payment.status === "paid") return;
   if (payment.status === "failed" && payment.metadata?.agentCancellationActionId === actionId) return;
-  if ((!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order)) || order.paymentStatus !== "unpaid" || payment.status !== "pending") {
+  const remaining = expected.paymentType === "remaining" && order.inspectionRequired && order.status === "completed" && order.paymentStatus === "partially_paid";
+  if ((!remaining && ((!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order)) || order.paymentStatus !== "unpaid")) || payment.status !== "pending") {
     throw new ActionPreconditionError("Trạng thái đơn hoặc giao dịch đã thay đổi. Vui lòng kiểm tra thanh toán.");
   }
   await cancelPendingPayosPayment(payment, user, "Khách hàng hủy QR thanh toán qua trợ lý", signal, actionId);
@@ -755,7 +776,10 @@ export const createAgentOrderPayment = async (user: RequestUser, input: CreatePa
   const preview = await previewOrderPayment(user, input.orderId, input.method, true);
   if (preview.amount !== expected.amount || preview.paymentType !== expected.paymentType
     || preview.previousPaymentId !== expected.previousPaymentId
-    || preview.previousPaymentMethod !== expected.previousPaymentMethod) throw new ActionPreconditionError();
+    || preview.previousPaymentMethod !== expected.previousPaymentMethod
+    || preview.quotationId !== expected.quotationId || preview.quotationRevision !== expected.quotationRevision) throw new ActionPreconditionError();
+  if (expected.paymentType === "remaining" && (input.paymentType !== "REMAINING" || input.quotationId !== expected.quotationId
+    || input.expectedRevision !== expected.quotationRevision || input.expectedAmount !== expected.amount)) throw new ActionPreconditionError();
   if (!expected.previousPaymentId) {
     signal?.throwIfAborted();
     return createPayment(user, input, expected);

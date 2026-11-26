@@ -8,9 +8,9 @@ import { ToolExecutor } from "../tools/tool-executor";
 import { withAgentTimeout } from "../agent/timeout";
 import { AppError } from "../../utils/appError";
 
-export const BOOKING_WRITE_TOOLS = ["create_booking", "save_booking_address", "cancel_booking",
+export const BOOKING_WRITE_TOOLS = ["create_booking", "save_booking_address", "cancel_booking", "discard_unpaid_order",
   "request_booking_reschedule", "respond_booking_reschedule", "cancel_booking_reschedule",
-  "select_order_provider", "respond_provider_reassignment"] as const;
+  "select_order_provider", "respond_provider_reassignment", "delete_saved_address", "set_default_address"] as const;
 
 export const buildBookingActionGraph = (deps: ConfirmedActionDependencies) =>
   buildConfirmedActionGraph("booking", BOOKING_WRITE_TOOLS, deps);

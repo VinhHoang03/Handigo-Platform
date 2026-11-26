@@ -3,6 +3,8 @@ import { repairKnowledgeSources } from "../repair-cases";
 
 // Mã nguồn ổn định, không phụ thuộc vị trí bài trong mảng; đổi tiêu đề phải đối chiếu mã này.
 const keys: Record<string, string> = {
+  "Tra kết quả kiểm duyệt nhận xét": "feedback-moderation",
+  "Xóa đơn chưa thanh toán đã tạo": "discard-unpaid-order",
   "Đặt lại đơn cũ, tìm đơn và chọn thợ từng phục vụ": "booking-history",
   "Giải thích báo giá và tra chi tiết hoàn tiền": "quotation-refunds",
   "Gửi ảnh hiện trạng khi đặt dịch vụ trong chat": "booking-images",
@@ -13,6 +15,11 @@ const keys: Record<string, string> = {
   "Hủy QR thanh toán nhưng giữ đơn": "payment-cancellation",
   "Điều kiện hủy đơn và hoàn tiền": "cancellation",
   "Khiếu nại chất lượng dịch vụ": "complaint",
+  "Báo cáo chất lượng dịch vụ (khiếu nại)": "complaint",
+  "Báo cáo hành vi vi phạm và theo dõi xử lý": "report",
+  "Rút tiền từ ví và theo dõi yêu cầu rút": "withdrawal",
+  "Dời lịch đơn đã tạo và phản hồi đề nghị": "reschedule",
+  "Tra thời gian thợ đến và theo dõi vị trí": "arrival-estimate",
   "Gửi và theo dõi yêu cầu hỗ trợ": "support",
   "Tài khoản, hồ sơ và địa chỉ": "account",
   "Chọn voucher và thay đổi mã giảm giá": "voucher",

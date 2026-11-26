@@ -30,7 +30,8 @@ async function fixture() {
   const customer = await User.create({ email: `user${sequence}@example.test`, fullName: 'Trần Văn Bình', role: 'CUSTOMER', status: 'active' });
   const category = await Category.create({ name: 'Gia dụng', slug: `gia-dung-${sequence}`, isActive: true });
   const catalog = await Service.create({ categoryId: category._id, name: 'Sửa điện dân dụng', slug: `sua-dien-${sequence}`, serviceType: 'variable_price', depositAmount: 50000, isActive: true });
-  const application = await ProviderApplication.create({ userId: customer._id, applicationType: 'initial', status: 'pending', description: 'Có kinh nghiệm sửa điện dân dụng nhiều năm', experienceYears: 3, serviceIds: [catalog._id], certificates: [], identityDocument: { type: 'cccd', frontImageUrl: 'https://example.test/front.png', backImageUrl: 'https://example.test/back.png' } });
+  const imageRoot = `https://res.cloudinary.com/ai-test/image/upload/handigo/provider-applications/${customer._id}/identity`;
+  const application = await ProviderApplication.create({ userId: customer._id, applicationType: 'initial', status: 'pending', description: 'Có kinh nghiệm sửa điện dân dụng nhiều năm', experienceYears: 3, serviceIds: [catalog._id], certificates: [], identityDocument: { type: 'cccd', frontImageUrl: `${imageRoot}/front.png`, backImageUrl: `${imageRoot}/back.png` } });
   return { admin, customer, category, catalog, application };
 }
 async function configure(feature, adminId, customPolicy = policy()) {
@@ -71,6 +72,8 @@ function mockAI(t, mutate) {
   t.mock.method(provider, 'generateAdminAI', async (feature, policy, sources) => {
     const evidence = [{ sourceId: sources[0].id, quote: sources[0].text.slice(0, 50) }];
     const output = { summary: 'Đã đối chiếu dữ liệu theo bộ tiêu chí.', checks: policy.criteria.filter(rule => rule.kind === 'ai').map(rule => ({ code: rule.code, status: 'pass', reason: 'Có dữ liệu phù hợp.', evidence })), evidence, categoryId: sources.find(item => item.id.startsWith('category:'))?.id.slice(9) || null, normalizedName: null, normalizedDescription: null, duplicateServiceIds: [], classification: feature === 'support_classification' ? { category: 'PAYMENT', priority: 'HIGH' } : null, draftReply: 'Vui lòng kiểm tra thông tin và bổ sung bằng chứng.', timeline: [], missingData: [] };
+    output.imageAnalyses = sources.filter(source => source.imageUrl).map(source => ({ sourceId: source.id, url: source.imageUrl,
+      status: 'analyzed', relevant: true, consistent: true, observations: ['Ảnh tài liệu rõ nét và khớp loại khai báo.'], uncertainties: [] }));
     if (mutate) await mutate(output, sources);
     return { output, model: 'mo-hinh-kiem-thu', usage: { inputTokens: 20, outputTokens: 30 } };
   });
@@ -82,6 +85,9 @@ test('AI admin với MongoDB replica set cô lập, transaction thật và API t
   fakePaymentConfig.forEach(key => { process.env[key] = 'gia-lap-khong-goi-cong-thanh-toan'; });
   t.after(() => fakePaymentConfig.forEach((key, i) => { if (previousPaymentConfig[i] === undefined) delete process.env[key]; else process.env[key] = previousPaymentConfig[i]; }));
   const previousKey = process.env.ADMIN_AI_API_KEY;
+  const previousCloud = process.env.CLOUDINARY_NAME;
+  process.env.CLOUDINARY_NAME = 'ai-test';
+  t.after(() => { if (previousCloud === undefined) delete process.env.CLOUDINARY_NAME; else process.env.CLOUDINARY_NAME = previousCloud; });
   process.env.ADMIN_AI_API_KEY = 'khoa-gia-lap-khong-goi-nha-cung-cap';
   const replica = await MongoMemoryReplSet.create({ replSet: { count: 1 }, binary: { version: '7.0.24' } });
   t.after(async () => { await mongoose.disconnect(); await replica.stop(); if (previousKey === undefined) delete process.env.ADMIN_AI_API_KEY; else process.env.ADMIN_AI_API_KEY = previousKey; });
@@ -124,12 +130,16 @@ test('AI admin với MongoDB replica set cô lập, transaction thật và API t
     assert((await Session.findOne()).revokedAt); assert.equal(await Notification.countDocuments({ userId: f.customer._id }), 1);
     assert.equal(await service.processNextAssessment(), false);
   });
-  for (const scenario of ['missing', 'ai_unknown', 'disabled_during_ai', 'criteria_changed', 'source_changed', 'admin_reviewed', 'owner_locked', 'admin_locked']) {
+  for (const scenario of ['missing', 'ai_unknown', 'disabled_during_ai', 'criteria_changed', 'source_changed', 'admin_reviewed', 'owner_locked', 'admin_locked', 'image_missing', 'image_unreadable', 'image_inconsistent', 'foreign_image']) {
     await clean();
     await t.test(`Không tự duyệt trường hợp ${scenario}`, async st => {
       const f = await fixture(); const cfg = await configure('provider_application', f.admin._id);
       if (scenario === 'missing') await ProviderApplication.updateOne({ _id: f.application._id }, { description: 'Ngắn' });
+      if (scenario === 'foreign_image') await ProviderApplication.updateOne({ _id: f.application._id }, { 'identityDocument.frontImageUrl': `https://res.cloudinary.com/ai-test/image/upload/handigo/provider-applications/${f.admin._id}/identity/front.png` });
       mockAI(st, async output => {
+        if (scenario === 'image_missing') output.imageAnalyses = [];
+        if (scenario === 'image_unreadable') output.imageAnalyses[0].status = 'unreadable';
+        if (scenario === 'image_inconsistent') output.imageAnalyses[0].consistent = false;
         if (scenario === 'ai_unknown') output.checks[0].status = 'unknown';
         if (scenario === 'disabled_during_ai') await service.changeConfig('provider_application', String(f.admin._id), cfg.revision, { enabled: false });
         if (scenario === 'criteria_changed') await service.changeConfig('provider_application', String(f.admin._id), cfg.revision, { draft: policy() });
@@ -164,10 +174,24 @@ test('AI admin với MongoDB replica set cô lập, transaction thật và API t
   await clean();
   await t.test('Bổ sung dịch vụ giữ quyền và thêm dịch vụ, không tạo provider thứ hai', async st => {
     const f = await fixture(); mockAI(st); await User.updateOne({ _id: f.customer._id }, { role: 'PROVIDER' });
-    await Provider.create({ userId: f.customer._id, description: 'Thợ hiện có', experienceYears: 1, serviceIds: [] });
-    await ProviderApplication.updateOne({ _id: f.application._id }, { applicationType: 'service_addition' });
-    await configure('provider_application', f.admin._id); await service.enqueueAssessment(input(f), String(f.admin._id)); await service.processNextAssessment();
+    await Provider.create({ userId: f.customer._id, description: 'Thợ hiện có', verified: true, experienceYears: 1, serviceIds: [] });
+    await ProviderApplication.updateOne({ _id: f.application._id }, { $set: { applicationType: 'service_addition', description: '' }, $unset: { identityDocument: '' } });
+    await configure('provider_application', f.admin._id, { ...service.defaults('provider_application'), autoRejectIncompleteApplications: true });
+    const job = await service.enqueueAssessment(input(f), String(f.admin._id)); await service.processNextAssessment();
+    assert.equal((await models.AdminAIAssessment.findById(job._id)).outcome, 'auto_approved');
     assert.equal(await Provider.countDocuments(), 1); assert.equal((await Provider.findOne()).serviceIds.length, 1); assert.equal((await User.findById(f.customer._id)).role, 'PROVIDER');
+  });
+  await clean();
+  await t.test('Đăng ký ban đầu thật sự thiếu giấy tờ vẫn chỉ tự từ chối khi Admin đã bật lựa chọn', async st => {
+    const f = await fixture();
+    await ProviderApplication.updateOne({ _id: f.application._id }, { $unset: { 'identityDocument.backImageUrl': '' } });
+    await configure('provider_application', f.admin._id, { ...service.defaults('provider_application'), autoRejectIncompleteApplications: true });
+    st.mock.method(provider, 'generateAdminAI', async () => { throw Error('Không cần gọi AI khi thiếu trường bắt buộc'); });
+    const job = await service.enqueueAssessment(input(f), String(f.admin._id)); await service.processNextAssessment();
+    assert.equal((await models.AdminAIAssessment.findById(job._id)).outcome, 'auto_rejected');
+    assert.equal((await ProviderApplication.findById(f.application._id)).status, 'rejected');
+    assert.equal((await User.findById(f.customer._id)).role, 'CUSTOMER');
+    assert.equal(await Provider.countDocuments(), 0);
   });
   await clean();
   await t.test('Rollback khi thông báo không ghi được: không có quyền hoặc provider cập nhật một phần', async st => {

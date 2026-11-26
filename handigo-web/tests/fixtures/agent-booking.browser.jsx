@@ -6,6 +6,7 @@ import { AgentConfirmationCard } from '../../src/features/chatbot/components/Age
 import { ChatbotMessageList } from '../../src/features/chatbot/components/ChatbotMessageList';
 import { ChatbotPanel } from '../../src/features/chatbot/components/ChatbotPanel';
 import { AgentBookingActions } from '../../src/features/chatbot/components/AgentBookingActions';
+import { AgentBookingPlan } from '../../src/features/chatbot/components/AgentBookingPlan';
 import { AgentPaymentCard } from '../../src/features/chatbot/components/AgentPaymentCard';
 import { getAgentConversationFlow } from '../../src/features/chatbot/utils/agentConversationFlow';
 import { saveAgentWalletResume, readAgentWalletResume, clearAgentWalletResume } from '../../src/features/chatbot/utils/agentWalletResume';
@@ -67,6 +68,7 @@ function confirmation(tool = 'create_booking') {
       policyVersion: fixture.policies.version,
       quantity: values.uniformQuantity, unitPrice: 200000, address: values.addressId === ids.address ? '12 Lê Lợi, Phường A, Hà Nội' : '34 Nguyễn Trãi, Phường B, Hà Nội',
       recipientPhone: values.recipientPhone ?? fixture.addresses.find((item) => item._id === values.addressId)?.recipientPhone,
+      recipientName: values.recipientName ?? fixture.addresses.find((item) => item._id === values.addressId)?.recipientName,
       schedule: values.scheduledAt || 'Đặt ngay', paymentMethod: values.paymentMethod, amount: 200000 * values.uniformQuantity,
       customerAttachments: values.customerAttachments ?? [], addressStorage: values.saveAddressToBook === false ? 'Chỉ dùng cho đơn này, không lưu vào sổ địa chỉ' : undefined,
       providerName: values.preferredProviderId ? 'Nguyễn Minh' : undefined } : { title: 'Xác nhận trừ tiền ví', orderId: ids.order, orderCode: 'ORD-KIEM-THU', amount: 600000, paymentMethod: 'wallet' } };
@@ -331,6 +333,10 @@ fixture.send = async (request) => {
     if (request.bookingAction?.patch.recipientPhone !== undefined) {
       if (request.bookingAction.patch.recipientPhone === null) delete values.recipientPhone;
       else values.recipientPhone = request.bookingAction.patch.recipientPhone;
+    }
+    if (request.bookingAction?.patch.recipientName !== undefined) {
+      if (request.bookingAction.patch.recipientName === null) delete values.recipientName;
+      else values.recipientName = request.bookingAction.patch.recipientName;
     }
     const time = /(\d{4}-\d{2}-\d{2}) lúc (\d{2}:\d{2})/.exec(text);
     if (time) { values.scheduledAt = time[1] + 'T' + time[2] + ':00+07:00'; values.orderType = 'scheduled'; }
@@ -625,7 +631,7 @@ async function verifyModelRecovery() {
   document.body.dataset.agentBookingPassed = 'true';
 }
 async function run() {
-  if (!returned && !visual) await verifyContextualActions();
+  if (!returned && !visual) { await verifyContextualActions(); await verifyBookingPlan(); }
   if (returned) return verifyWalletReturn();
   await wait(() => document.querySelector('[aria-label="Mở Trợ lý Handigo"]'), 'hiển thị widget');
   document.querySelector('[aria-label="Mở Trợ lý Handigo"]').click();
@@ -766,6 +772,22 @@ async function run() {
   assert(!lastSend().message.includes('bản nháp') && !lastSend().message.includes('Chưa tạo đơn'), 'tin chọn địa chỉ không kèm chỉ dẫn xử lý nội bộ');
   assert(lastSend().bookingAction?.patch.addressId === ids.otherAddress, 'địa chỉ được chọn bằng ID dữ liệu, không nhờ AI đoán tên');
   assert(lastSend().message.split('Phường B').length === 2 && lastSend().message.split('Hà Nội').length === 2, 'lệnh chọn địa chỉ không ghép lặp khu vực');
+  await click('Tên người nhận');
+  verifyDialogBounds();
+  assert(dialog().querySelector('input[name="recipient-name"]').value === 'Trần Bình', 'tên thực tế từ địa chỉ');
+  const beforeName = calls.filter((item) => item.type === 'send').length;
+  change(dialog().querySelector('input[name="recipient-name"]'), '123'); await pause();
+  await click('Gửi thay đổi', dialog());
+  assert(calls.filter((item) => item.type === 'send').length === beforeName, 'chặn tên sai trước khi gửi');
+  change(dialog().querySelector('input[name="recipient-name"]'), '  Lê   Minh '); await pause();
+  await click('Gửi thay đổi', dialog());
+  await wait(() => values.recipientName === 'Lê Minh' && !dialog(), 'tên riêng được chuẩn hóa');
+  assert(session.pendingConfirmation.preview.recipientName === 'Lê Minh' && fixture.addresses[1].recipientName === 'Trần Bình', 'tên riêng chỉ dùng cho đơn');
+  assert(button('Xác nhận').disabled, 'đổi tên phải đồng ý chính sách trên form mới');
+  await click('Tên người nhận'); dialog().querySelector('input[type="checkbox"]').click(); await pause();
+  await click('Gửi thay đổi', dialog());
+  await wait(() => !values.recipientName && !dialog(), 'dùng lại tên từ địa chỉ');
+  assert(lastSend().bookingAction.patch.recipientName === null, 'null bỏ tên riêng');
   await click('Số điện thoại người nhận');
   verifyDialogBounds();
   assert(dialog().querySelector('input[type="tel"]').value === '0987654321', 'điền số thực tế từ địa chỉ đang chọn');
@@ -848,6 +870,34 @@ async function run() {
   render('quay-lai-sau-payos');
   await verifyWalletReturn();
 }
+async function verifyBookingPlan() {
+  const container = document.createElement('div'); document.body.append(container);
+  const planRoot = createRoot(container), sent = [];
+  const plan = { id: crypto.randomUUID(), revision: 6, status: 'active', activeItemId: 'muc-hai', note: 'Mỗi đơn xác nhận riêng; bỏ danh sách không hủy đơn đã tạo.',
+    items: [{ id: 'muc-mot', label: 'Vệ sinh máy lạnh', status: 'created', orderId: ids.order, orderCode: 'ORD-1' },
+      { id: 'muc-hai', label: 'Sửa ống nước', status: 'active' }] };
+  const show = async (overrides = {}, disabled = false) => {
+    planRoot.render(<BrowserRouter><AgentBookingPlan session={{ ...session, pendingConfirmation: null, requiresReconciliation: false, bookingPlan: plan, ...overrides }}
+      disabled={disabled} onSend={async (...args) => { sent.push(args); }} /></BrowserRouter>); await pause();
+  };
+  try {
+    await show();
+    assert(container.textContent.includes('1/2 đã tạo đơn') && container.textContent.includes('Sửa ống nước'), 'hiển thị tiến độ từng việc');
+    assert(container.querySelector(`a[href="/customer/bookings/${ids.order}"]`), 'mở đúng đơn đã tạo');
+    await click('Để lại yêu cầu', container);
+    assert(sent[0][2].type === 'plan' && sent[0][2].plan.action === 'defer' && sent[0][2].plan.revision === 6 && sent[0][2].plan.planId === plan.id, 'gửi đúng danh sách và phiên bản');
+    for (const overrides of [{ requiresReconciliation: true }, { pendingConfirmation: { tool: 'create_payment' } }]) {
+      await show(overrides);
+      assert([...container.querySelectorAll('button')].every((button) => button.disabled), 'chặn chuyển việc khi cần xác nhận/đối soát');
+    }
+    await show({}, true); assert([...container.querySelectorAll('button')].every((button) => button.disabled), 'khóa khi gửi yêu cầu');
+    await show({ bookingPlan: { ...plan, status: 'paused' } });
+    assert(button('Tiếp tục danh sách', container) && !button('Để lại yêu cầu', container), 'tạm dừng có bước tiếp tục riêng');
+    await show({ bookingPlan: { ...plan, status: 'completed' } });
+    assert(!container.querySelector('button') && container.textContent.includes('ORD-1'), 'danh sách kết thúc giữ kết quả và không gợi ý ghi lại');
+  } finally { planRoot.unmount(); container.remove(); }
+}
+
 async function verifyContextualActions() {
   const container = document.createElement('div'); document.body.append(container);
   const contextRoot = createRoot(container);

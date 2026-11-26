@@ -1,4 +1,6 @@
 import { Skeleton } from "@/components/common/Skeleton";
+import { Modal } from "@/components/common/Modal";
+import { ReliableImage } from "@/components/common/ReliableImage";
 import type { ChatbotAudience, ChatbotMessage } from "../types/chatbot.types";
 import { ChatbotComposer } from "./ChatbotComposer";
 import { ChatbotMessageList } from "./ChatbotMessageList";
@@ -11,6 +13,7 @@ import { AgentConfirmationCard } from "./AgentConfirmationCard";
 import { AgentBookingConfirmation } from "./AgentBookingConfirmation";
 import { AgentBookingTools, type AgentBookingTool } from "./AgentBookingTools";
 import { AgentBookingActions } from "./AgentBookingActions";
+import { AgentBookingPlan } from "./AgentBookingPlan";
 import { AgentWalletResumeCard } from "./AgentWalletResumeCard";
 import { AgentAssignedProviderCard } from "./AgentAssignedProviderCard";
 import type { AgentWalletResume } from "../utils/agentWalletResume";
@@ -87,6 +90,7 @@ export function ChatbotPanel({
   const [bookingTool, setBookingTool] = useState<{ tool: AgentBookingTool; fingerprint: string } | null>(null);
   const [attachmentEdit, setAttachmentEdit] = useState<string | null>(null);
   const [composerBusy, setComposerBusy] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState("");
   const latestDialogueId = agentSession?.messages.findLast((message) => !message._id.startsWith("order-event:") && !message._id.startsWith("booking:"))?._id ?? "";
   const fingerprint = `${agentSession?.sessionId}:${agentSession?.bookingDraft?.revision}:${pendingConfirmation?.actionId ?? ""}:${latestDialogueId}`;
   const attachmentsDirty = attachmentEdit !== null && attachmentEdit === (agentSession?.sessionId ?? "new");
@@ -185,6 +189,7 @@ export function ChatbotPanel({
       ) : (
         <ChatbotMessageList
           onSend={onSend}
+          onPreviewImage={setPreviewImageUrl}
           choicesDisabled={attachmentsDirty || taskBlocked || Boolean(pendingConfirmation) || Boolean(availabilityMessage) || blockingError}
           bookingVoucherChoicesEnabled={audience === "CUSTOMER" && pendingConfirmation?.tool === "create_booking" && !attachmentsDirty && !controlsDisabled}
           messages={messages}
@@ -217,6 +222,7 @@ export function ChatbotPanel({
         <button type="button" onClick={onContinue} disabled={isReplying || isLoading} className="mx-4 mb-2 shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{taskBlocked ? "Kiểm tra kết quả thao tác" : "Tiếp tục yêu cầu"}</button>
       )}
       <div ref={toolsAnchorRef} className="shrink-0">
+        {!history && audience === "CUSTOMER" && agentSession?.bookingPlan && <AgentBookingPlan session={agentSession} disabled={attachmentsDirty || controlsDisabled} onSend={onSend} />}
         {!history && !activeTool && audience === "CUSTOMER" && <AgentBookingActions key={fingerprint} session={agentSession} disabled={attachmentsDirty || controlsDisabled}
           onOpenTool={openTool} onSend={onSend} onCheckPayment={onCheckPayment} />}
       </div>
@@ -249,7 +255,7 @@ export function ChatbotPanel({
           || taskBlocked && (!agentSession?.requiresReconciliation || Boolean(error))}
         onSend={onSend}
         onUploadAttachment={onUploadAttachment}
-        attachmentUrls={agentSession?.bookingDraft?.status === "active" ? agentSession.bookingDraft.values?.customerAttachments : undefined}
+        onPreviewImage={setPreviewImageUrl}
         attachmentPurpose={agentSession?.bookingDraft?.status === "active" ? "booking" : "general"}
         onAttachmentChange={(dirty) => setAttachmentEdit(dirty ? agentSession?.sessionId ?? "new" : null)}
         onActivityChange={setComposerBusy}
@@ -258,6 +264,9 @@ export function ChatbotPanel({
       {!history && bookingTool?.fingerprint === fingerprint && agentSession && userId && <AgentBookingTools
         key={`${fingerprint}:${bookingTool.tool}`} tool={bookingTool.tool} session={agentSession} userId={userId}
         anchorRef={toolsAnchorRef} disabled={controlsDisabled} onClose={() => setBookingTool(null)} onSend={onSend} />}
+      <Modal open={Boolean(previewImageUrl)} title="Ảnh trong cuộc trò chuyện" onClose={() => setPreviewImageUrl("")} size="lg">
+        <ReliableImage src={previewImageUrl} alt="Ảnh xem kích thước lớn" className="mx-auto max-h-[70dvh] max-w-full rounded-2xl object-contain" />
+      </Modal>
     </aside>
   );
 }

@@ -3,13 +3,15 @@ import { ArrowUpRight, Check, ClipboardCheck, Clock3 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
+import { REPORT_TYPES } from "@/features/case-management/components/reportFieldOptions.constants";
 
 const labels: Record<string, string> = {
   service: "Dịch vụ", options: "Tùy chọn", address: "Địa chỉ", schedule: "Thời gian",
   unitPrice: "Đơn giá", voucherCode: "Voucher", quantity: "Số lượng",
   originalAmount: "Giá trước giảm", discountAmount: "Giảm giá", providerName: "Chuyên gia ưu tiên",
-  previousAddress: "Địa chỉ trước khi sửa", recipientName: "Người nhận", recipientPhone: "Số điện thoại người nhận",
+  previousAddress: "Địa chỉ trước khi sửa", recipientName: "Người nhận", recipientPhone: "Số điện thoại người nhận", bookingPlanLabel: "Yêu cầu trong danh sách",
   addressNote: "Ghi chú địa chỉ",
+  bankName: "Ngân hàng nhận", maskedAccountNumber: "Số tài khoản", accountHolderName: "Chủ tài khoản",
   currentSchedule: "Lịch hiện tại", offerName: "Ưu đãi", points: "Điểm sử dụng", pointsBalance: "Điểm hiện có",
   minOrderAmount: "Đơn tối thiểu", maxDiscountAmount: "Giảm tối đa", validityDays: "Hiệu lực", discountValue: "Giá trị ưu đãi", applicableOrderType: "Áp dụng cho",
   rating: "Số sao",
@@ -18,6 +20,7 @@ const labels: Record<string, string> = {
   refundAmount: "Dự kiến hoàn", cancellationFee: "Phí hủy", note: "Lưu ý",
   paymentLabel: "Khoản thanh toán",
   subject: "Tiêu đề yêu cầu", category: "Nhóm hỗ trợ", priority: "Độ ưu tiên",
+  reportType: "Loại báo cáo", targetType: "Đối tượng",
   caseId: "Mã yêu cầu", caseStatus: "Trạng thái hiện tại",
   responseDeadline: "Hạn phản hồi",
   quotationCode: "Mã báo giá", quotationAmount: "Tổng báo giá", providerCompensation: "Chuyển cho thợ",
@@ -25,6 +28,8 @@ const labels: Record<string, string> = {
 const paymentLabels: Record<string, string> = { cash: "Tiền mặt", bank: "Trực tuyến", wallet: "Ví Handigo" };
 function formatValue(key: string, value: unknown, serviceType?: unknown, discountType?: unknown) {
   if (value == null) return "";
+  if (key === "reportType") return REPORT_TYPES.find((item) => item.value === value)?.label ?? "Báo cáo vi phạm";
+  if (key === "targetType") return ({ order: "Đơn dịch vụ", chat_conversation: "Cuộc trò chuyện", system: "Hệ thống", app: "Ứng dụng" } as Record<string, string>)[String(value)] ?? "Đối tượng đã chọn";
   if (["quantity", "rating"].includes(key) && typeof value === "number") return value.toLocaleString("vi-VN");
   if (["points", "pointsBalance"].includes(key) && typeof value === "number") return `${value.toLocaleString("vi-VN")} điểm`;
   if (key === "validityDays" && typeof value === "number") return `${value} ngày`;

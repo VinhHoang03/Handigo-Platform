@@ -8,7 +8,7 @@ const orderSchema = z.object({ orderId: idSchema }).strict();
 export const getBookingQuotationTool: AgentTool<z.infer<typeof orderSchema>> = {
   name: "get_booking_quotation", inputSchema: orderSchema,
   roles: ["CUSTOMER"], mutates: false, requiresConfirmation: false,
-  description: "Đọc báo giá hiện tại trên đơn của khách: từng hạng mục, số lượng, đơn giá, giảm giá, tổng báo giá, cọc thực trả và tiền còn trả trực tiếp. Chưa có báo giá trả quotation null. Không thu phần sửa chữa qua Handigo; không tự xác nhận đã trả tiền. canRequestRejection là khả năng sơ bộ, cần preview để kiểm tra chính sách hủy.",
+  description: "Đọc báo giá hiện tại trên đơn của khách: từng hạng mục, số lượng, đơn giá, giảm giá, tổng báo giá, cọc thực trả và tiền còn trả trực tiếp. Chưa có báo giá trả quotation null. Phần còn lại sau khi đơn hoàn thành có thể thanh toán bằng Ví Handigo hoặc PayOS, hoặc trực tiếp. Khấu trừ khoản đã thanh toán; không tự xác nhận đã trả tiền. canRequestRejection là khả năng sơ bộ, cần preview để kiểm tra chính sách hủy.",
   execute: (context, args) => AgentQuotationService.get(context.user.id, args.orderId),
   reply: (result) => ({ state: "WAITING_USER_INPUT", message: quotationReply(result as Awaited<ReturnType<typeof AgentQuotationService.get>>) }),
 };

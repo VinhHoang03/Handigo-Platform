@@ -5,7 +5,9 @@ export const agentApi = {
   uploadAttachment: async (sessionId: string, file: File) => {
     const form = new FormData();
     form.append("image", file);
-    return unwrap<{ url: string }>(await api.post(`/ai/sessions/${sessionId}/attachments`, form));
+    return unwrap<{ url: string }>(await api.post(`/ai/sessions/${sessionId}/attachments`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }));
   },
   delete: async (sessionId: string) => unwrap<null>(await api.delete(`/ai/sessions/${sessionId}`)),
   list: async (page = 1, signal?: AbortSignal) => unwrap<AgentSessionHistory>(await api.get("/ai/sessions", { params: { page, limit: 20 }, signal })),

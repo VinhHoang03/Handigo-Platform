@@ -6,6 +6,7 @@ import { createFeedbackSchema } from "../validations/feedback.validator";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { agentActionResourceId } from "../utils/agentActionResourceId";
+import { listFeedbackModeration } from "./feedbackModeration.service";
 
 export const agentFeedbackSchema = createFeedbackSchema.omit({ images: true }).extend({
   mode: z.enum(["create", "update"]).default("create"), customerAttachments: bookingAttachmentsSchema.optional(),
@@ -13,6 +14,16 @@ export const agentFeedbackSchema = createFeedbackSchema.omit({ images: true }).e
 type Arguments = z.infer<typeof agentFeedbackSchema>;
 
 export const AgentFeedbackService = {
+  async moderation(userId: string, orderId: string, page = 1) {
+    const { order, feedback } = await getOrderFeedbackContext(userId, orderId);
+    const data = await listFeedbackModeration(page, 10, userId, orderId, "comment");
+    return { orderId, orderCode: order.orderCode, hasFeedback: Boolean(feedback), isVisible: feedback?.isVisible ?? false,
+      items: data.items.map(item => ({ id: String(item._id), content: item.content, status: item.status,
+        statusLabel: item.status === "pending" ? "Đang chờ kiểm duyệt" : item.status === "rejected" ? "Không được duyệt" : "Đã được duyệt nội dung",
+        isCurrent: String(feedback?.moderationId ?? "") === String(item._id), createdAt: item.createdAt, updatedAt: item.updatedAt })),
+      pagination: data.pagination,
+      note: "Đã duyệt nội dung không tự đồng nghĩa đang hiển thị. Chỉ mục isCurrent là nội dung đang gắn với đánh giá; bản gửi bị chặn hoặc bản cũ được liệt kê riêng. Đánh giá có thể còn ẩn để Admin kiểm tra. Không tự gửi lại, sửa số sao hoặc yêu cầu quản trị viên duyệt thay khách." };
+  },
   async get(userId: string, orderId: string) {
     const { order, feedback, canReview, reason } = await getOrderFeedbackContext(userId, orderId);
     return { orderId: String(order._id), orderCode: order.orderCode, canReview, reason,

@@ -5,6 +5,7 @@ const escape = (value: unknown) => String(value ?? "—").replace(/[&<>"']/g, (c
 
 // Báo cáo ngoại tuyến, không nhúng payload log, không gọi script/font/tài nguyên bên ngoài.
 export function renderCustomerMetricsReport(report: ReturnType<CustomerMetricsSummary["report"]>) {
+  const cache = report.cache.map((item) => `<tr><td>${escape(item.name)}</td><td>${item.hits}</td><td>${item.misses}</td><td>${item.hitRate === null ? "—" : `${(item.hitRate * 100).toFixed(1)}%`}</td></tr>`).join("");
   const stages = report.stages.map((item) => `<tr><td>${escape(item.stage)}</td><td>${item.count}</td><td>${item.errors}</td><td>${escape(item.perTurn.p50Ms)}</td><td>${escape(item.perTurn.p95Ms)}</td></tr>`).join("");
   const usage = report.usage.map((item) => `<tr><td>${escape(item.provider)} / ${escape(item.model)}</td><td>${item.calls}</td><td>${item.inputTokens}</td><td>${item.outputTokens}</td><td>${item.estimatedUsd === null ? "Chưa có đơn giá" : escape(item.estimatedUsd.toFixed(6))}</td></tr>`).join("");
   const checks = [["Lượt FAILED", report.failed], ["Lỗi runtime", report.outcomes.error], ["Cần đối soát", report.requiresReconciliation],
@@ -17,6 +18,7 @@ export function renderCustomerMetricsReport(report: ReturnType<CustomerMetricsSu
 <ul>${checks.map(([label, count]) => `<li>${escape(label)}: <strong>${count}</strong>${count ? " — cần xem xét" : ""}</li>`).join("")}</ul>
 <p class="note">Đây là dấu hiệu cần kiểm tra, chưa phải ngưỡng SLA đã nghiệm thu. Gián đoạn hoặc đối soát không tự đồng nghĩa thao tác thất bại. Tệp không có dữ liệu không chứng minh hệ thống khỏe.</p></section>
 <section><h2>Thời gian từng bước</h2><table><thead><tr><th>Bước</th><th>Số lần</th><th>Lỗi</th><th>p50/lượt (ms)</th><th>p95/lượt (ms)</th></tr></thead><tbody>${stages}</tbody></table><p class="note">Khoảng đo lồng nhau; không cộng trực tiếp thời gian các bước.</p></section>
+<section><h2>Cache và số lần gọi model</h2><p>${report.modelCalls} lần gọi model trong ${report.samples} lượt hợp lệ.</p><table><thead><tr><th>Cache</th><th>Lượt dùng lại</th><th>Lượt không có kết quả</th><th>Tỷ lệ dùng lại</th></tr></thead><tbody>${cache}</tbody></table></section>
 <section><h2>Token và chi phí ước tính</h2><p>${report.turnsWithUsage}/${report.samples} lượt có metadata token.</p><table><thead><tr><th>Model</th><th>Lần có số liệu</th><th>Token vào</th><th>Token ra</th><th>Ước tính USD</th></tr></thead><tbody>${usage}</tbody></table>
 <p class="note">Chỉ tính phản hồi có metadata và đơn giá do người vận hành cấp. Không phải hóa đơn; chưa gồm embedding, storage, thuế hoặc lời gọi lỗi không có usage. Thiếu metadata không có nghĩa miễn phí.</p></section></html>`;
 }
