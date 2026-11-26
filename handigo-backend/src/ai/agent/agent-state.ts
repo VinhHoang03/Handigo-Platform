@@ -28,6 +28,7 @@ export interface PendingAction {
 }
 
 export interface AgentSession {
+  bookingPlan?: import("./booking-plan").BookingPlan;
   modelWorkflow?: import("./model-workflow").ModelWorkflowFrame;
   rebookProposal?: { id: string; arguments: { orderId: string; useSameProvider: boolean }; revision: number; taskVersion: number };
   draftBackup?: { id: string; draft: import("./booking-draft").BookingDraft };

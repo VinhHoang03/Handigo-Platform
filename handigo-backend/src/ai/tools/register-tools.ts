@@ -12,6 +12,7 @@ import { createBookingTool } from "./implementations/create-booking.tool";
 import { cancelBookingTool } from "./implementations/cancel-booking.tool";
 import { idSchema } from "./implementations/booking.schemas";
 import { getAgentServiceCatalog } from "../../services/agentCatalog.service";
+import { recordCustomerCache } from "../runtime/customer-runtime-metrics";
 import { cancelPaymentTool, createPaymentTool, getPaymentStatusTool } from "./implementations/payment.tools";
 import { createSupportTicketTool } from "./implementations/create-support-ticket.tool";
 import { getMySupportTicketsTool } from "./implementations/get-my-support-tickets.tool";
@@ -31,16 +32,26 @@ import { getOrderProviderOptionsTool, selectOrderProviderTool, respondProviderRe
 import { searchMyBookingsTool, rebookBookingTool, getPreviousProvidersTool, getBookingRefundsTool } from "./implementations/booking-history.tools";
 import { getBookingQuotationTool, rejectBookingQuotationTool } from "./implementations/quotation.tools";
 import { getBookingProviderTool } from "./implementations/assigned-provider.tool";
-import { getBookingFeedbackTool, submitBookingFeedbackTool } from "./implementations/feedback.tools";
+import { getBookingFeedbackTool, submitBookingFeedbackTool, getFeedbackModerationTool } from "./implementations/feedback.tools";
+import { discardUnpaidOrderTool } from "./implementations/discard-unpaid-order.tool";
+import { bookingPlanTool } from "./implementations/booking-plan.tool";
 import { addComplaintEvidenceTool } from "./implementations/complaint-evidence.tool";
 import { getBookingRescheduleTool, requestBookingRescheduleTool, respondBookingRescheduleTool, cancelBookingRescheduleTool } from "./implementations/reschedule.tools";
 import { getMyRewardsTool, getRewardHistoryTool, getMyRewardVouchersTool, redeemRewardTool,
   getMyWalletTool, getWalletHistoryTool, createWalletDepositTool, getWalletDepositStatusTool, cancelWalletDepositTool } from "./implementations/customer-account.tools";
 import { getBookingArrivalEstimateTool } from "./implementations/arrival-estimate.tool";
 import { analyzeRepairImagesTool } from "./implementations/analyze-repair-images.tool";
+import { createReportTool, getReportContextTool, getMyReportsTool, getReportTool, cancelReportTool, addReportEvidenceTool } from "./implementations/report.tools";
+import { getWithdrawalAccountsTool, createWithdrawalTool, getMyWithdrawalsTool, getWithdrawalTool } from "./implementations/withdrawal.tools";
+import { deleteSavedAddressTool, setDefaultAddressTool } from "./implementations/address-book.tools";
 
 export function registerTools(policies: Record<string, ToolPolicy>) {
   return new ToolRegistry(policies, true)
+    .register(bookingPlanTool)
+    .register(discardUnpaidOrderTool).register(getFeedbackModerationTool)
+    .register(createReportTool).register(getReportContextTool).register(getMyReportsTool).register(getReportTool).register(cancelReportTool).register(addReportEvidenceTool)
+    .register(getWithdrawalAccountsTool).register(createWithdrawalTool).register(getMyWithdrawalsTool).register(getWithdrawalTool)
+    .register(deleteSavedAddressTool).register(setDefaultAddressTool)
     .register(getBookingRescheduleTool).register(requestBookingRescheduleTool).register(respondBookingRescheduleTool).register(cancelBookingRescheduleTool)
     .register(getMyRewardsTool).register(getRewardHistoryTool).register(getMyRewardVouchersTool).register(redeemRewardTool)
     .register(getMyWalletTool).register(getWalletHistoryTool).register(createWalletDepositTool).register(getWalletDepositStatusTool).register(cancelWalletDepositTool)
@@ -60,7 +71,7 @@ export function registerTools(policies: Record<string, ToolPolicy>) {
     .register(createPaymentTool).register(getPaymentStatusTool).register(cancelPaymentTool)
     .register({ name: "get_service_catalog", description: "Xem tổng số dịch vụ đang hoạt động, danh sách dịch vụ và các dịch vụ phổ biến theo số đơn. Dùng khi khách hỏi nền tảng có bao nhiêu dịch vụ, có những dịch vụ nào hoặc dịch vụ phổ biến; không cần từ khóa.",
       inputSchema: z.object({}).strict(), mutates: false, requiresConfirmation: false, roles: ["CUSTOMER"],
-      execute: () => getAgentServiceCatalog() })
+      execute: () => getAgentServiceCatalog((hit) => recordCustomerCache("catalog", hit)) })
     .register(getPriceTool).register(getAvailableTimesTool).register(createBookingTool).register(cancelBookingTool)
     .register({ name: "get_addresses", description: "Lấy địa chỉ đã lưu của chính khách hàng để chọn địa chỉ đặt dịch vụ.",
       inputSchema: z.object({}).strict(), mutates: false, requiresConfirmation: false, roles: ["CUSTOMER"],

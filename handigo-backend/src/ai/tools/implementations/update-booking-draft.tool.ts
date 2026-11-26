@@ -2,18 +2,25 @@ import { AppError } from "../../../utils/appError";
 import { bookingDraftPatchSchema, updateBookingDraft, type BookingDraftPatch, type BookingDraftDependencies } from "../../agent/booking-draft";
 import type { AgentTool } from "../tool.interface";
 import { requireBookingAttachments } from "../../agent/booking-attachments";
+import { activeBookingItem } from "../../agent/booking-plan";
 
 export function createUpdateBookingDraftTool(deps?: BookingDraftDependencies): AgentTool<BookingDraftPatch> {
   return {
     name: "update_booking_draft",
-    description: "Chuẩn bị/sửa bản nháp, nhận nhiều trường cùng lúc; chỉ gửi phần khách thay đổi. ID lấy từ hệ thống. Sửa điều hòa mặc định treo tường khi khách chưa nêu loại; không mở gói bổ sung. optionPreference chỉ khi khách muốn đổi loại/gói; tên khớp duy nhất được chọn ngay, đã chọn không hỏi lại. voucherCode chọn mã, null để bỏ; voucherPreference best khi khách yêu cầu mã giảm nhiều nhất, choose để mở lại lựa chọn. providerPreference là tên thợ; preferredProviderId null bỏ yêu cầu đích danh; providerCriteria nearest/highest_rating/most_completed khi khách yêu cầu chọn theo tiêu chí, choose để xem danh sách. Không gửi đồng thời ID thợ và tiêu chí, hoặc mã voucher và yêu cầu best. addressPreference giữ địa chỉ chưa xác định, khớp duy nhất sẽ tái sử dụng địa chỉ lưu. Địa chỉ mới giữ tạm bằng save_booking_address rồi resume, mặc định chỉ lưu khi đặt đơn thành công. recipientPhone là số điện thoại người nhận riêng cho đơn đang đặt, không sửa hồ sơ hoặc sổ địa chỉ; null để dùng lại số từ địa chỉ đã chọn. Giữ số này khi sửa các thông tin khác; startNew bắt đầu lại không giữ số cũ. saveAddressToBook false khi khách chỉ dùng địa chỉ một lần/không lưu; true khi khách yêu cầu lưu lại, không xóa địa chỉ đã có. Thiếu lựa chọn đưa choiceGroups, đủ dữ liệu gửi form. mode pause/resume/discard; startNew chỉ khi đặt thêm. Không tạo đơn hoặc trừ tiền.",
+    description: "Chuẩn bị/sửa bản nháp, nhận nhiều trường cùng lúc; chỉ gửi phần khách thay đổi. ID lấy từ hệ thống. Sửa điều hòa mặc định treo tường khi khách chưa nêu loại; không mở gói bổ sung. optionPreference chỉ khi khách muốn đổi loại/gói; tên khớp duy nhất được chọn ngay, đã chọn không hỏi lại. voucherCode chọn mã, null để bỏ; voucherPreference best khi khách yêu cầu mã giảm nhiều nhất, choose để mở lại lựa chọn. providerPreference là tên thợ; preferredProviderId null bỏ yêu cầu đích danh; providerCriteria nearest/highest_rating/most_completed khi khách yêu cầu chọn theo tiêu chí, choose để xem danh sách. Không gửi đồng thời ID thợ và tiêu chí, hoặc mã voucher và yêu cầu best. addressPreference giữ địa chỉ chưa xác định, khớp duy nhất sẽ tái sử dụng địa chỉ lưu. Địa chỉ mới giữ tạm bằng save_booking_address rồi resume, mặc định chỉ lưu khi đặt đơn thành công. recipientName là tên và recipientPhone là số điện thoại người nhận riêng cho đơn đang đặt, không sửa hồ sơ hoặc sổ địa chỉ; null để dùng lại số từ địa chỉ đã chọn. Giữ số này khi sửa các thông tin khác; startNew bắt đầu lại không giữ số cũ. saveAddressToBook false khi khách chỉ dùng địa chỉ một lần/không lưu; true khi khách yêu cầu lưu lại, không xóa địa chỉ đã có. Thiếu lựa chọn đưa choiceGroups, đủ dữ liệu gửi form. mode pause/resume/discard; startNew chỉ khi đặt thêm. Không tạo đơn hoặc trừ tiền.",
     inputSchema: bookingDraftPatchSchema, mutates: false, requiresConfirmation: false, roles: ["CUSTOMER"],
     execute: async (context, input) => {
       if (!context.session) throw new AppError("Không tìm thấy phiên đặt lịch.", 409);
       if (context.session.pendingAction || context.session.requiresReconciliation) throw new AppError("Cần xử lý hành động đang chờ trước khi sửa bản nháp.", 409);
+      const item = activeBookingItem(context.session);
+      if (context.session.bookingPlan && ["active", "paused"].includes(context.session.bookingPlan.status)) {
+        if (context.session.bookingPlan.status !== "active" || item?.status !== "active") throw new AppError("Hãy tiếp tục yêu cầu trong danh sách trước khi sửa bản nháp.", 409);
+        if (input.startNew || input.mode === "discard" || input.mode === "pause") throw new AppError("Hãy dùng quản lý danh sách để thêm, bỏ hoặc tạm dừng yêu cầu đặt dịch vụ.", 409);
+        if (!item.seedApplied) input = bookingDraftPatchSchema.parse({ ...item.seed, ...input });
+      }
       requireBookingAttachments(context.session, input.customerAttachments);
       const request = context.session.activeRequest?.input;
-      if (request && "message" in request && request.customerAttachments !== undefined) {
+      if (!item && request && "message" in request && request.customerAttachments !== undefined) {
         input = { ...input, customerAttachments: request.customerAttachments };
       }
       const services = deps ?? (await import("../../../services/agentBooking.service")).AgentBookingService;
@@ -30,6 +37,7 @@ export function createUpdateBookingDraftTool(deps?: BookingDraftDependencies): A
       context.signal.throwIfAborted();
       if (input.startNew) context.session.taskVersion += 1;
       context.session.bookingDraft = next;
+      if (item?.status === "active") item.seedApplied = true;
       context.session.rebookProposal = undefined;
       if (input.startNew || input.mode === "discard") context.session.draftBackup = undefined;
       if (next.lookupFailures?.length) context.session.recovery = { tool: "update_booking_draft", arguments: { mode: "resume" },

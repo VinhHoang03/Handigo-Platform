@@ -13,6 +13,9 @@ export const CUSTOMER_RUNTIME_STAGES = ["route_request", "compact_context", "cal
   "refresh_sources", "history_request", "voucher_request", "recover_draft", "recover_address",
   "model_request", "checkpoint_read", "checkpoint_write", "merge_messages", "action_graph"] as const;
 export type CustomerRuntimeStage = typeof CUSTOMER_RUNTIME_STAGES[number];
+export const CUSTOMER_CACHE_NAMES = ["faq", "catalog", "query_embedding"] as const;
+export type CustomerCacheName = typeof CUSTOMER_CACHE_NAMES[number];
+type CacheCount = { hits: number; misses: number };
 export interface CustomerStageMetric {
   stage: CustomerRuntimeStage;
   count: number;
@@ -21,8 +24,17 @@ export interface CustomerStageMetric {
   maxMs: number;
 }
 const timings = new AsyncLocalStorage<{ stages: Map<CustomerRuntimeStage, CustomerStageMetric>;
-  usage: Map<string, ModelUsage & { calls: number }>; closed: boolean }>();
+  usage: Map<string, ModelUsage & { calls: number }>; cache: Map<CustomerCacheName, CacheCount>; closed: boolean }>();
 const allowedStages = new Set<string>(CUSTOMER_RUNTIME_STAGES);
+
+export function recordCustomerCache(name: CustomerCacheName, hit: boolean) {
+  const scope = timings.getStore();
+  if (!scope || scope.closed) return;
+  const count = scope.cache.get(name) ?? { hits: 0, misses: 0 };
+  if (hit) count.hits++;
+  else count.misses++;
+  scope.cache.set(name, count);
+}
 
 export function recordCustomerModelUsage(value: ModelUsage) {
   const scope = timings.getStore(), parsed = modelUsageSchema.safeParse(value);
@@ -62,6 +74,7 @@ export interface CustomerTurnMetric {
   interrupted?: boolean;
   stages?: CustomerStageMetric[];
   usage?: Array<ModelUsage & { calls: number }>;
+  cache?: Array<{ name: CustomerCacheName } & CacheCount>;
 }
 
 export async function observeCustomerTurn(run: () => Promise<AgentSession>,
@@ -70,7 +83,7 @@ export async function observeCustomerTurn(run: () => Promise<AgentSession>,
     else logger.info("Đã ghi nhận kết quả lượt trợ lý.", { ...event });
   }) {
   const scope = { stages: new Map<CustomerRuntimeStage, CustomerStageMetric>(),
-    usage: new Map<string, ModelUsage & { calls: number }>(), closed: false };
+    usage: new Map<string, ModelUsage & { calls: number }>(), cache: new Map<CustomerCacheName, CacheCount>(), closed: false };
   return timings.run(scope, async () => {
     const start = performance.now();
     const event: CustomerTurnMetric = { engine: "langgraph-customer", version: CUSTOMER_GRAPH_VERSION, durationMs: 0, outcome: "error" };
@@ -90,6 +103,7 @@ export async function observeCustomerTurn(run: () => Promise<AgentSession>,
       if (scope.stages.size) event.stages = [...scope.stages.values()].map((item) => ({ ...item,
         totalMs: Math.round(item.totalMs), maxMs: Math.round(item.maxMs) }));
       if (scope.usage.size) event.usage = [...scope.usage.values()].map((item) => ({ ...item }));
+      if (scope.cache.size) event.cache = [...scope.cache].map(([name, count]) => ({ name, ...count }));
       // Chỉ phát metadata cố định; không đưa ID, hội thoại, tool args/result hoặc lỗi gốc vào log.
       try { emit(event); } catch { /* Hệ thống log lỗi không được làm mất kết quả nghiệp vụ. */ }
     }

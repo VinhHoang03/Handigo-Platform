@@ -37,6 +37,7 @@ export const rebookBookingTool: AgentTool<z.infer<typeof rebookSchema>> = {
   execute: async (context, args) => {
     const session = context.session;
     if (!session || session.pendingAction || session.requiresReconciliation) throw new AppError("Cần xử lý hành động đang chờ trước khi đặt lại.", 409);
+    if (session.bookingPlan && ["active", "paused"].includes(session.bookingPlan.status)) throw new AppError("Hãy hoàn tất hoặc bỏ danh sách yêu cầu hiện tại trước khi đặt lại đơn cũ.", 409);
     const order = await ownedBooking(context.user.id, args.orderId);
     if (!["completed", "cancelled"].includes(order.status)) throw new AppError("Đơn này vẫn đang được xử lý. Hãy mở chi tiết đơn để theo dõi; chưa tạo bản đặt lại.", 409);
     if (session.bookingDraft && ["active", "paused"].includes(session.bookingDraft.status) && !session.bookingDraft.orderId

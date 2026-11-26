@@ -11,7 +11,7 @@ import { AutomaticReviewResults } from "./AutomaticReviewResults";
 const featureContent = {
   provider_application: {
     title: "Kiểm duyệt tự động · Hồ sơ thợ", button: "Kiểm duyệt tự động", start: "Bật kiểm duyệt",
-    description: "Kiểm tra có ảnh giấy tờ và mô tả phù hợp các dịch vụ đăng ký theo tiêu chí bên dưới. AI chỉ duyệt hồ sơ đạt đủ điều kiện bắt buộc; trường hợp chưa rõ để Admin kiểm tra.",
+    description: "Đọc ảnh giấy tờ/chứng chỉ và đối chiếu thông tin khai báo, dịch vụ theo tiêu chí bên dưới. Hồ sơ bổ sung dịch vụ không yêu cầu nộp lại giấy tờ đăng ký mới. Ảnh mờ, sai loại, ngoài phạm vi hoặc chưa đọc đủ chuyển Admin; AI không xác minh danh tính hay tính thật của giấy tờ.",
     scope: "",
   },
   service_suggestion: {

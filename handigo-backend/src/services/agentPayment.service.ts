@@ -14,14 +14,16 @@ export const agentPaymentResultSchema = z.object({
   method: z.string().optional(), paymentType: z.string().optional(),
   checkoutUrl: z.string().url().optional(),
   paymentId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
+  quotationId: z.string().regex(/^[a-f\d]{24}$/i).optional(), quotationRevision: z.number().int().nonnegative().optional(),
 });
 export type AgentPaymentResult = z.infer<typeof agentPaymentResultSchema>;
 export type AgentPaymentArguments = { orderId: string; method: CreatePaymentInput["method"] };
-export const paymentExpectationSchema = z.object({ amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit"]),
+export const paymentExpectationSchema = z.object({ amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit", "remaining"]),
+  quotationId: z.string().regex(/^[a-f\d]{24}$/i).optional(), quotationRevision: z.number().int().nonnegative().optional(),
   previousPaymentId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   previousPaymentMethod: z.enum(["cash", "payos"]).optional() });
 export const paymentCancellationExpectationSchema = z.object({ paymentId: z.string().regex(/^[a-f\d]{24}$/i),
-  amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit"]) });
+  amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit", "remaining"]) });
 
 // Liên kết chỉ lấy từ giao dịch backend, không lấy từ nội dung LLM.
 export const safePayosUrl = (value: unknown) => {
@@ -66,16 +68,23 @@ export function createAgentPaymentService(deps = dependencies, cancellation = ca
       order = await ownedOrder(user, orderId);
       payments = await deps.payments(orderId);
     }
-    const payment = payments.find((item) => ["paid", "pending"].includes(item.status)) ?? payments[0];
+    const remaining = order.inspectionRequired && order.status === "completed";
+    const relevant = remaining ? payments.filter((item) => item.paymentType === "remaining") : payments;
+    const payment = relevant.find((item) => ["paid", "pending"].includes(item.status)) ?? relevant[0];
     const base = { orderId, orderCode: order.orderCode, amount: payment?.amount,
-      method: payment?.method, paymentType: payment?.paymentType, paymentId: payment ? String(payment._id) : undefined };
+      method: payment?.method, paymentType: payment?.paymentType, paymentId: payment ? String(payment._id) : undefined,
+      ...(payment?.paymentType === "remaining" ? {
+        quotationId: typeof payment.metadata?.quotationId === "string" ? payment.metadata.quotationId : undefined,
+        quotationRevision: typeof payment.metadata?.quotationRevision === "number" ? payment.metadata.quotationRevision : undefined,
+      } : {}) };
     if (payment?.status === "paid") return { ...base,
       status: payment.paymentType === "inspection_deposit" ? "deposit_paid" : "paid",
       message: payment.paymentType === "inspection_deposit"
-        ? "Đã thanh toán tiền cọc. Chi phí sau khảo sát trả trực tiếp cho thợ."
+        ? "Đã thanh toán tiền cọc. Phần báo giá còn lại có thể trả bằng Ví Handigo hoặc PayOS sau khi đơn hoàn thành, hoặc trả trực tiếp cho thợ."
         : "Đã thanh toán thành công." };
     if (payment?.status === "refunded") return { ...base, status: "refunded", message: "Giao dịch đã được hoàn tiền. Xem chi tiết trong đơn hàng." };
-    if (order.status === "cancelled" || order.status === "completed") return { ...base, status: "blocked",
+    if (remaining && order.paymentStatus === "paid") return { ...base, status: "paid", message: "Đơn đã được ghi nhận thanh toán đầy đủ. Không thanh toán thêm khoản báo giá này." };
+    if (order.status === "cancelled" || order.status === "completed" && !remaining) return { ...base, status: "blocked",
       message: "Đơn đã kết thúc hoặc bị hủy, không thể thanh toán thêm. Bạn có thể xem chi tiết đơn." };
     if (payment?.status === "failed" && payment.metadata?.customerCancelledQr === true) return { ...base, status: "failed",
       message: "Đã hủy giao dịch QR thanh toán. Đơn hàng được giữ theo thời hạn hiện tại. Bạn có thể chọn thanh toán lại hoặc phương thức khác." };
@@ -85,6 +94,8 @@ export function createAgentPaymentService(deps = dependencies, cancellation = ca
       return { ...base, status: "pending", checkoutUrl: safePayosUrl(link?.checkoutUrl),
         message: "Đang chờ thanh toán. Bạn quét mã QR bên dưới để thanh toán." };
     }
+    if (remaining) return { ...base, status: payment?.status === "failed" ? "failed" : "unpaid",
+      message: "Phần báo giá còn lại chưa được ghi nhận thanh toán. Bạn có thể chọn Ví Handigo hoặc PayOS; hệ thống sẽ kiểm tra số tiền và phiên bản báo giá trước khi xác nhận." };
     if (order.orderType === "scheduled"
       && !(order.status === "in_progress" && !order.inspectionRequired && order.paymentStatus === "unpaid")
       && !(order.status === "created" && !order.providerId)
@@ -133,7 +144,7 @@ export function createAgentPaymentService(deps = dependencies, cancellation = ca
       return Boolean(payment && payment.status === result.status && payment.amount === result.amount
         && payment.method === result.method && payment.paymentType === result.paymentType
         && payment.createdAt && payment.createdAt.getTime() >= Date.parse(startedAt)
-        && !payments.some((item) => item.status === "pending" || item.status === "paid"));
+        && !payments.some((item) => item.paymentType === result.paymentType && (item.status === "pending" || item.status === "paid")));
     },
     async preview(user: RequestUser, args: AgentPaymentArguments) {
       await ownedOrder(user, args.orderId);
@@ -147,14 +158,16 @@ export function createAgentPaymentService(deps = dependencies, cancellation = ca
         const current = await deps.preview(user, args);
         if (current.amount !== expected.amount || current.paymentType !== expected.paymentType
           || current.previousPaymentId !== expected.previousPaymentId
-          || current.previousPaymentMethod !== expected.previousPaymentMethod) throw new ActionPreconditionError();
+          || current.previousPaymentMethod !== expected.previousPaymentMethod
+          || current.quotationId !== expected.quotationId || current.quotationRevision !== expected.quotationRevision) throw new ActionPreconditionError();
         // URL trở về lấy từ cấu hình server, tuyệt đối không cho LLM chọn tên miền.
         const redirectUrls = buildOrderPaymentRedirects(args.orderId, process.env.FRONTEND_URL?.trim() || "https://localhost:5173", {
           returnUrl: process.env.PAYOS_RETURN_URL, cancelUrl: process.env.PAYOS_CANCEL_URL,
         });
         executionStarted = true;
         await deps.create(user, { ...args,
-          paymentType: expected.paymentType === "inspection_deposit" ? "INSPECTION_DEPOSIT" : "FULL",
+          paymentType: expected.paymentType === "remaining" ? "REMAINING" : expected.paymentType === "inspection_deposit" ? "INSPECTION_DEPOSIT" : "FULL",
+          ...(expected.paymentType === "remaining" ? { quotationId: expected.quotationId, expectedRevision: expected.quotationRevision, expectedAmount: expected.amount } : {}),
           ...redirectUrls,
         }, expected, signal);
       } catch (error) {

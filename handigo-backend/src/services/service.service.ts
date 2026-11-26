@@ -9,6 +9,7 @@ import { AppError } from "../utils/appError";
 import { isAirConditionerCleaning } from "../utils/airConditionerCleaning";
 
 import { validateNewServiceImages } from "./serviceImage.service";
+import { invalidateAgentServiceCatalog } from "./agentCatalog.service";
 
 interface ServiceInput {
   categoryId?: string;
@@ -295,7 +296,9 @@ export const createService = async (data: ServiceInput, session?: ClientSession)
     const [service] = await Service.create([payload], { session });
     return service;
   }
-  return Service.create(payload);
+  const service = await Service.create(payload);
+  invalidateAgentServiceCatalog();
+  return service;
 };
 
 export const updateService = async (id: string, data: ServiceInput) => {
@@ -366,7 +369,9 @@ export const updateService = async (id: string, data: ServiceInput) => {
     slug,
 
   });
-  return service.save();
+  const updated = await service.save();
+  invalidateAgentServiceCatalog();
+  return updated;
 };
 
 export const deleteService = async (id: string) => {
@@ -376,4 +381,5 @@ export const deleteService = async (id: string) => {
 
   service.isActive = false;
   await service.save();
+  invalidateAgentServiceCatalog();
 };

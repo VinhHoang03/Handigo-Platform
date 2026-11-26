@@ -16,7 +16,7 @@ import { getOrderSettlement, withPendingOrderSettlement } from "../utils/orderSe
 import { OrderStatus } from "../models/orderStatus.model";
 import { ensureAddressCoordinates, createAddress } from "./address.service";
 import { AppError } from "../utils/appError";
-import { vietnamesePhoneSchema } from "../validations/user.validator";
+import { vietnamesePhoneSchema, personNameSchema } from "../validations/user.validator";
 import { withTransactionRetry } from "../utils/transaction";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
@@ -159,6 +159,7 @@ export interface CreateOrderPayload {
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
   addressId: string;
   recipientPhone?: string;
+  recipientName?: string;
   orderType?: "normal" | "scheduled";
   scheduledAt?: Date | string;
   problemDescription?: string;
@@ -204,6 +205,7 @@ export const OrderService = {
    */
   async createOrder(payload: CreateOrderPayload, confirmedOrderId?: Types.ObjectId, draftAddress?: IAddress, saveAddressToBook = true): Promise<IOrder> {
     const recipientPhone = payload.recipientPhone === undefined ? undefined : vietnamesePhoneSchema.parse(payload.recipientPhone);
+    const recipientName = payload.recipientName === undefined ? undefined : personNameSchema.parse(payload.recipientName);
     await assertFeatureAllowed(payload.customerId, "booking");
     if (!payload.paymentMethod || !["wallet", "bank", "cash"].includes(payload.paymentMethod)) {
       throw new AppError("Phương thức thanh toán không hợp lệ.", 400);
@@ -445,7 +447,7 @@ export const OrderService = {
       selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
       addressId: draftAddress && !saveAddressToBook ? null : new Types.ObjectId(payload.addressId),
       addressSnapshot: {
-        recipientName: address.recipientName, recipientPhone: recipientPhone ?? address.recipientPhone,
+        recipientName: recipientName ?? address.recipientName, recipientPhone: recipientPhone ?? address.recipientPhone,
         fullAddress: address.fullAddress, province: address.province, ward: address.ward,
         note: address.note,
         latitude: address.latitude, longitude: address.longitude,
@@ -526,12 +528,13 @@ export const OrderService = {
     return order;
   },
 
-  async discardUnpaidOrder(orderId: string, customerId: string) {
+  async discardUnpaidOrder(orderId: string, customerId: string, expectedVersion?: string) {
     const draft = await Order.findOne({ _id: orderId, customerId });
     if (!draft) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
     if (draft.isDeleted && draft.paymentStatus === "unpaid" && draft.status === "created") {
       return { orderId: draft._id.toString() };
     }
+    if (expectedVersion && draft.updatedAt.toISOString() !== expectedVersion) throw new ActionPreconditionError();
     if (draft.isDeleted || draft.status !== "created" || draft.paymentStatus !== "unpaid" || draft.readyForMatching) {
       throw new AppError("Đơn hàng không còn ở trạng thái có thể loại bỏ", 409);
     }
@@ -547,6 +550,7 @@ export const OrderService = {
           paymentStatus: "unpaid",
           readyForMatching: false,
           isDeleted: false,
+          ...(expectedVersion ? { updatedAt: new Date(expectedVersion) } : {}),
         }).session(session);
         if (!order) {
           const discarded = await Order.findOne({ _id: orderId, customerId, isDeleted: true,
@@ -584,6 +588,7 @@ export const OrderService = {
         );
 
         order.isDeleted = true;
+        order.deletedAt = new Date();
         order.readyForMatching = false;
         await releaseVoucherReservation(order._id, session);
         await releaseOrderPromotion(order._id, session);

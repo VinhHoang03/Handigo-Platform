@@ -14,6 +14,7 @@ import {
 } from "../validations/serviceSuggestion.validator";
 import * as categoryService from "./category.service";
 import * as catalogService from "./service.service";
+import { invalidateAgentServiceCatalog } from "./agentCatalog.service";
 import { withTransactionRetry } from '../utils/transaction';
 import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
 import type { AutomatedReviewContext } from "../ai/admin/admin-ai.review-context";
@@ -290,6 +291,9 @@ export const updateServiceSuggestion = async (suggestionId: string, data: Update
   try {
     const result = await withTransactionRetry(session, () => updateServiceSuggestionInSession(suggestionId, data, adminId, session, automation));
     if (!result) throw new AppError('Không thể cập nhật đề xuất. Vui lòng thử lại.', 409);
+    if (data.status === "approved" && (result.suggestion.createdServiceId || result.suggestion.createdCategoryId)) {
+      invalidateAgentServiceCatalog();
+    }
     if (result.notification) emitRealtimeNotification(result.notification);
     return await getServiceSuggestionById(suggestionId);
   } catch (error) {

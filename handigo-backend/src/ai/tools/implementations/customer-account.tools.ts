@@ -10,7 +10,7 @@ const page = z.object({ page: z.number().int().min(1).max(1000).default(1) }).st
 const offer = z.object({ offerId: z.string().trim().min(1).max(100) }).strict();
 const amount = z.object({ amount: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) }).strict();
 const deposit = z.object({ orderCode: z.string().regex(/^\d{1,16}$/, "Mã khoản nạp không hợp lệ.") }).strict();
-const history = z.object({ page: page.shape.page, type: z.enum(["deposit", "payment", "refund", "adjustment"]).optional(),
+const history = z.object({ page: page.shape.page, type: z.enum(["deposit", "payment", "refund", "withdraw", "withdraw_rejected", "adjustment"]).optional(),
   fromDate: z.string().datetime({ offset: true }).optional(), toDate: z.string().datetime({ offset: true }).optional() }).strict();
 const reply = (result: unknown) => {
   const data = result as { message: string; checkoutUrl?: string | null };

@@ -20,6 +20,12 @@ import { measureCustomerStage } from "../runtime/customer-runtime-metrics";
 import { rememberReadSource } from "./read-source-refresh";
 import type { TurnPlan } from "./turn-plan";
 import { AgentCheckpointError } from "./checkpoint-error";
+import { recordPlannedBooking } from "./booking-plan";
+import { createLogger } from "../../utils/logger";
+import { readBookingFaq } from "../knowledge/booking-faq";
+import { recordCustomerCache } from "../runtime/customer-runtime-metrics";
+
+const toolLogger = createLogger("AgentTool");
 
 export const toolError = (error: unknown, tool?: string) => error instanceof ZodError
   ? "Thông tin chưa hợp lệ. Vui lòng kiểm tra và chọn lại."
@@ -27,7 +33,10 @@ export const toolError = (error: unknown, tool?: string) => error instanceof Zod
     : `${({ save_booking_address: "Chưa tra cứu được địa chỉ.", get_available_times: "Chưa kiểm tra được lịch hẹn.",
       search_booking_providers: "Chưa kiểm tra được thợ.", get_booking_vouchers: "Chưa kiểm tra được mã giảm giá.",
       get_booking_quotation: "Chưa tải được báo giá.", get_booking_refunds: "Chưa tra được khoản hoàn.",
-      search_my_bookings: "Chưa tải được lịch sử đơn.", get_previous_providers: "Chưa tải được lịch sử thợ." } as Record<string, string>)[tool ?? ""]
+      search_my_bookings: "Chưa tải được lịch sử đơn.", get_previous_providers: "Chưa tải được lịch sử thợ.",
+      update_booking_draft: "Chưa chuẩn bị được thông tin đặt lịch.", rebook_booking: "Chưa chuẩn bị được bản đặt lại.",
+      manage_booking_plan: "Chưa cập nhật được danh sách yêu cầu.", analyze_repair_images: "Chưa đọc được ảnh hiện trạng.",
+      get_repair_advice: "Chưa lấy được hướng dẫn cho sự cố này." } as Record<string, string>)[tool ?? ""]
       ?? "Chức năng tạm thời không khả dụng."} Vui lòng thử lại.`;
 
 export class AgentLoop {
@@ -38,11 +47,25 @@ export class AgentLoop {
     readonly actionGraphs?: ActionGraphRunner,
     readonly modelWorkflowRunner?: ModelWorkflowRunner) { }
 
+  private reportToolFailure(error: unknown, session: AgentSession, tool: string, stage: "authorize" | "execute" | "prepare") {
+    if (error instanceof ZodError || error instanceof AppError && error.statusCode < 500) return;
+    const details = error && typeof error === "object" ? error as { name?: unknown; code?: unknown } : {};
+    // Chỉ ghi metadata để nhận diện lỗi, không ghi lời khách, ảnh, arguments hoặc phản hồi dịch vụ.
+    toolLogger.warn("Công cụ trợ lý gặp lỗi khi xử lý yêu cầu.", {
+      tool, stage, requestId: session.activeRequest?.requestId,
+      errorType: typeof details.name === "string" && /^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(details.name) ? details.name : "UnknownError",
+      errorCode: typeof details.code === "number" && Number.isFinite(details.code) ? details.code
+        : typeof details.code === "string" && /^[A-Z][A-Z0-9_]{1,63}$/.test(details.code) ? details.code : undefined,
+      statusCode: error instanceof AppError ? error.statusCode : undefined,
+    });
+  }
+
   async executeActionGraph(session: AgentSession, context: ToolContext, action: PendingAction, checkpoint: () => Promise<void>) {
     if (!this.actionGraphs) throw new AppError("Phiên chưa được cấu hình graph nghiệp vụ.", 503);
     const result = await measureCustomerStage("action_graph", () => this.actionGraphs!.run(session, context, action));
     Object.assign(action, result.action);
     Object.assign(session, result.session);
+    recordPlannedBooking(session, action);
     let hasDirectReply = false;
     if (session.requiresReconciliation) {
       this.reply(session, "FAILED", "Chưa xác định được kết quả thao tác. Hệ thống sẽ đối soát trước khi thực hiện thêm thay đổi.");
@@ -85,6 +108,7 @@ export class AgentLoop {
       args = new ToolExecutor(this.tools).authorize(session, context, tool, args, action);
     } catch (error) {
       if (error instanceof AgentCheckpointError) throw error;
+      this.reportToolFailure(error, session, tool.name, "authorize");
       if (action && session.pendingAction === action && action.status === "WAITING_CONFIRMATION") {
         action.status = "EXPIRED";
         session.actions.push({ ...action });
@@ -129,7 +153,7 @@ export class AgentLoop {
       if (tool.name === "save_booking_address" && context.bookingAddressLookup) context.bookingAddressLookup.value = undefined;
       this.record(session, tool.name, result, true);
       if (this.modelWorkflowRunner && !action) rememberReadSource(session, tool, args);
-      if (action) { action.status = "SUCCEEDED"; action.result = result; }
+      if (action) { action.status = "SUCCEEDED"; action.result = result; recordPlannedBooking(session, action); }
       if (tool.name === "create_booking" && session.bookingDraft) {
         session.draftBackup = undefined;
         session.rebookProposal = undefined;
@@ -141,6 +165,7 @@ export class AgentLoop {
       if (action && directReply?.retryable) action.status = "EXPIRED";
     } catch (error) {
       if (error instanceof AgentCheckpointError) throw error;
+      this.reportToolFailure(error, session, tool.name, "execute");
       if (error instanceof ActionPreconditionError) {
         if (action) action.status = "EXPIRED";
         this.record(session, tool.name, { error: error.message }, false);
@@ -181,6 +206,23 @@ export class AgentLoop {
     return this.executeTurnPlan(session, context, checkpoint, plan);
   }
 
+  async answerBookingFaq(session: AgentSession, context: ToolContext) {
+    const input = session.activeRequest?.input;
+    if (!input || !("message" in input) || input.bookingAction || input.customerAttachments !== undefined
+      || context.readOnly || session.requiresReconciliation || session.pendingAction
+      || session.bookingDraft && ["active", "paused"].includes(session.bookingDraft.status)
+      || session.bookingPlan && ["active", "paused"].includes(session.bookingPlan.status)) return undefined;
+    try {
+      const knowledge = this.tools.get("search_customer_knowledge", context);
+      if (this.tools.needsConfirmation(knowledge)) return undefined;
+    } catch {
+      return undefined;
+    }
+    const answer = await readBookingFaq(input.message, context.signal);
+    recordCustomerCache("faq", answer !== undefined);
+    return answer;
+  }
+
   planTurn(session: AgentSession, context: ToolContext): string | TurnPlan | null {
     context.bookingAddressLookup = {};
     const latestMessage = [...session.conversation].reverse().find((item) => item.role === "user")?.content ?? "";
@@ -200,7 +242,9 @@ export class AgentLoop {
     if (input && "message" in input && input.bookingAction) {
       const action = bookingActionSchema.parse(input.bookingAction);
       session.recovery = undefined;
-      if (action.type === "update") {
+      if (action.type === "plan") {
+        historyRequest = { tool: "manage_booking_plan", args: action.plan };
+      } else if (action.type === "update") {
         const draft = session.bookingDraft;
         if (!draft || !["active", "paused"].includes(draft.status) || draft.orderId || draft.revision !== action.revision) {
           return this.reply(session, "WAITING_USER_INPUT", "Bản nháp đã thay đổi hoặc không còn chỉnh sửa được. Hãy tải trạng thái mới trước khi chọn lại.");
@@ -258,7 +302,16 @@ export class AgentLoop {
       try {
         const retryTool = this.tools.get(recovery.tool, context);
         if (retryTool.mutates || this.tools.needsConfirmation(retryTool)) return this.reply(session, "WAITING_USER_INPUT", "Thao tác này cần kiểm tra kết quả và xác nhận mới trước khi thực hiện; chưa chạy lại.");
-        historyRequest = { tool: retryTool.name, args: recovery.arguments };
+        let retryArgs = retryTool.inputSchema.parse(recovery.arguments);
+        if (retryTool.name === "analyze_repair_images" && retryArgs && typeof retryArgs === "object"
+          && (!("customerAttachments" in retryArgs) || retryArgs.customerAttachments === undefined)) {
+          // Phiên cũ chưa ghim URL: chỉ lấy ảnh của yêu cầu ngay trước các tin nhắn tiếp tục.
+          const original = [...session.conversation].reverse().find((message) => message.role === "user" && !isContinueRequest(message.content));
+          if (original?.customerAttachments !== undefined) {
+            retryArgs = retryTool.inputSchema.parse({ ...retryArgs, customerAttachments: original.customerAttachments });
+          }
+        }
+        historyRequest = { tool: retryTool.name, args: retryArgs };
         if (recovery.replaceDraft && retryTool.name === "rebook_booking") context.replaceBookingDraft = true;
       } catch (error) {
         if (error instanceof AgentCheckpointError) throw error;
@@ -313,13 +366,19 @@ export class AgentLoop {
           ? result.items.length ? "Chọn thao tác trên đơn bạn muốn xử lý bên dưới." : "Không tìm thấy đơn phù hợp. Bạn có thể đổi tiêu chí hoặc tìm tất cả đơn."
           : "Kết quả tìm kiếm quá dài. Hãy thu hẹp tiêu chí để tìm đúng đơn.", result);
       }
+      if (tool.name === "manage_booking_plan") {
+        if (session.bookingPlan?.status === "active") return null;
+        return this.reply(session, "WAITING_USER_INPUT", session.bookingPlan?.status === "paused" ? "Đã tạm dừng danh sách yêu cầu. Các đơn đã tạo được giữ nguyên."
+          : "Đã xử lý danh sách yêu cầu. Các đơn đã tạo được giữ nguyên.");
+      }
       if (tool.name === "rebook_booking" || tool.name === "update_booking_draft") return await this.prepareBookingDraft(session, context, checkpoint)
         ?? this.reply(session, "WAITING_USER_INPUT", session.bookingDraft?.status === "paused" ? "Đã tạm dừng bản nháp."
           : session.bookingDraft?.status === "discarded" ? "Đã bỏ bản nháp." : "Vui lòng chọn lịch mới để đặt lại.");
       if (!context.readOnly && session.bookingDraft?.status === "active") session.bookingDraft.status = "paused";
     } catch (error) {
       if (error instanceof AgentCheckpointError) throw error;
-      return this.reply(session, "WAITING_USER_INPUT", toolError(error));
+      this.reportToolFailure(error, session, historyRequest.tool, "prepare");
+      return this.reply(session, "WAITING_USER_INPUT", toolError(error, historyRequest.tool));
     }
     const voucher = this.planVoucherTurn(session, context);
     return typeof voucher === "string" || voucher === null ? voucher : this.executeTurnPlan(session, context, checkpoint, voucher);
@@ -434,6 +493,7 @@ export class AgentLoop {
       return message;
     } catch (error) {
       if (error instanceof AgentCheckpointError) throw error;
+      this.reportToolFailure(error, session, "create_booking", "prepare");
       this.record(session, "create_booking", { error: toolError(error) }, false);
       session.recovery = { tool: "create_booking", arguments: bookingArgs, taskVersion: session.taskVersion, revision: draft.revision, stage: "preview" };
       return this.reply(session, "WAITING_USER_INPUT", toolError(error));

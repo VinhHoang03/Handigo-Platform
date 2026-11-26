@@ -14,28 +14,31 @@ export const AgentQuotationService = {
     const order = await ownedBooking(userId, orderId);
     const result = await AssignmentService.getQuotationByOrder(orderId, userId, "CUSTOMER");
     if (!result) return { orderId, orderCode: order.orderCode, quotation: null, note: "Đơn chưa có báo giá hiện tại." };
-    const payments = await Payment.find({ orderId, customerId: userId, paymentType: "inspection_deposit", status: "paid", isDeleted: false }).select("amount").lean();
-    const paidDeposit = payments.reduce((sum, payment) => sum + payment.amount, 0);
+    const payments = await Payment.find({ orderId, customerId: userId, paymentType: { $in: ["inspection_deposit", "remaining"] }, status: "paid", isDeleted: false }).select("amount paymentType metadata").lean();
+    const paidDeposit = payments.filter(payment => payment.paymentType === "inspection_deposit").reduce((sum, payment) => sum + payment.amount, 0);
     // Đồng nhất cách khấu trừ cọc với màn chi tiết đơn trên web, kể cả dữ liệu cũ.
     const appliedDeposit = order.pricing.baseAmount !== undefined
       ? order.depositPaidAt ? Math.max(order.pricing.totalPaidAmount, 0) : paidDeposit
       : order.depositPaidAt ? Math.max(paidDeposit, order.depositAmount || 0) : paidDeposit;
     const quotation = result.quotation;
+    const systemPaidAmount = payments.filter(payment => payment.paymentType === "remaining"
+      && payment.metadata?.quotationId === String(quotation._id) && payment.metadata?.quotationRevision === (quotation.revision ?? 0))
+      .reduce((sum, payment) => sum + payment.amount, 0);
     return { orderId, orderCode: order.orderCode, orderStatus: order.status,
       quotation: { id: String(quotation._id), code: quotation.quotationCode, revision: quotation.revision ?? 0,
         status: quotation.status, inspectionNote: quotation.inspectionNote, recommendation: quotation.recommendation,
         subtotalAmount: quotation.subtotalAmount, discountAmount: quotation.discountAmount,
-        finalAmount: quotation.finalAmount, paidDeposit: appliedDeposit,
+        finalAmount: quotation.finalAmount, paidDeposit: appliedDeposit, systemPaidAmount,
         directPaymentAmount: Math.max(quotation.finalAmount - appliedDeposit, 0),
         directPaymentConfirmedAmount: quotation.directPaymentConfirmedAmount ?? null,
         directPaymentConfirmedAt: quotation.directPaymentConfirmedAt ?? null,
-        remainingDirectPaymentAmount: order.status === "cancelled" || ["rejected", "cancelled", "expired"].includes(quotation.status)
-          ? 0 : Math.max(quotation.finalAmount - appliedDeposit - (quotation.directPaymentConfirmedAt ? quotation.directPaymentConfirmedAmount ?? 0 : 0), 0),
+        remainingDirectPaymentAmount: order.status === "cancelled" || order.status === "completed" && order.paymentStatus === "paid" || ["rejected", "cancelled", "expired"].includes(quotation.status)
+          ? 0 : Math.max(quotation.finalAmount - appliedDeposit - systemPaidAmount - (quotation.directPaymentConfirmedAt ? quotation.directPaymentConfirmedAmount ?? 0 : 0), 0),
         items: result.items.map((item) => ({ title: item.title, description: item.description, type: item.itemType,
           quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.totalPrice, note: item.note })),
       },
       canRequestRejection: quotation.status === "pending" && ["created", "accepted"].includes(order.status),
-      note: "Số tiền trực tiếp = max(tổng báo giá − cọc thực trả được khấu trừ, 0); phần này trả trực tiếp cho thợ, không thu qua Handigo. Xác nhận trực tiếp của thợ là dữ liệu ghi nhận, không tự khẳng định khách đã giao tiền. Luồng khách hiện chỉ từ chối báo giá pending khi chính sách cho phép hủy; saved/approved không được tự đổi trạng thái hoặc hủy thay thợ." };
+      note: "Tiền còn lại được khấu trừ cọc và khoản đã ghi nhận thanh toán. Sau khi đơn hoàn thành, khách có thể trả bằng Ví Handigo hoặc PayOS, hoặc trả trực tiếp cho thợ. Không thu thêm khi đơn đã thanh toán đầy đủ. Xác nhận trực tiếp của thợ là dữ liệu ghi nhận; nếu chưa đúng cần liên hệ hỗ trợ. Chỉ từ chối báo giá pending khi chính sách cho phép hủy." };
   },
   async previewReject(userId: string, orderId: string, reason: string) {
     const detail = await this.get(userId, orderId);

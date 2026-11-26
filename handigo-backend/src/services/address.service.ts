@@ -257,10 +257,14 @@ export const updateAddress = async (addressId: string, userId: string, data: Add
   });
 };
 
-export const deleteAddress = async (addressId: string, userId: string) => changeAddresses(userId, async session => {
-  const address = await Address.findOneAndUpdate({ _id: addressId, userId, isDeleted: { $ne: true } },
+export const deleteAddress = async (addressId: string, userId: string, expectedVersion?: string) => changeAddresses(userId, async session => {
+  const address = await Address.findOneAndUpdate({ _id: addressId, userId, isDeleted: { $ne: true },
+    ...(expectedVersion ? { updatedAt: new Date(expectedVersion) } : {}) },
     { $set: { isDeleted: true, deletedAt: new Date(), isDefault: false } }, { returnDocument: "after", session, runValidators: true });
-  if (!address) throw new AppError("Không tìm thấy địa chỉ.", 404);
+  if (!address) {
+    if (expectedVersion) throw new ActionPreconditionError();
+    throw new AppError("Không tìm thấy địa chỉ.", 404);
+  }
   return address;
 });
 
@@ -277,9 +281,13 @@ export const getUserAddresses = async (userId: string) => {
   }));
 };
 
-export const setDefaultAddress = async (userId: string, addressId: string) => changeAddresses(userId, async session => {
-  const exists = await Address.exists({ _id: addressId, userId, isDeleted: { $ne: true } }).session(session);
-  if (!exists) throw new AppError("Không tìm thấy địa chỉ.", 404);
+export const setDefaultAddress = async (userId: string, addressId: string, expectedVersion?: string) => changeAddresses(userId, async session => {
+  const exists = await Address.exists({ _id: addressId, userId, isDeleted: { $ne: true },
+    ...(expectedVersion ? { updatedAt: new Date(expectedVersion) } : {}) }).session(session);
+  if (!exists) {
+    if (expectedVersion) throw new ActionPreconditionError();
+    throw new AppError("Không tìm thấy địa chỉ.", 404);
+  }
   await Address.updateMany({ userId, _id: { $ne: addressId } }, { $set: { isDefault: false } }, { session, runValidators: true });
   return Address.findOneAndUpdate({ _id: addressId, userId, isDeleted: { $ne: true } },
     { $set: { isDefault: true } }, { returnDocument: "after", session, runValidators: true });

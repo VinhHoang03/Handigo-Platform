@@ -17,7 +17,7 @@ import { createNotificationRecord } from "./notification.service";
 
 const logger = createLogger("QuotationWalletPayment");
 
-export const validateQuotationPayment = async (user: RequestUser, input: CreatePaymentInput, session: mongoose.ClientSession) => {
+export const validateQuotationPayment = async (user: RequestUser, input: CreatePaymentInput, session: mongoose.ClientSession, lockSchedule = true) => {
   if (user.role !== "CUSTOMER" || !["WALLET", "PAYOS"].includes(input.method)) {
     throw new AppError("Chỉ khách hàng sở hữu đơn được thanh toán báo giá bằng ví hoặc PayOS.", 403);
   }
@@ -27,7 +27,7 @@ export const validateQuotationPayment = async (user: RequestUser, input: CreateP
   const initialOrder = await Order.findOne({ _id: input.orderId, customerId: user.id, isDeleted: false }).session(session);
   if (!initialOrder) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
   if (!initialOrder.providerId) throw new AppError("Đơn hàng chưa có thợ thực hiện.", 409);
-  await lockProviderSchedule(initialOrder.providerId, session);
+  if (lockSchedule) await lockProviderSchedule(initialOrder.providerId, session);
   const order = await Order.findOne({ _id: input.orderId, customerId: user.id, isDeleted: false }).session(session);
   if (!order || !order.inspectionRequired || order.status !== "completed" || !order.depositPaidAt) {
     throw new AppError("Chỉ thanh toán báo giá sau khi đơn hoàn thành và tiền cọc đã được thanh toán.", 409);

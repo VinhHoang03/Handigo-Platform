@@ -34,6 +34,7 @@ function modelMessage(message: AgentMessage, session: AgentSession): AgentMessag
 
 // Giới hạn ngữ cảnh gửi model; lịch sử đầy đủ và biên nhận vẫn được lưu để đối soát.
 export function agentContext(session: AgentSession) {
+  const planItem = session.bookingPlan?.items.find(item => item.id === session.bookingPlan?.activeItemId);
   const available = session.conversation.filter((message) => !message.supersededRead);
   const conversation = [];
   let size = 0;
@@ -46,13 +47,15 @@ export function agentContext(session: AgentSession) {
   }
   const latestUser = [...session.conversation].reverse().find((message) => message.role === "user");
   return {
-    goal: latestUser?.content ?? session.currentGoal,
+    goal: session.bookingPlan?.status === "active" && planItem?.status === "active"
+      ? `Yêu cầu đang soạn: ${planItem.request}\nTin nhắn mới nhất: ${latestUser?.content ?? ""}` : latestUser?.content ?? session.currentGoal,
     conversation,
     taskContext: {
       summary: session.contextSummary?.content,
       earlierRequests: available.slice(0, available.length - conversation.length)
         .filter((message) => message.role === "user").slice(-8).map((message) => message.content.slice(0, 500)),
       bookingDraft: session.bookingDraft,
+      bookingPlan: session.bookingPlan ? { ...session.bookingPlan, items: session.bookingPlan.items.map(({ draft: _draft, ...item }) => item) } : undefined,
       viewedOrder: session.viewedOrder,
       rebookProposal: session.rebookProposal ? { awaitingDecision: true } : undefined,
       actions: session.actions.slice(-20).map((action) => ({ tool: action.tool, status: action.status,

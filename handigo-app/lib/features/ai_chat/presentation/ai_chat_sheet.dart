@@ -11,6 +11,8 @@ import '../../auth/domain/app_user.dart';
 import 'ai_chat_controller.dart';
 import 'ai_chat_history.dart';
 import 'ai_chat_composer.dart';
+import 'ai_booking_editor.dart';
+import 'ai_booking_plan.dart';
 import '../../booking/presentation/booking_policy_panel.dart';
 
 Future<void> showAiChatSheet(BuildContext context) =>
@@ -582,6 +584,10 @@ class _AiChatSheetState extends ConsumerState<AiChatSheet> {
                                   'Cuộc trò chuyện đã kết thúc. Nhấn nút cuộc trò chuyện mới để tiếp tục.',
                                 ),
                               ),
+                            if (controller.session?['bookingPlan'] != null)
+                              AiBookingPlan(
+                                enabled: canInteract && _attachments == null,
+                              ),
                             if (confirmation != null)
                               _ConfirmationCard(
                                 key: ValueKey(
@@ -591,6 +597,26 @@ class _AiChatSheetState extends ConsumerState<AiChatSheet> {
                                 policies: controller.bookingPolicies,
                                 enabled: canInteract && _attachments == null,
                                 onDecision: controller.decide,
+                                onEdit:
+                                    controller.session?['bookingDraft'] is Map
+                                    ? (mode) {
+                                        final draft = Map<String, dynamic>.from(
+                                          controller.session!['bookingDraft']
+                                              as Map,
+                                        );
+                                        showDialog<void>(
+                                          context: context,
+                                          builder: (_) => AiBookingEditor(
+                                            mode: mode,
+                                            draft: draft,
+                                            preview: Map<String, dynamic>.from(
+                                              confirmation['preview'] as Map? ??
+                                                  {},
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    : null,
                               ),
                             if (payment != null)
                               _PaymentCard(
@@ -924,6 +950,7 @@ const _previewLabels = {
   'service': 'Dịch vụ',
   'options': 'Tùy chọn',
   'address': 'Địa chỉ',
+  'currentSchedule': 'Lịch hiện tại',
   'schedule': 'Thời gian',
   'unitPrice': 'Đơn giá',
   'quantity': 'Số lượng',
@@ -934,7 +961,11 @@ const _previewLabels = {
   'providerName': 'Chuyên gia ưu tiên',
   'previousAddress': 'Địa chỉ trước khi sửa',
   'recipientName': 'Người nhận',
+  'bookingPlanLabel': 'Yêu cầu trong danh sách',
   'recipientPhone': 'Số điện thoại người nhận',
+  'bankName': 'Ngân hàng nhận',
+  'maskedAccountNumber': 'Số tài khoản',
+  'accountHolderName': 'Chủ tài khoản',
   'defaultAddress': 'Địa chỉ mặc định',
   'addressNote': 'Ghi chú địa chỉ',
   'responseDeadline': 'Hạn phản hồi',
@@ -943,6 +974,17 @@ const _previewLabels = {
   'description': 'Mô tả',
   'orderCode': 'Mã đơn',
   'reason': 'Lý do hủy',
+  'quotationCode': 'Mã báo giá',
+  'quotationAmount': 'Tổng báo giá',
+  'providerCompensation': 'Chuyển cho thợ',
+  'offerName': 'Ưu đãi',
+  'points': 'Điểm sử dụng',
+  'pointsBalance': 'Điểm hiện có',
+  'minOrderAmount': 'Đơn tối thiểu',
+  'maxDiscountAmount': 'Giảm tối đa',
+  'validityDays': 'Hiệu lực',
+  'discountValue': 'Giá trị ưu đãi',
+  'applicableOrderType': 'Áp dụng cho',
   'paidAmount': 'Đã thanh toán',
   'refundAmount': 'Dự kiến hoàn',
   'cancellationFee': 'Phí hủy',
@@ -951,11 +993,17 @@ const _previewLabels = {
   'subject': 'Tiêu đề yêu cầu',
   'category': 'Nhóm hỗ trợ',
   'priority': 'Độ ưu tiên',
+  'reportType': 'Loại báo cáo',
+  'targetType': 'Đối tượng',
   'caseId': 'Mã yêu cầu',
   'caseStatus': 'Trạng thái hiện tại',
 };
 
 String _previewValue(String key, dynamic value) {
+  if (value is num && ['points', 'pointsBalance'].contains(key)) {
+    return '${NumberFormat.decimalPattern('vi_VN').format(value)} điểm';
+  }
+  if (value is num && key == 'validityDays') return '$value ngày';
   if (value is num) {
     return key == 'quantity' || key == 'rating'
         ? NumberFormat.decimalPattern('vi_VN').format(value)
@@ -971,14 +1019,52 @@ String _previewValue(String key, dynamic value) {
         }[value] ??
         value;
   }
-  if (key == 'schedule') {
+  if (['schedule', 'currentSchedule', 'responseDeadline'].contains(key)) {
     final date = DateTime.tryParse(value);
     if (date != null) {
       return DateFormat('dd/MM/yyyy HH:mm').format(date.toLocal());
     }
   }
+  if (key == 'targetType') {
+    return const {
+          'order': 'Đơn dịch vụ',
+          'chat_conversation': 'Cuộc trò chuyện',
+          'system': 'Hệ thống',
+          'app': 'Ứng dụng',
+        }[value] ??
+        'Đối tượng đã chọn';
+  }
+  if (key == 'reportType') return _reportTypeLabels[value] ?? 'Báo cáo vi phạm';
+  if (key == 'applicableOrderType') {
+    return value == 'fixed_price'
+        ? 'Dịch vụ giá cố định'
+        : value == 'variable_price'
+        ? 'Dịch vụ khảo sát'
+        : value;
+  }
   return value;
 }
+
+const _reportTypeLabels = {
+  'spam_chat': 'Tin nhắn rác',
+  'harassment': 'Quấy rối',
+  'insulting_language': 'Ngôn từ xúc phạm',
+  'fraud': 'Lừa đảo',
+  'impersonation': 'Mạo danh',
+  'advertisement': 'Quảng cáo',
+  'spam_booking': 'Đặt đơn rác',
+  'voucher_abuse': 'Lạm dụng mã giảm giá',
+  'payment_fraud': 'Gian lận thanh toán',
+  'fake_review': 'Đánh giá giả',
+  'sabotage': 'Phá hoại',
+  'false_reporting': 'Báo cáo sai sự thật',
+  'system_bug': 'Lỗi hệ thống',
+  'ui_issue': 'Lỗi giao diện',
+  'user_behavior': 'Hành vi người dùng',
+  'payment_issue': 'Vấn đề thanh toán',
+  'service_quality': 'Chất lượng dịch vụ',
+  'other': 'Khác',
+};
 
 class _ConfirmationCard extends StatefulWidget {
   const _ConfirmationCard({
@@ -986,12 +1072,14 @@ class _ConfirmationCard extends StatefulWidget {
     required this.policies,
     required this.enabled,
     required this.onDecision,
+    this.onEdit,
     super.key,
   });
   final Map<String, dynamic> action;
   final Map<String, dynamic>? policies;
   final bool enabled;
   final Future<void> Function(String, {bool policyAccepted}) onDecision;
+  final void Function(String)? onEdit;
 
   @override
   State<_ConfirmationCard> createState() => _ConfirmationCardState();
@@ -1005,6 +1093,13 @@ class _ConfirmationCardState extends State<_ConfirmationCard> {
     final action = widget.action;
     final preview = action['preview'] as Map<String, dynamic>? ?? {};
     final needsConsent = action['tool'] == 'create_booking';
+    final images = (preview['customerAttachments'] as List? ?? [])
+        .whereType<String>()
+        .where((value) {
+          final uri = Uri.tryParse(value);
+          return uri?.scheme == 'https' && uri?.host == 'res.cloudinary.com';
+        })
+        .toList();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1024,9 +1119,72 @@ class _ConfirmationCardState extends State<_ConfirmationCard> {
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: Text(
-                    '${entry.value}: ${_previewValue(entry.key, preview[entry.key])}',
+                    '${entry.value}: ${entry.key == 'discountValue' && preview['discountType'] == 'PERCENT' ? '${preview[entry.key]}%' : _previewValue(entry.key, preview[entry.key])}',
                   ),
                 ),
+            if (images.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text('Ảnh đính kèm yêu cầu'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (var index = 0; index < images.length; index++)
+                    InkWell(
+                      onTap: () => showDialog<void>(
+                        context: context,
+                        builder: (dialogContext) => Dialog(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: InteractiveViewer(
+                                  child: Image.network(
+                                    images[index],
+                                    errorBuilder: (_, error, stack) =>
+                                        const Padding(
+                                          padding: EdgeInsets.all(16),
+                                          child: Text(
+                                            'Không tải được ảnh. Hãy kiểm tra lại trước khi xác nhận.',
+                                          ),
+                                        ),
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(),
+                                child: const Text('Đóng ảnh'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      child: Image.network(
+                        images[index],
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                        semanticLabel: 'Xem ảnh đính kèm ${index + 1}',
+                        loadingBuilder: (_, child, progress) => progress == null
+                            ? child
+                            : const SizedBox(
+                                width: 72,
+                                height: 72,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                        errorBuilder: (_, error, stack) => const SizedBox(
+                          width: 72,
+                          height: 72,
+                          child: Center(child: Text('Lỗi tải ảnh')),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
             if (action['expiresAt'] is String)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
@@ -1036,6 +1194,25 @@ class _ConfirmationCardState extends State<_ConfirmationCard> {
               ),
             const SizedBox(height: 12),
             if (needsConsent) ...[
+              if (widget.onEdit != null)
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text('Sửa thông tin đặt lịch'),
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final edit in bookingEditLabels.entries)
+                          OutlinedButton(
+                            onPressed: widget.enabled
+                                ? () => widget.onEdit!(edit.key)
+                                : null,
+                            child: Text(edit.value),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               IgnorePointer(
                 ignoring: !widget.enabled,
                 child: BookingPolicyConsent(

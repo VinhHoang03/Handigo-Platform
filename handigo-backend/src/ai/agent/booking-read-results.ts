@@ -17,9 +17,11 @@ export function quotationReply(result: Awaited<ReturnType<typeof AgentQuotationS
     `Cọc thực trả được khấu trừ: ${money(q.paidDeposit)}.`,
     ["cancelled", "rejected", "expired"].includes(q.status) || result.orderStatus === "cancelled"
       ? "Báo giá/đơn đã ngừng thực hiện. Không cần trả thêm theo báo giá này."
-      : `Còn thanh toán trực tiếp với thợ: ${money(q.remainingDirectPaymentAmount)}.`,
+      : `Còn cần thanh toán: ${money(q.remainingDirectPaymentAmount)}.`,
+    q.systemPaidAmount > 0 ? `Đã thanh toán báo giá qua hệ thống: ${money(q.systemPaidAmount)}.` : "",
     q.directPaymentConfirmedAt ? `Thợ ghi nhận đã nhận ${money(q.directPaymentConfirmedAmount ?? 0)}. Nếu chưa đúng, vui lòng liên hệ hỗ trợ.` : "",
-    "Chi phí sửa chữa trả trực tiếp cho thợ.",
+    q.remainingDirectPaymentAmount > 0 ? "Sau khi đơn hoàn thành, có thể thanh toán phần còn lại bằng Ví Handigo hoặc PayOS, hoặc trả trực tiếp cho thợ."
+      : "Không thanh toán thêm khoản đã được ghi nhận đầy đủ.",
     result.canRequestRejection ? "Muốn từ chối báo giá? Bạn có thể xem phí hủy và tiền hoàn trước khi xác nhận." : "",
   ].filter(Boolean).join("\n");
 }

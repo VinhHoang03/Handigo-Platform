@@ -7,7 +7,7 @@ const ts = require('typescript');
 const mongoose = require('mongoose');
 const { bookingSchema } = require('../dist/ai/tools/implementations/booking.schemas');
 const { bookingDraftPatchSchema, updateBookingDraft, readyBookingArguments } = require('../dist/ai/agent/booking-draft');
-const { vietnamesePhoneSchema } = require('../dist/validations/user.validator');
+const { vietnamesePhoneSchema, personNameSchema } = require('../dist/validations/user.validator');
 const bookingPolicy = require('../dist/utils/bookingPolicy');
 
 // Chạy service thật với dữ liệu giả, không kết nối database, AI hoặc thanh toán.
@@ -50,6 +50,7 @@ test('Thao tác sửa từ giao diện và schema công cụ AI đều nhận s�
   const { bookingActionSchema } = load('ai/agent/booking-actions.ts', {
     zod: { z },
     './booking-draft': { bookingDraftPatchSchema },
+    './booking-plan': require('../dist/ai/agent/booking-plan'),
     '../tools/implementations/booking.schemas': { idSchema: z.string() },
     '../../services/agentFeedback.service': { agentFeedbackSchema: z.object({}) },
   });
@@ -115,7 +116,7 @@ function orderFixture() {
   const { OrderService } = load('services/order.service.ts', {
     mongoose,
     crypto: require('node:crypto'),
-    '../validations/user.validator': { vietnamesePhoneSchema },
+    '../validations/user.validator': { vietnamesePhoneSchema, personNameSchema },
     '../utils/appError': require('../dist/utils/appError'),
     '../utils/actionPreconditionError': require('../dist/utils/actionPreconditionError'),
     '../utils/bookingPolicy': bookingPolicy,
@@ -169,4 +170,33 @@ test('Số không hợp lệ, địa chỉ không thuộc khách hoặc địa c
   runtime.deny();
   await assert.rejects(runtime.create({ recipientPhone: '0987654321' }), /Địa chỉ không hợp lệ/);
   assert.equal(runtime.writes.length, 0);
+});
+
+test('Tên người nhận chuẩn hóa, kiểm tra hợp lệ và giữ riêng trong bản nháp cho tới khi khách bỏ lựa chọn', async () => {
+  assert.equal(bookingSchema.parse({ ...args, recipientName: '  Trần   Bình  ' }).recipientName, 'Trần Bình');
+  for (const recipientName of ['', 'A', '123', '<script>', 'A'.repeat(121), null]) assert.equal(bookingSchema.safeParse({ ...args, recipientName }).success, false);
+  const deps = { search: async () => [], service: async () => service, addresses: async () => [address], vouchers: async () => [], price: async () => ({ amount: 100000 }) };
+  const update = (previous, patch) => updateBookingDraft(previous, bookingDraftPatchSchema.parse(patch), userId, deps);
+  const first = await update(undefined, { ...args, recipientName: 'Trần Bình' });
+  assert.match(first.summary.join(' '), /Trần Bình/);
+  assert.equal(readyBookingArguments(first).recipientName, 'Trần Bình');
+  assert.equal((await update(first, { quantity: 2 })).values.recipientName, 'Trần Bình');
+  assert.equal((await update(first, { recipientName: null })).values.recipientName, undefined);
+  assert.equal((await update(first, { startNew: true })).values.recipientName, undefined);
+  assert.equal((await bookingFixture().preview(userId, { ...args, recipientName: 'Trần Bình' })).recipientName, 'Trần Bình');
+});
+
+test('Tên riêng chỉ lưu vào thông tin đơn, địa chỉ cũ/mới giữ nguyên; tên sai không được ghi', async () => {
+  const originalStartSession = mongoose.startSession;
+  mongoose.startSession = async () => ({ withTransaction: async work => work(), endSession: async () => {} });
+  try {
+    const runtime = orderFixture();
+    const order = await runtime.create({ recipientName: '  Trần  Bình ' });
+    assert.equal(order.addressSnapshot.recipientName, 'Trần Bình'); assert.equal(address.recipientName, 'Nguyễn An');
+    const draft = { ...address, validate: async () => {}, toObject() { return { ...address }; } };
+    const saved = await runtime.create({ recipientName: 'Trần Bình' }, draft, true);
+    assert.equal(saved.addressSnapshot.recipientName, 'Trần Bình'); assert.equal(runtime.savedAddresses[0].recipientName, 'Nguyễn An');
+    const count = runtime.writes.length;
+    await assert.rejects(runtime.create({ recipientName: '123' })); assert.equal(runtime.writes.length, count);
+  } finally { mongoose.startSession = originalStartSession; }
 });

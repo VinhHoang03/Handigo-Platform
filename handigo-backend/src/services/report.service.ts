@@ -84,7 +84,7 @@ const assertUserExists = async (userId: string) => {
   }
 };
 
-const resolveReportTarget = async (
+export const resolveReportTarget = async (
   reporterId: string,
   role: UserRole,
   payload: CreateReportPayload,

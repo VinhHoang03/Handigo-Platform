@@ -11,6 +11,7 @@ export function ChatbotComposer({
   onActivityChange,
   voiceEnabled = false,
   onUploadAttachment,
+  onPreviewImage,
   attachmentUrls = [],
   onAttachmentChange,
   attachmentPurpose = "booking",
@@ -19,6 +20,7 @@ export function ChatbotComposer({
   onSend: (content: string, customerAttachments?: string[]) => Promise<void>;
   onActivityChange?: (busy: boolean) => void;
   onUploadAttachment?: (file: File) => Promise<string>;
+  onPreviewImage: (url: string) => void;
   attachmentUrls?: string[];
   onAttachmentChange?: (dirty: boolean) => void;
   attachmentPurpose?: "booking" | "general";
@@ -50,16 +52,20 @@ export function ChatbotComposer({
     event?.preventDefault();
     const value = content.trim() || (attachments !== undefined ? attachmentPurpose === "booking"
       ? "Cập nhật ảnh hiện trạng cho bản nháp đặt dịch vụ này."
-      : "Tôi gửi ảnh đính kèm. Hãy hỏi tôi muốn dùng ảnh cho yêu cầu nào nếu chưa rõ." : "");
+      : "Ảnh đính kèm." : "");
     if (!value || disabled || uploading || voice.listening) return;
+    const submittedAttachments = attachments;
     voice.cancel();
     setContent("");
+    setAttachments([]);
+    onAttachmentChange?.(false);
     try {
-      await onSend(value, attachments);
+      await onSend(value, submittedAttachments);
       setAttachments(undefined);
-      onAttachmentChange?.(false);
     } catch {
       setContent(value);
+      setAttachments(submittedAttachments);
+      onAttachmentChange?.(submittedAttachments !== undefined);
     }
   };
 
@@ -100,7 +106,10 @@ export function ChatbotComposer({
       <div className="rounded-2xl border border-outline-variant/60 bg-surface-container-low/50 p-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/10">
         {onUploadAttachment && selected.length > 0 && <div className="flex gap-2 overflow-x-auto px-2 pt-2" aria-label="Ảnh hiện trạng đính kèm">
           {selected.map((url, index) => <div key={url} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-outline-variant/50">
-            <img src={url} alt={`Ảnh hiện trạng ${index + 1}`} className="h-full w-full object-cover" />
+            <button type="button" onClick={() => onPreviewImage(url)} aria-label={`Mở ảnh hiện trạng ${index + 1}`}
+              className="h-full w-full cursor-zoom-in focus-visible:outline-2 focus-visible:outline-primary">
+              <img src={url} alt={`Ảnh hiện trạng ${index + 1}`} className="h-full w-full object-cover" />
+            </button>
             <button type="button" disabled={disabled || uploading} onClick={() => { setAttachments(selected.filter((item) => item !== url)); onAttachmentChange?.(true); }}
               aria-label={`Bỏ ảnh hiện trạng ${index + 1}`} className="absolute right-0 top-0 grid h-11 w-11 place-items-center rounded-bl-xl bg-surface-container-lowest/90 text-on-surface focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"><X size={16} aria-hidden="true" /></button>
           </div>)}
@@ -158,7 +167,6 @@ export function ChatbotComposer({
         </div>
       </div>
       {attachmentError && <p role="alert" className="mt-2 px-1 text-xs text-error">{attachmentError}</p>}
-      {onUploadAttachment && (selected.length > 0 || attachments !== undefined) && <p className="mt-2 px-1 text-xs text-on-surface-variant">{selected.length}/4 ảnh đính kèm. {attachments !== undefined ? "Nhấn Gửi để cập nhật ảnh trước khi xác nhận." : attachmentPurpose === "booking" ? "Ảnh sẽ được gửi kèm đơn sau xác nhận." : "Ảnh sẽ được gửi cùng yêu cầu sau xác nhận."} Agent chưa phân tích nội dung ảnh.</p>}
       {voiceEnabled && (voice.error || voice.listening || !voice.supported) && (
         <p role="status" className="mt-2 px-1 text-xs leading-5 text-on-surface-variant">
           {voice.error || (voice.listening ? "Đang nghe tiếng Việt… Nhấn dừng, kiểm tra nội dung rồi gửi." : "Trình duyệt chưa hỗ trợ giọng nói. Bạn vẫn có thể nhập bằng bàn phím.")}

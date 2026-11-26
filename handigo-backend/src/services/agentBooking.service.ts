@@ -34,7 +34,7 @@ function bookingView(order: Pick<IOrder, "_id" | "orderCode" | "status" | "booki
 }
 
 type PriceArguments = Pick<CreateOrderPayload, "serviceId" | "selectedOptions" | "uniformQuantity">;
-type BookingArguments = PriceArguments & Pick<CreateOrderPayload, "addressId" | "recipientPhone" | "paymentMethod" | "problemDescription" | "customerAttachments" | "voucherCode" | "preferredProviderId"> & {
+type BookingArguments = PriceArguments & Pick<CreateOrderPayload, "addressId" | "recipientPhone" | "recipientName" | "paymentMethod" | "problemDescription" | "customerAttachments" | "voucherCode" | "preferredProviderId"> & {
   orderType: "normal" | "scheduled";
   saveAddressToBook?: boolean;
   scheduledAt?: string;
@@ -277,7 +277,7 @@ export const AgentBookingService = {
       ...(quantityPrice ? { unitPrice: quantityPrice.price, quantity: quantityPrice.quantity }
         : { options: price.options.map((option) => `${option.name} × ${option.quantity}: ${option.subtotal.toLocaleString("vi-VN")} đ`) }),
       address: bookingAddressLabel(address),
-      recipientName: address.recipientName, recipientPhone: args.recipientPhone ?? address.recipientPhone,
+      recipientName: args.recipientName ?? address.recipientName, recipientPhone: args.recipientPhone ?? address.recipientPhone,
       ...(draft?.id === args.addressId ? { addressNote: address.note } : {}),
       addressVersion: address.updatedAt.toISOString(),
       addressStorage: draft?.id === args.addressId
@@ -314,6 +314,10 @@ export const AgentBookingService = {
     return order ? bookingView(order) : null;
   },
   async getBooking(userId: string, orderId: string) {
+    // Agent khách hàng không được kế thừa quyền xem đơn từ Provider Profile còn lưu.
+    const ownership = await Order.findOne({ _id: orderId, isDeleted: false }).select("customerId").lean();
+    if (!ownership) throw new AppError("Đơn hàng không tồn tại.", 404);
+    if (String(ownership.customerId) !== userId) throw new AppError("Bạn không có quyền xem đơn hàng này.", 403);
     const order = await OrderService.getOrderById(orderId, userId);
     return bookingView(order);
   },

@@ -17,8 +17,9 @@ export type AgentInput = { requestId: string } & (
 );
 export type AgentPolicyConsent = { accepted: true; version: string };
 export type AgentBookingAction =
+  | { type: "plan"; plan: { action: "next" | "skip" | "defer" | "pause" | "resume" | "cancel"; planId: string; revision: number; itemId?: string } }
   | { type: "update"; revision: number; patch: { mode?: "update" | "pause" | "discard" | "resume"; quantity?: number;
-      selectedOptions?: Array<{ optionId: string; quantity: number }>; addressId?: string; recipientPhone?: string | null; paymentMethod?: "bank" | "wallet" | "cash";
+      selectedOptions?: Array<{ optionId: string; quantity: number }>; addressId?: string; recipientPhone?: string | null; recipientName?: string | null; paymentMethod?: "bank" | "wallet" | "cash";
       orderType?: "normal" | "scheduled"; scheduledAt?: string | null; preferredProviderId?: string | null; saveAddressToBook?: boolean; voucherCode?: string | null } }
   | { type: "rebook_decision"; proposalId: string; accept: boolean }
   | { type: "restore_draft"; backupId: string }
@@ -45,6 +46,7 @@ export interface AgentBookingValues {
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
   addressId?: string;
   recipientPhone?: string;
+  recipientName?: string;
   orderType?: "normal" | "scheduled";
   scheduledAt?: string;
   paymentMethod?: "bank" | "wallet" | "cash";
@@ -54,6 +56,8 @@ export interface AgentBookingValues {
   preferredProviderId?: string;
 }
 export interface AgentSession {
+  bookingPlan?: { id: string; revision: number; status: "active" | "paused" | "completed" | "cancelled"; activeItemId?: string; note: string;
+    items: Array<{ id: string; label: string; status: "queued" | "active" | "blocked" | "created" | "skipped"; orderId?: string; orderCode?: string }> } | null;
   retryableStep?: { tool: string } | null;
   rebookProposal?: { id: string } | null;
   draftBackup?: { id: string } | null;
@@ -96,6 +100,9 @@ export interface AgentPayment {
   method?: string;
   checkoutUrl?: string;
   paymentId?: string;
+  paymentType?: "full" | "inspection_deposit" | "remaining";
+  quotationId?: string;
+  quotationRevision?: number;
 }
 
 export interface AgentProgress {

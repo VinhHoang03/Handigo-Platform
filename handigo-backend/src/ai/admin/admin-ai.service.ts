@@ -10,7 +10,7 @@ import { AdminAIConfig, AdminAIConfigHistory, AdminAIAssessment, AdminAIQuota } 
 import { FEATURES, RETIRED_FEATURES, policySchema, type AdminAIFeature, type RunInput, type AIOutput, type CriterionResult } from "./admin-ai.validation";
 import { adminAIConfig, generateAdminAI, prepareComplaintResolution } from "./admin-ai.provider";
 import { loadContext, sourceModel, type SourceRow } from "./admin-ai.context";
-import { evaluateCriteria, allRequiredPassed, normalizeServiceName, incompleteApplicationReasons } from "./admin-ai.criteria";
+import { evaluateCriteria, allRequiredPassed, normalizeServiceName, incompleteApplicationReasons, applicationImagesPassed } from "./admin-ai.criteria";
 import { applyComplaintAssessment } from "./admin-ai.complaint";
 
 const reviewableStatuses: Record<string, string[]> = {
@@ -161,6 +161,7 @@ async function guardAndComplete(job: Job, session: ClientSession, output: AIOutp
     }
   } else if (applying && ["provider_application", "service_suggestion"].includes(job.feature)) {
     if (job.feature === "provider_application" && context.row && incompleteApplicationReasons(context.row).length) throw new AppError("Hồ sơ còn thiếu mô tả hoặc ảnh giấy tờ, chưa thể tự duyệt.", 409);
+    if (job.feature === "provider_application" && context.row && !applicationImagesPassed(context.row, output)) throw new AppError("Ảnh hồ sơ chưa được phân tích đầy đủ và nhất quán. Cần Admin kiểm tra.", 409);
     const latestChecks = [...evaluateCriteria(policySchema.parse(job.policy), context.row), ...output.checks];
     if (!allRequiredPassed(policySchema.parse(job.policy), latestChecks, output)) throw new AppError("Hồ sơ không còn đạt đầy đủ tiêu chí.", 409);
   }
@@ -181,7 +182,7 @@ async function applyResult(job: Job, row: SourceRow | null, output: AIOutput, ch
       }, { assessmentId: String(job._id), beforeWrite: session => guardAndComplete(job, session, output, checks, "auto_rejected") });
       return null;
     }
-    if (!row || !["pending", "resubmitted"].includes(row.status || "") || incompleteApplicationReasons(row).length || !(row.serviceIds as unknown[] || []).length || !catalogComplete || !policy.applicationTypes.includes((row.applicationType || "initial") as "initial" | "service_addition") || !allRequiredPassed(policy, checks, output)) return { status: "manual", outcome: "manual_review" };
+    if (!row || !["pending", "resubmitted"].includes(row.status || "") || incompleteApplicationReasons(row).length || !applicationImagesPassed(row, output) || !(row.serviceIds as unknown[] || []).length || !catalogComplete || !policy.applicationTypes.includes((row.applicationType || "initial") as "initial" | "service_addition") || !allRequiredPassed(policy, checks, output)) return { status: "manual", outcome: "manual_review" };
     await reviewApplication(String(job.configuredBy), job.sourceId, { status: "approved" }, { assessmentId: String(job._id), beforeWrite: session => guardAndComplete(job, session, output, checks, "auto_approved") });
     return null;
   }
